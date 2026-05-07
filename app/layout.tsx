@@ -3,9 +3,9 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
 const instrumentSerif = Instrument_Serif({
   weight: "400",
@@ -27,7 +27,13 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, geist.variable, instrumentSerif.variable, "font-sans")}
+      className={cn(
+        "antialiased",
+        fontMono.variable,
+        geist.variable,
+        instrumentSerif.variable,
+        "font-sans"
+      )}
     >
       <body>
         <ThemeProvider>
