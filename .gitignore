@@ -37,3 +37,6 @@ next-env.d.ts
 
 # screenshots
 /.screenshots/*.png
+
+# dev-loop runtime artifacts
+/.dev-loop/
