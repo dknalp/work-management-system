@@ -5,6 +5,7 @@ import { WelcomeBanner } from "@/components/dashboard/welcome-banner"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { UpcomingTasks } from "@/components/dashboard/upcoming-tasks"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
+import { MyDay } from "@/components/dashboard/my-day"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
 export default function Page() {
@@ -27,6 +28,9 @@ export default function Page() {
 
             {/* KPI Stats row */}
             <StatsCards />
+
+            {/* My Day — personal task overview */}
+            <MyDay />
 
             {/* Bottom two-column row */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
