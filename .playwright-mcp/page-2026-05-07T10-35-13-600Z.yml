@@ -1,0 +1,406 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "WorkOS" [ref=e9] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e11]
+            - generic [ref=e14]: WorkOS
+      - generic [ref=e15]:
+        - list [ref=e18]:
+          - listitem [ref=e19]:
+            - link "Analytics" [ref=e20] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e21]
+              - generic [ref=e26]: Analytics
+          - listitem [ref=e27]:
+            - link "Pipeline board view" [ref=e28] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e29]
+              - generic [ref=e30]: Pipeline board view
+          - listitem [ref=e31]:
+            - link "Tasks" [ref=e32] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e33]
+              - generic [ref=e36]: Tasks
+          - listitem [ref=e37]:
+            - link "Calendar" [ref=e38] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e39]
+              - generic [ref=e41]: Calendar
+          - listitem [ref=e42]:
+            - link "Files" [ref=e43] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e44]
+              - generic [ref=e46]: Files
+          - listitem [ref=e47]:
+            - link "Team" [ref=e48] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e49]
+              - generic [ref=e54]: Team
+        - list [ref=e57]:
+          - listitem [ref=e58]:
+            - link "Settings" [ref=e59] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e60]
+              - generic [ref=e63]: Settings
+      - list [ref=e65]:
+        - listitem [ref=e66]:
+          - button "CN Alex Johnson alex@workos.com" [ref=e67]:
+            - generic [ref=e69]: CN
+            - generic [ref=e70]:
+              - generic [ref=e71]: Alex Johnson
+              - generic [ref=e72]: alex@workos.com
+            - img [ref=e73]
+    - main [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - button "Toggle Sidebar" [ref=e81]:
+            - img
+            - generic [ref=e82]: Toggle Sidebar
+          - generic [ref=e83]: Dashboard
+        - generic [ref=e85]:
+          - img
+          - textbox "Global search" [ref=e86]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e87]:
+          - button "Notifications" [ref=e89]:
+            - img
+          - button "Create New" [ref=e90]:
+            - img
+            - generic [ref=e91]: Create New
+      - main [ref=e92]:
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - heading "Tasks" [level=1] [ref=e97]
+              - paragraph [ref=e98]: 12 total tasks
+            - button "Add Task" [ref=e99]:
+              - img
+              - text: Add Task
+          - generic [ref=e101]:
+            - generic [ref=e102]:
+              - img
+              - textbox "Search tasks..." [ref=e103]
+            - button "Status" [ref=e104]:
+              - img
+              - text: Status
+            - button "Priority" [ref=e105]:
+              - img
+              - text: Priority
+          - table [ref=e108]:
+            - rowgroup [ref=e109]:
+              - row "Select all ID Title Status Priority Assignee Due Date Tags" [ref=e110]:
+                - columnheader "Select all" [ref=e111]:
+                  - checkbox "Select all" [ref=e112]
+                  - checkbox
+                - columnheader "ID" [ref=e113]:
+                  - button "ID" [ref=e114]:
+                    - text: ID
+                    - img
+                - columnheader "Title" [ref=e115]:
+                  - button "Title" [ref=e116]:
+                    - text: Title
+                    - img
+                - columnheader "Status" [ref=e117]:
+                  - button "Status" [ref=e118]:
+                    - text: Status
+                    - img
+                - columnheader "Priority" [ref=e119]:
+                  - button "Priority" [ref=e120]:
+                    - text: Priority
+                    - img
+                - columnheader "Assignee" [ref=e121]:
+                  - button "Assignee" [ref=e122]:
+                    - text: Assignee
+                    - img
+                - columnheader "Due Date" [ref=e123]:
+                  - button "Due Date" [ref=e124]:
+                    - text: Due Date
+                    - img
+                - columnheader "Tags" [ref=e125]
+                - columnheader [ref=e126]
+            - rowgroup [ref=e127]:
+              - row "Select row TASK-001 Redesign onboarding flow for new users In Progress High AJ Alex Johnson May 10, 2026 design ux Open menu" [ref=e128]:
+                - cell "Select row" [ref=e129]:
+                  - checkbox "Select row" [ref=e130]
+                  - checkbox
+                - cell "TASK-001" [ref=e131]
+                - cell "Redesign onboarding flow for new users" [ref=e132]:
+                  - generic [ref=e133]: Redesign onboarding flow for new users
+                - cell "In Progress" [ref=e134]:
+                  - generic [ref=e135]:
+                    - img
+                    - text: In Progress
+                - cell "High" [ref=e136]:
+                  - generic [ref=e137]: High
+                - cell "AJ Alex Johnson" [ref=e139]:
+                  - generic [ref=e140]:
+                    - generic [ref=e141]: AJ
+                    - generic [ref=e142]: Alex Johnson
+                - cell "May 10, 2026" [ref=e143]
+                - cell "design ux" [ref=e144]:
+                  - generic [ref=e145]:
+                    - generic [ref=e146]: design
+                    - generic [ref=e147]: ux
+                - cell "Open menu" [ref=e148]:
+                  - button "Open menu" [ref=e149]:
+                    - img
+                    - generic [ref=e150]: Open menu
+              - row "Select row TASK-002 Implement JWT refresh token mechanism Todo High SC Sarah Chen May 8, 2026 backend security Open menu" [ref=e151]:
+                - cell "Select row" [ref=e152]:
+                  - checkbox "Select row" [ref=e153]
+                  - checkbox
+                - cell "TASK-002" [ref=e154]
+                - cell "Implement JWT refresh token mechanism" [ref=e155]:
+                  - generic [ref=e156]: Implement JWT refresh token mechanism
+                - cell "Todo" [ref=e157]:
+                  - generic [ref=e158]:
+                    - img
+                    - text: Todo
+                - cell "High" [ref=e159]:
+                  - generic [ref=e160]: High
+                - cell "SC Sarah Chen" [ref=e162]:
+                  - generic [ref=e163]:
+                    - generic [ref=e164]: SC
+                    - generic [ref=e165]: Sarah Chen
+                - cell "May 8, 2026" [ref=e166]
+                - cell "backend security" [ref=e167]:
+                  - generic [ref=e168]:
+                    - generic [ref=e169]: backend
+                    - generic [ref=e170]: security
+                - cell "Open menu" [ref=e171]:
+                  - button "Open menu" [ref=e172]:
+                    - img
+                    - generic [ref=e173]: Open menu
+              - row "Select row TASK-003 Write unit tests for payment module Todo Medium MW Marcus Webb May 15, 2026 testing backend Open menu" [ref=e174]:
+                - cell "Select row" [ref=e175]:
+                  - checkbox "Select row" [ref=e176]
+                  - checkbox
+                - cell "TASK-003" [ref=e177]
+                - cell "Write unit tests for payment module" [ref=e178]:
+                  - generic [ref=e179]: Write unit tests for payment module
+                - cell "Todo" [ref=e180]:
+                  - generic [ref=e181]:
+                    - img
+                    - text: Todo
+                - cell "Medium" [ref=e182]:
+                  - generic [ref=e183]: Medium
+                - cell "MW Marcus Webb" [ref=e185]:
+                  - generic [ref=e186]:
+                    - generic [ref=e187]: MW
+                    - generic [ref=e188]: Marcus Webb
+                - cell "May 15, 2026" [ref=e189]
+                - cell "testing backend" [ref=e190]:
+                  - generic [ref=e191]:
+                    - generic [ref=e192]: testing
+                    - generic [ref=e193]: backend
+                - cell "Open menu" [ref=e194]:
+                  - button "Open menu" [ref=e195]:
+                    - img
+                    - generic [ref=e196]: Open menu
+              - row "Select row TASK-004 Migrate database to PostgreSQL 16 In Progress High PN Priya Nair May 12, 2026 database devops Open menu" [ref=e197]:
+                - cell "Select row" [ref=e198]:
+                  - checkbox "Select row" [ref=e199]
+                  - checkbox
+                - cell "TASK-004" [ref=e200]
+                - cell "Migrate database to PostgreSQL 16" [ref=e201]:
+                  - generic [ref=e202]: Migrate database to PostgreSQL 16
+                - cell "In Progress" [ref=e203]:
+                  - generic [ref=e204]:
+                    - img
+                    - text: In Progress
+                - cell "High" [ref=e205]:
+                  - generic [ref=e206]: High
+                - cell "PN Priya Nair" [ref=e208]:
+                  - generic [ref=e209]:
+                    - generic [ref=e210]: PN
+                    - generic [ref=e211]: Priya Nair
+                - cell "May 12, 2026" [ref=e212]
+                - cell "database devops" [ref=e213]:
+                  - generic [ref=e214]:
+                    - generic [ref=e215]: database
+                    - generic [ref=e216]: devops
+                - cell "Open menu" [ref=e217]:
+                  - button "Open menu" [ref=e218]:
+                    - img
+                    - generic [ref=e219]: Open menu
+              - row "Select row TASK-005 Create reusable date-picker component Done Medium AJ Alex Johnson Apr 30, 2026 ui frontend Open menu" [ref=e220]:
+                - cell "Select row" [ref=e221]:
+                  - checkbox "Select row" [ref=e222]
+                  - checkbox
+                - cell "TASK-005" [ref=e223]
+                - cell "Create reusable date-picker component" [ref=e224]:
+                  - generic [ref=e225]: Create reusable date-picker component
+                - cell "Done" [ref=e226]:
+                  - generic [ref=e227]:
+                    - img
+                    - text: Done
+                - cell "Medium" [ref=e228]:
+                  - generic [ref=e229]: Medium
+                - cell "AJ Alex Johnson" [ref=e231]:
+                  - generic [ref=e232]:
+                    - generic [ref=e233]: AJ
+                    - generic [ref=e234]: Alex Johnson
+                - cell "Apr 30, 2026" [ref=e235]
+                - cell "ui frontend" [ref=e236]:
+                  - generic [ref=e237]:
+                    - generic [ref=e238]: ui
+                    - generic [ref=e239]: frontend
+                - cell "Open menu" [ref=e240]:
+                  - button "Open menu" [ref=e241]:
+                    - img
+                    - generic [ref=e242]: Open menu
+              - row "Select row TASK-006 Set up CI/CD pipeline with GitHub Actions Done High MW Marcus Webb Apr 28, 2026 devops ci-cd Open menu" [ref=e243]:
+                - cell "Select row" [ref=e244]:
+                  - checkbox "Select row" [ref=e245]
+                  - checkbox
+                - cell "TASK-006" [ref=e246]
+                - cell "Set up CI/CD pipeline with GitHub Actions" [ref=e247]:
+                  - generic [ref=e248]: Set up CI/CD pipeline with GitHub Actions
+                - cell "Done" [ref=e249]:
+                  - generic [ref=e250]:
+                    - img
+                    - text: Done
+                - cell "High" [ref=e251]:
+                  - generic [ref=e252]: High
+                - cell "MW Marcus Webb" [ref=e254]:
+                  - generic [ref=e255]:
+                    - generic [ref=e256]: MW
+                    - generic [ref=e257]: Marcus Webb
+                - cell "Apr 28, 2026" [ref=e258]
+                - cell "devops ci-cd" [ref=e259]:
+                  - generic [ref=e260]:
+                    - generic [ref=e261]: devops
+                    - generic [ref=e262]: ci-cd
+                - cell "Open menu" [ref=e263]:
+                  - button "Open menu" [ref=e264]:
+                    - img
+                    - generic [ref=e265]: Open menu
+              - row "Select row TASK-007 Add dark mode support to dashboard Todo Low SC Sarah Chen May 20, 2026 ui design Open menu" [ref=e266]:
+                - cell "Select row" [ref=e267]:
+                  - checkbox "Select row" [ref=e268]
+                  - checkbox
+                - cell "TASK-007" [ref=e269]
+                - cell "Add dark mode support to dashboard" [ref=e270]:
+                  - generic [ref=e271]: Add dark mode support to dashboard
+                - cell "Todo" [ref=e272]:
+                  - generic [ref=e273]:
+                    - img
+                    - text: Todo
+                - cell "Low" [ref=e274]:
+                  - generic [ref=e275]: Low
+                - cell "SC Sarah Chen" [ref=e277]:
+                  - generic [ref=e278]:
+                    - generic [ref=e279]: SC
+                    - generic [ref=e280]: Sarah Chen
+                - cell "May 20, 2026" [ref=e281]
+                - cell "ui design" [ref=e282]:
+                  - generic [ref=e283]:
+                    - generic [ref=e284]: ui
+                    - generic [ref=e285]: design
+                - cell "Open menu" [ref=e286]:
+                  - button "Open menu" [ref=e287]:
+                    - img
+                    - generic [ref=e288]: Open menu
+              - row "Select row TASK-008 Optimize image loading with lazy load Todo Medium PN Priya Nair May 18, 2026 performance frontend Open menu" [ref=e289]:
+                - cell "Select row" [ref=e290]:
+                  - checkbox "Select row" [ref=e291]
+                  - checkbox
+                - cell "TASK-008" [ref=e292]
+                - cell "Optimize image loading with lazy load" [ref=e293]:
+                  - generic [ref=e294]: Optimize image loading with lazy load
+                - cell "Todo" [ref=e295]:
+                  - generic [ref=e296]:
+                    - img
+                    - text: Todo
+                - cell "Medium" [ref=e297]:
+                  - generic [ref=e298]: Medium
+                - cell "PN Priya Nair" [ref=e300]:
+                  - generic [ref=e301]:
+                    - generic [ref=e302]: PN
+                    - generic [ref=e303]: Priya Nair
+                - cell "May 18, 2026" [ref=e304]
+                - cell "performance frontend" [ref=e305]:
+                  - generic [ref=e306]:
+                    - generic [ref=e307]: performance
+                    - generic [ref=e308]: frontend
+                - cell "Open menu" [ref=e309]:
+                  - button "Open menu" [ref=e310]:
+                    - img
+                    - generic [ref=e311]: Open menu
+              - row "Select row TASK-009 Integrate Stripe webhook handling In Progress High AJ Alex Johnson May 6, 2026 backend payments Open menu" [ref=e312]:
+                - cell "Select row" [ref=e313]:
+                  - checkbox "Select row" [ref=e314]
+                  - checkbox
+                - cell "TASK-009" [ref=e315]
+                - cell "Integrate Stripe webhook handling" [ref=e316]:
+                  - generic [ref=e317]: Integrate Stripe webhook handling
+                - cell "In Progress" [ref=e318]:
+                  - generic [ref=e319]:
+                    - img
+                    - text: In Progress
+                - cell "High" [ref=e320]:
+                  - generic [ref=e321]: High
+                - cell "AJ Alex Johnson" [ref=e323]:
+                  - generic [ref=e324]:
+                    - generic [ref=e325]: AJ
+                    - generic [ref=e326]: Alex Johnson
+                - cell "May 6, 2026" [ref=e327]
+                - cell "backend payments" [ref=e328]:
+                  - generic [ref=e329]:
+                    - generic [ref=e330]: backend
+                    - generic [ref=e331]: payments
+                - cell "Open menu" [ref=e332]:
+                  - button "Open menu" [ref=e333]:
+                    - img
+                    - generic [ref=e334]: Open menu
+              - row "Select row TASK-010 Audit and fix accessibility issues Todo Medium MW Marcus Webb May 22, 2026 a11y frontend Open menu" [ref=e335]:
+                - cell "Select row" [ref=e336]:
+                  - checkbox "Select row" [ref=e337]
+                  - checkbox
+                - cell "TASK-010" [ref=e338]
+                - cell "Audit and fix accessibility issues" [ref=e339]:
+                  - generic [ref=e340]: Audit and fix accessibility issues
+                - cell "Todo" [ref=e341]:
+                  - generic [ref=e342]:
+                    - img
+                    - text: Todo
+                - cell "Medium" [ref=e343]:
+                  - generic [ref=e344]: Medium
+                - cell "MW Marcus Webb" [ref=e346]:
+                  - generic [ref=e347]:
+                    - generic [ref=e348]: MW
+                    - generic [ref=e349]: Marcus Webb
+                - cell "May 22, 2026" [ref=e350]
+                - cell "a11y frontend" [ref=e351]:
+                  - generic [ref=e352]:
+                    - generic [ref=e353]: a11y
+                    - generic [ref=e354]: frontend
+                - cell "Open menu" [ref=e355]:
+                  - button "Open menu" [ref=e356]:
+                    - img
+                    - generic [ref=e357]: Open menu
+          - generic [ref=e358]:
+            - generic [ref=e360]: 12 row(s)
+            - generic [ref=e361]:
+              - generic [ref=e362]:
+                - generic [ref=e363]: Rows per page
+                - combobox "Rows per page" [ref=e364]:
+                  - img
+                - combobox [ref=e365]
+              - generic [ref=e366]: Page 1 of 2
+              - generic [ref=e367]:
+                - button [disabled]:
+                  - img
+                - button [disabled]:
+                  - img
+                - button [ref=e368]:
+                  - img
+                - button [ref=e369]:
+                  - img
+  - button "Open Next.js Dev Tools" [ref=e375] [cursor=pointer]:
+    - img [ref=e376]

@@ -1,0 +1,211 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "WorkOS" [ref=e9] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e11]
+            - generic [ref=e14]: WorkOS
+      - generic [ref=e15]:
+        - list [ref=e18]:
+          - listitem [ref=e19]:
+            - link "Analytics" [ref=e20] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e21]
+              - generic [ref=e26]: Analytics
+          - listitem [ref=e27]:
+            - link "Pipeline board view" [ref=e28] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e29]
+              - generic [ref=e30]: Pipeline board view
+          - listitem [ref=e31]:
+            - link "Tasks" [ref=e32] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e33]
+              - generic [ref=e36]: Tasks
+          - listitem [ref=e37]:
+            - link "Calendar" [ref=e38] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e39]
+              - generic [ref=e41]: Calendar
+          - listitem [ref=e42]:
+            - link "Files" [ref=e43] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e44]
+              - generic [ref=e46]: Files
+          - listitem [ref=e47]:
+            - link "Team" [ref=e48] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e49]
+              - generic [ref=e54]: Team
+        - list [ref=e57]:
+          - listitem [ref=e58]:
+            - link "Settings" [ref=e59] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e60]
+              - generic [ref=e63]: Settings
+      - list [ref=e65]:
+        - listitem [ref=e66]:
+          - button "CN Alex Johnson alex@workos.com" [ref=e67]:
+            - generic [ref=e69]: CN
+            - generic [ref=e70]:
+              - generic [ref=e71]: Alex Johnson
+              - generic [ref=e72]: alex@workos.com
+            - img [ref=e73]
+    - main [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - button "Toggle Sidebar" [ref=e81]:
+            - img
+            - generic [ref=e82]: Toggle Sidebar
+          - generic [ref=e83]: Dashboard
+        - generic [ref=e85]:
+          - img
+          - textbox "Global search" [ref=e86]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e87]:
+          - button "Notifications" [ref=e89]:
+            - img
+          - button "Create New" [ref=e90]:
+            - img
+            - generic [ref=e91]: Create New
+      - main [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]:
+            - heading "Pipeline board view" [level=2] [ref=e95]
+            - paragraph [ref=e96]: Manage your team's workflow and track progress.
+          - generic [ref=e97]:
+            - button "Share" [ref=e98]:
+              - img
+              - text: Share
+            - button "Customize" [ref=e99]:
+              - img
+              - text: Customize
+            - button "Add Column" [ref=e101]:
+              - img
+              - text: Add Column
+        - generic [ref=e103]:
+          - generic [ref=e104]:
+            - generic [ref=e105]:
+              - generic [ref=e106]:
+                - heading "To-Do" [level=3] [ref=e108]
+                - generic [ref=e109]: "3"
+              - generic [ref=e110]:
+                - button [ref=e111]:
+                  - img
+                - button [ref=e112]:
+                  - img
+            - generic [ref=e113]:
+              - button "high Ali'yi ara - Proje detaylarını konuş Müşteri Arama 2 1" [ref=e114]:
+                - generic [ref=e115]:
+                  - generic [ref=e117]: high
+                  - paragraph [ref=e118]: Ali'yi ara - Proje detaylarını konuş
+                  - generic [ref=e119]:
+                    - generic [ref=e120]: Müşteri
+                    - generic [ref=e121]: Arama
+                  - generic [ref=e123]:
+                    - generic [ref=e124]:
+                      - img [ref=e125]
+                      - generic [ref=e127]: "2"
+                    - generic [ref=e128]:
+                      - img [ref=e129]
+                      - generic [ref=e131]: "1"
+              - button "medium Yeni dashboard tasarımlarını incele Tasarım Analiz 2 1" [ref=e132]:
+                - generic [ref=e133]:
+                  - generic [ref=e135]: medium
+                  - paragraph [ref=e136]: Yeni dashboard tasarımlarını incele
+                  - generic [ref=e137]:
+                    - generic [ref=e138]: Tasarım
+                    - generic [ref=e139]: Analiz
+                  - generic [ref=e141]:
+                    - generic [ref=e142]:
+                      - img [ref=e143]
+                      - generic [ref=e145]: "2"
+                    - generic [ref=e146]:
+                      - img [ref=e147]
+                      - generic [ref=e149]: "1"
+              - button "low Dokümantasyon güncelleme Yazım 2 1" [ref=e150]:
+                - generic [ref=e151]:
+                  - generic [ref=e153]: low
+                  - paragraph [ref=e154]: Dokümantasyon güncelleme
+                  - generic [ref=e156]: Yazım
+                  - generic [ref=e158]:
+                    - generic [ref=e159]:
+                      - img [ref=e160]
+                      - generic [ref=e162]: "2"
+                    - generic [ref=e163]:
+                      - img [ref=e164]
+                      - generic [ref=e166]: "1"
+            - button "Add Card" [ref=e167]:
+              - img
+              - text: Add Card
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - generic [ref=e170]:
+                - heading "In Progress" [level=3] [ref=e172]
+                - generic [ref=e173]: "2"
+              - generic [ref=e174]:
+                - button [ref=e175]:
+                  - img
+                - button [ref=e176]:
+                  - img
+            - generic [ref=e177]:
+              - button "high Backend API entegrasyonu Geliştirme API 2 1" [ref=e178]:
+                - generic [ref=e179]:
+                  - generic [ref=e181]: high
+                  - paragraph [ref=e182]: Backend API entegrasyonu
+                  - generic [ref=e183]:
+                    - generic [ref=e184]: Geliştirme
+                    - generic [ref=e185]: API
+                  - generic [ref=e187]:
+                    - generic [ref=e188]:
+                      - img [ref=e189]
+                      - generic [ref=e191]: "2"
+                    - generic [ref=e192]:
+                      - img [ref=e193]
+                      - generic [ref=e195]: "1"
+              - button "medium Dnd-kit kütüphanesi entegrasyonu Geliştirme 2 1" [ref=e196]:
+                - generic [ref=e197]:
+                  - generic [ref=e199]: medium
+                  - paragraph [ref=e200]: Dnd-kit kütüphanesi entegrasyonu
+                  - generic [ref=e202]: Geliştirme
+                  - generic [ref=e204]:
+                    - generic [ref=e205]:
+                      - img [ref=e206]
+                      - generic [ref=e208]: "2"
+                    - generic [ref=e209]:
+                      - img [ref=e210]
+                      - generic [ref=e212]: "1"
+            - button "Add Card" [ref=e213]:
+              - img
+              - text: Add Card
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e216]:
+                - heading "Completed" [level=3] [ref=e218]
+                - generic [ref=e219]: "1"
+              - generic [ref=e220]:
+                - button [ref=e221]:
+                  - img
+                - button [ref=e222]:
+                  - img
+            - button "low Logo revizyonu tamamlandı Tasarım 2 1" [ref=e224]:
+              - generic [ref=e225]:
+                - generic [ref=e227]: low
+                - paragraph [ref=e228]: Logo revizyonu tamamlandı
+                - generic [ref=e230]: Tasarım
+                - generic [ref=e232]:
+                  - generic [ref=e233]:
+                    - img [ref=e234]
+                    - generic [ref=e236]: "2"
+                  - generic [ref=e237]:
+                    - img [ref=e238]
+                    - generic [ref=e240]: "1"
+            - button "Add Card" [ref=e241]:
+              - img
+              - text: Add Card
+  - button "Open Next.js Dev Tools" [ref=e247] [cursor=pointer]:
+    - img [ref=e248]

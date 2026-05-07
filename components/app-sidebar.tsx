@@ -78,7 +78,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const navMainWithActive = data.navMain.map((item) => ({
     ...item,
-    isActive: pathname === item.url || (item.url !== "/dashboard" && pathname.startsWith(item.url)),
+    isActive:
+      pathname === item.url ||
+      (item.url !== "/dashboard" && pathname.startsWith(item.url)),
   }))
 
   const navSecondaryWithActive = data.navSecondary.map((item) => ({
@@ -96,7 +98,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:p-2!"
             >
               <a href="/dashboard" className="flex items-center gap-2.5">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm text-primary-foreground!">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground text-primary-foreground! shadow-sm">
                   <BriefcaseIcon className="size-4!" />
                 </div>
                 <span className="text-base font-semibold tracking-tight">

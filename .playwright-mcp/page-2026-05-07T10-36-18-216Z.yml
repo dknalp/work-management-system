@@ -1,0 +1,294 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "WorkOS" [ref=e9] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e11]
+            - generic [ref=e14]: WorkOS
+      - generic [ref=e15]:
+        - list [ref=e18]:
+          - listitem [ref=e19]:
+            - link "Analytics" [ref=e20] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e21]
+              - generic [ref=e26]: Analytics
+          - listitem [ref=e27]:
+            - link "Pipeline board view" [ref=e28] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e29]
+              - generic [ref=e30]: Pipeline board view
+          - listitem [ref=e31]:
+            - link "Tasks" [ref=e32] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e33]
+              - generic [ref=e36]: Tasks
+          - listitem [ref=e37]:
+            - link "Calendar" [ref=e38] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e39]
+              - generic [ref=e41]: Calendar
+          - listitem [ref=e42]:
+            - link "Files" [ref=e43] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e44]
+              - generic [ref=e46]: Files
+          - listitem [ref=e47]:
+            - link "Team" [ref=e48] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e49]
+              - generic [ref=e54]: Team
+        - list [ref=e57]:
+          - listitem [ref=e58]:
+            - link "Settings" [ref=e59] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e60]
+              - generic [ref=e63]: Settings
+      - list [ref=e65]:
+        - listitem [ref=e66]:
+          - button "CN Alex Johnson alex@workos.com" [ref=e67]:
+            - generic [ref=e69]: CN
+            - generic [ref=e70]:
+              - generic [ref=e71]: Alex Johnson
+              - generic [ref=e72]: alex@workos.com
+            - img [ref=e73]
+    - main [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - button "Toggle Sidebar" [ref=e81]:
+            - img
+            - generic [ref=e82]: Toggle Sidebar
+          - generic [ref=e83]: Dashboard
+        - generic [ref=e85]:
+          - img
+          - textbox "Global search" [ref=e86]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e87]:
+          - button "Notifications" [ref=e89]:
+            - img
+          - button "Create New" [ref=e90]:
+            - img
+            - generic [ref=e91]: Create New
+      - main [ref=e92]:
+        - generic [ref=e93]:
+          - complementary [ref=e94]:
+            - generic [ref=e95]:
+              - img
+              - textbox "Search events..." [ref=e96]
+            - generic [ref=e97]:
+              - heading "My Calendars" [level=3] [ref=e98]
+              - generic [ref=e99]:
+                - generic [ref=e102] [cursor=pointer]: Team Events
+                - generic [ref=e105] [cursor=pointer]: Personal Tasks
+                - generic [ref=e108] [cursor=pointer]: Deadlines
+                - generic [ref=e111] [cursor=pointer]: Research
+                - generic [ref=e114] [cursor=pointer]: Partners
+            - paragraph [ref=e118]: "Tip: Click any day to see its events. Click the + icon on a day to quickly add a new event."
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e123]:
+                - heading "May 2026" [level=2] [ref=e124]
+                - generic [ref=e125]:
+                  - button "Previous month" [ref=e126]:
+                    - img
+                  - button "Today" [ref=e127]
+                  - button "Next month" [ref=e128]:
+                    - img
+              - button "Add Event" [ref=e129]:
+                - img
+                - text: Add Event
+            - generic [ref=e130]:
+              - generic [ref=e131]: Sun
+              - generic [ref=e132]: Mon
+              - generic [ref=e133]: Tue
+              - generic [ref=e134]: Wed
+              - generic [ref=e135]: Thu
+              - generic [ref=e136]: Fri
+              - generic [ref=e137]: Sat
+            - generic [ref=e138]:
+              - generic [ref=e141] [cursor=pointer]: "26"
+              - generic [ref=e144] [cursor=pointer]: "27"
+              - generic [ref=e145] [cursor=pointer]:
+                - generic [ref=e147]: "28"
+                - generic "Q2 Strategy Session · 13:00–15:00" [ref=e149]:
+                  - generic [ref=e151]: Q2 Strategy Session
+              - generic [ref=e154] [cursor=pointer]: "29"
+              - generic [ref=e157] [cursor=pointer]: "30"
+              - generic [ref=e158] [cursor=pointer]:
+                - generic [ref=e159]:
+                  - generic [ref=e160]: "1"
+                  - button "Add event" [ref=e161]:
+                    - img [ref=e162]
+                - generic [ref=e163]:
+                  - generic "Project Kickoff · 09:00–10:00" [ref=e164]:
+                    - generic [ref=e166]: Project Kickoff
+                  - generic "Design Review · 14:00–15:30" [ref=e167]:
+                    - generic [ref=e169]: Design Review
+              - generic [ref=e171] [cursor=pointer]:
+                - generic [ref=e172]: "2"
+                - button "Add event" [ref=e173]:
+                  - img [ref=e174]
+              - generic [ref=e176] [cursor=pointer]:
+                - generic [ref=e177]: "3"
+                - button "Add event" [ref=e178]:
+                  - img [ref=e179]
+              - generic [ref=e181] [cursor=pointer]:
+                - generic [ref=e182]: "4"
+                - button "Add event" [ref=e183]:
+                  - img [ref=e184]
+              - generic [ref=e185] [cursor=pointer]:
+                - generic [ref=e186]:
+                  - generic [ref=e187]: "5"
+                  - button "Add event" [ref=e188]:
+                    - img [ref=e189]
+                - generic "Client Call – Acme Corp · 11:00–11:45" [ref=e191]:
+                  - generic [ref=e193]: Client Call – Acme Corp
+              - generic [ref=e194] [cursor=pointer]:
+                - generic [ref=e195]:
+                  - generic [ref=e196]: "6"
+                  - button "Add event" [ref=e197]:
+                    - img [ref=e198]
+                - generic "Sprint Planning · 10:00–12:00" [ref=e200]:
+                  - generic [ref=e202]: Sprint Planning
+              - generic [ref=e204] [cursor=pointer]:
+                - generic [ref=e205]: "7"
+                - button "Add event" [ref=e206]:
+                  - img [ref=e207]
+              - generic [ref=e208] [cursor=pointer]:
+                - generic [ref=e209]:
+                  - generic [ref=e210]: "8"
+                  - button "Add event" [ref=e211]:
+                    - img [ref=e212]
+                - generic "API Integration Deadline · 17:00–17:30" [ref=e214]:
+                  - generic [ref=e216]: API Integration Deadline
+              - generic [ref=e218] [cursor=pointer]:
+                - generic [ref=e219]: "9"
+                - button "Add event" [ref=e220]:
+                  - img [ref=e221]
+              - generic [ref=e223] [cursor=pointer]:
+                - generic [ref=e224]: "10"
+                - button "Add event" [ref=e225]:
+                  - img [ref=e226]
+              - generic [ref=e228] [cursor=pointer]:
+                - generic [ref=e229]: "11"
+                - button "Add event" [ref=e230]:
+                  - img [ref=e231]
+              - generic [ref=e232] [cursor=pointer]:
+                - generic [ref=e233]:
+                  - generic [ref=e234]: "12"
+                  - button "Add event" [ref=e235]:
+                    - img [ref=e236]
+                - generic "Marketing Sync · 13:00–13:30" [ref=e238]:
+                  - generic [ref=e240]: Marketing Sync
+              - generic [ref=e242] [cursor=pointer]:
+                - generic [ref=e243]: "13"
+                - button "Add event" [ref=e244]:
+                  - img [ref=e245]
+              - generic [ref=e246] [cursor=pointer]:
+                - generic [ref=e247]:
+                  - generic [ref=e248]: "14"
+                  - button "Add event" [ref=e249]:
+                    - img [ref=e250]
+                - generic "User Research Session · 15:00–16:30" [ref=e252]:
+                  - generic [ref=e254]: User Research Session
+              - generic [ref=e255] [cursor=pointer]:
+                - generic [ref=e256]:
+                  - generic [ref=e257]: "15"
+                  - button "Add event" [ref=e258]:
+                    - img [ref=e259]
+                - generic "All-Hands Meeting · 09:00–10:30" [ref=e261]:
+                  - generic [ref=e263]: All-Hands Meeting
+              - generic [ref=e265] [cursor=pointer]:
+                - generic [ref=e266]: "16"
+                - button "Add event" [ref=e267]:
+                  - img [ref=e268]
+              - generic [ref=e270] [cursor=pointer]:
+                - generic [ref=e271]: "17"
+                - button "Add event" [ref=e272]:
+                  - img [ref=e273]
+              - generic [ref=e275] [cursor=pointer]:
+                - generic [ref=e276]: "18"
+                - button "Add event" [ref=e277]:
+                  - img [ref=e278]
+              - generic [ref=e279] [cursor=pointer]:
+                - generic [ref=e280]:
+                  - generic [ref=e281]: "19"
+                  - button "Add event" [ref=e282]:
+                    - img [ref=e283]
+                - generic "Infrastructure Review · 11:00–12:00" [ref=e285]:
+                  - generic [ref=e287]: Infrastructure Review
+              - generic [ref=e289] [cursor=pointer]:
+                - generic [ref=e290]: "20"
+                - button "Add event" [ref=e291]:
+                  - img [ref=e292]
+              - generic [ref=e294] [cursor=pointer]:
+                - generic [ref=e295]: "21"
+                - button "Add event" [ref=e296]:
+                  - img [ref=e297]
+              - generic [ref=e298] [cursor=pointer]:
+                - generic [ref=e299]:
+                  - generic [ref=e300]: "22"
+                  - button "Add event" [ref=e301]:
+                    - img [ref=e302]
+                - generic "Product Demo · 14:00–15:00" [ref=e304]:
+                  - generic [ref=e306]: Product Demo
+              - generic [ref=e308] [cursor=pointer]:
+                - generic [ref=e309]: "23"
+                - button "Add event" [ref=e310]:
+                  - img [ref=e311]
+              - generic [ref=e313] [cursor=pointer]:
+                - generic [ref=e314]: "24"
+                - button "Add event" [ref=e315]:
+                  - img [ref=e316]
+              - generic [ref=e318] [cursor=pointer]:
+                - generic [ref=e319]: "25"
+                - button "Add event" [ref=e320]:
+                  - img [ref=e321]
+              - generic [ref=e323] [cursor=pointer]:
+                - generic [ref=e324]: "26"
+                - button "Add event" [ref=e325]:
+                  - img [ref=e326]
+              - generic [ref=e327] [cursor=pointer]:
+                - generic [ref=e328]:
+                  - generic [ref=e329]: "27"
+                  - button "Add event" [ref=e330]:
+                    - img [ref=e331]
+                - generic "1:1 – Sarah · 10:00–10:30" [ref=e333]:
+                  - generic [ref=e335]: 1:1 – Sarah
+              - generic [ref=e337] [cursor=pointer]:
+                - generic [ref=e338]: "28"
+                - button "Add event" [ref=e339]:
+                  - img [ref=e340]
+              - generic [ref=e341] [cursor=pointer]:
+                - generic [ref=e342]:
+                  - generic [ref=e343]: "29"
+                  - button "Add event" [ref=e344]:
+                    - img [ref=e345]
+                - generic [ref=e346]:
+                  - generic "Release v2.4 · 08:00–09:00" [ref=e347]:
+                    - generic [ref=e349]: Release v2.4
+                  - generic "Retrospective · 15:00–16:00" [ref=e350]:
+                    - generic [ref=e352]: Retrospective
+              - generic [ref=e354] [cursor=pointer]:
+                - generic [ref=e355]: "30"
+                - button "Add event" [ref=e356]:
+                  - img [ref=e357]
+              - generic [ref=e359] [cursor=pointer]:
+                - generic [ref=e360]: "31"
+                - button "Add event" [ref=e361]:
+                  - img [ref=e362]
+              - generic [ref=e365] [cursor=pointer]: "1"
+              - generic [ref=e366] [cursor=pointer]:
+                - generic [ref=e368]: "2"
+                - generic "Partner Onboarding · 09:30–11:00" [ref=e370]:
+                  - generic [ref=e372]: Partner Onboarding
+              - generic [ref=e375] [cursor=pointer]: "3"
+              - generic [ref=e378] [cursor=pointer]: "4"
+              - generic [ref=e381] [cursor=pointer]: "5"
+              - generic [ref=e384] [cursor=pointer]: "6"
+    - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e390] [cursor=pointer]:
+    - img [ref=e391]

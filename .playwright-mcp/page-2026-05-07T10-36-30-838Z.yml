@@ -1,0 +1,270 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e5]:
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "WorkOS" [ref=e9] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e11]
+            - generic [ref=e14]: WorkOS
+      - generic [ref=e15]:
+        - list [ref=e18]:
+          - listitem [ref=e19]:
+            - link "Analytics" [ref=e20] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e21]
+              - generic [ref=e26]: Analytics
+          - listitem [ref=e27]:
+            - link "Pipeline board view" [ref=e28] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e29]
+              - generic [ref=e30]: Pipeline board view
+          - listitem [ref=e31]:
+            - link "Tasks" [ref=e32] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e33]
+              - generic [ref=e36]: Tasks
+          - listitem [ref=e37]:
+            - link "Calendar" [ref=e38] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e39]
+              - generic [ref=e41]: Calendar
+          - listitem [ref=e42]:
+            - link "Files" [ref=e43] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e44]
+              - generic [ref=e46]: Files
+          - listitem [ref=e47]:
+            - link "Team" [ref=e48] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e49]
+              - generic [ref=e54]: Team
+        - list [ref=e57]:
+          - listitem [ref=e58]:
+            - link "Settings" [ref=e59] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e60]
+              - generic [ref=e63]: Settings
+      - list [ref=e65]:
+        - listitem [ref=e66]:
+          - button "CN Alex Johnson alex@workos.com" [ref=e67]:
+            - generic [ref=e69]: CN
+            - generic [ref=e70]:
+              - generic [ref=e71]: Alex Johnson
+              - generic [ref=e72]: alex@workos.com
+            - img [ref=e73]
+    - main [ref=e77]:
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - button "Toggle Sidebar" [ref=e81]:
+            - img
+            - generic [ref=e82]: Toggle Sidebar
+          - generic [ref=e83]: Dashboard
+        - generic [ref=e85]:
+          - img
+          - textbox "Global search" [ref=e86]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e87]:
+          - button "Notifications" [ref=e89]:
+            - img
+          - button "Create New" [ref=e90]:
+            - img
+            - generic [ref=e91]: Create New
+      - main [ref=e92]:
+        - generic [ref=e93]:
+          - generic [ref=e94]:
+            - heading "Team" [level=1] [ref=e95]
+            - paragraph [ref=e96]: Manage your team members, roles and departments.
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - img [ref=e100]
+              - generic [ref=e105]:
+                - paragraph [ref=e106]: "12"
+                - paragraph [ref=e107]: Total Members
+            - generic [ref=e109]:
+              - img [ref=e111]
+              - generic [ref=e115]:
+                - paragraph [ref=e116]: "8"
+                - paragraph [ref=e117]: Active Now
+            - generic [ref=e119]:
+              - img [ref=e121]
+              - generic [ref=e124]:
+                - paragraph [ref=e125]: "6"
+                - paragraph [ref=e126]: Departments
+          - generic [ref=e128]:
+            - generic [ref=e129]:
+              - generic [ref=e130]:
+                - img [ref=e131]
+                - textbox "Search members..." [ref=e134]
+              - combobox [ref=e135]:
+                - img
+              - combobox [ref=e136]
+            - generic [ref=e137]:
+              - generic [ref=e138]:
+                - button [ref=e139]:
+                  - img
+                - button [ref=e140]:
+                  - img
+              - button "Add Member" [ref=e141]:
+                - img
+                - text: Add Member
+          - generic [ref=e142]:
+            - table [ref=e145]:
+              - rowgroup [ref=e146]:
+                - row "Member Email Department Status Joined" [ref=e147]:
+                  - columnheader "Member" [ref=e148]:
+                    - button "Member" [ref=e149]:
+                      - text: Member
+                      - img
+                  - columnheader "Email" [ref=e150]
+                  - columnheader "Department" [ref=e151]:
+                    - button "Department" [ref=e152]:
+                      - text: Department
+                      - img
+                  - columnheader "Status" [ref=e153]
+                  - columnheader "Joined" [ref=e154]:
+                    - button "Joined" [ref=e155]:
+                      - text: Joined
+                      - img
+                  - columnheader [ref=e156]
+              - rowgroup [ref=e157]:
+                - row "SC Sarah Chen Product Owner sarah.chen@worksync.io Product Active Mar 12, 2023" [ref=e158]:
+                  - cell "SC Sarah Chen Product Owner" [ref=e159]:
+                    - generic [ref=e160]:
+                      - generic [ref=e161]: SC
+                      - generic [ref=e162]:
+                        - paragraph [ref=e163]: Sarah Chen
+                        - paragraph [ref=e164]: Product Owner
+                  - cell "sarah.chen@worksync.io" [ref=e165]
+                  - cell "Product" [ref=e166]:
+                    - generic [ref=e167]: Product
+                  - cell "Active" [ref=e168]:
+                    - generic [ref=e169]: Active
+                  - cell "Mar 12, 2023" [ref=e171]
+                  - cell [ref=e172]:
+                    - button [ref=e174]:
+                      - img
+                - row "MR Michael Ross Senior Developer michael.ross@worksync.io Engineering Active Jun 27, 2022" [ref=e175]:
+                  - cell "MR Michael Ross Senior Developer" [ref=e176]:
+                    - generic [ref=e177]:
+                      - generic [ref=e178]: MR
+                      - generic [ref=e179]:
+                        - paragraph [ref=e180]: Michael Ross
+                        - paragraph [ref=e181]: Senior Developer
+                  - cell "michael.ross@worksync.io" [ref=e182]
+                  - cell "Engineering" [ref=e183]:
+                    - generic [ref=e184]: Engineering
+                  - cell "Active" [ref=e185]:
+                    - generic [ref=e186]: Active
+                  - cell "Jun 27, 2022" [ref=e188]
+                  - cell [ref=e189]:
+                    - button [ref=e191]:
+                      - img
+                - row "EW Emily Watson UI/UX Designer emily.watson@worksync.io Design Away Jan 8, 2024" [ref=e192]:
+                  - cell "EW Emily Watson UI/UX Designer" [ref=e193]:
+                    - generic [ref=e194]:
+                      - generic [ref=e195]: EW
+                      - generic [ref=e196]:
+                        - paragraph [ref=e197]: Emily Watson
+                        - paragraph [ref=e198]: UI/UX Designer
+                  - cell "emily.watson@worksync.io" [ref=e199]
+                  - cell "Design" [ref=e200]:
+                    - generic [ref=e201]: Design
+                  - cell "Away" [ref=e202]:
+                    - generic [ref=e203]: Away
+                  - cell "Jan 8, 2024" [ref=e205]
+                  - cell [ref=e206]:
+                    - button [ref=e208]:
+                      - img
+                - row "JN James Nakamura DevOps Engineer james.nakamura@worksync.io Engineering Active Nov 15, 2022" [ref=e209]:
+                  - cell "JN James Nakamura DevOps Engineer" [ref=e210]:
+                    - generic [ref=e211]:
+                      - generic [ref=e212]: JN
+                      - generic [ref=e213]:
+                        - paragraph [ref=e214]: James Nakamura
+                        - paragraph [ref=e215]: DevOps Engineer
+                  - cell "james.nakamura@worksync.io" [ref=e216]
+                  - cell "Engineering" [ref=e217]:
+                    - generic [ref=e218]: Engineering
+                  - cell "Active" [ref=e219]:
+                    - generic [ref=e220]: Active
+                  - cell "Nov 15, 2022" [ref=e222]
+                  - cell [ref=e223]:
+                    - button [ref=e225]:
+                      - img
+                - row "PS Priya Sharma Data Analyst priya.sharma@worksync.io Analytics Active Jul 20, 2023" [ref=e226]:
+                  - cell "PS Priya Sharma Data Analyst" [ref=e227]:
+                    - generic [ref=e228]:
+                      - generic [ref=e229]: PS
+                      - generic [ref=e230]:
+                        - paragraph [ref=e231]: Priya Sharma
+                        - paragraph [ref=e232]: Data Analyst
+                  - cell "priya.sharma@worksync.io" [ref=e233]
+                  - cell "Analytics" [ref=e234]:
+                    - generic [ref=e235]: Analytics
+                  - cell "Active" [ref=e236]:
+                    - generic [ref=e237]: Active
+                  - cell "Jul 20, 2023" [ref=e239]
+                  - cell [ref=e240]:
+                    - button [ref=e242]:
+                      - img
+                - row "LB Lucas Becker QA Engineer lucas.becker@worksync.io Engineering Offline Sep 5, 2023" [ref=e243]:
+                  - cell "LB Lucas Becker QA Engineer" [ref=e244]:
+                    - generic [ref=e245]:
+                      - generic [ref=e246]: LB
+                      - generic [ref=e247]:
+                        - paragraph [ref=e248]: Lucas Becker
+                        - paragraph [ref=e249]: QA Engineer
+                  - cell "lucas.becker@worksync.io" [ref=e250]
+                  - cell "Engineering" [ref=e251]:
+                    - generic [ref=e252]: Engineering
+                  - cell "Offline" [ref=e253]:
+                    - generic [ref=e254]: Offline
+                  - cell "Sep 5, 2023" [ref=e256]
+                  - cell [ref=e257]:
+                    - button [ref=e259]:
+                      - img
+                - row "OM Olivia Martínez Scrum Master olivia.martinez@worksync.io Product Active Dec 1, 2021" [ref=e260]:
+                  - cell "OM Olivia Martínez Scrum Master" [ref=e261]:
+                    - generic [ref=e262]:
+                      - generic [ref=e263]: OM
+                      - generic [ref=e264]:
+                        - paragraph [ref=e265]: Olivia Martínez
+                        - paragraph [ref=e266]: Scrum Master
+                  - cell "olivia.martinez@worksync.io" [ref=e267]
+                  - cell "Product" [ref=e268]:
+                    - generic [ref=e269]: Product
+                  - cell "Active" [ref=e270]:
+                    - generic [ref=e271]: Active
+                  - cell "Dec 1, 2021" [ref=e273]
+                  - cell [ref=e274]:
+                    - button [ref=e276]:
+                      - img
+                - row "EP Ethan Park Frontend Developer ethan.park@worksync.io Engineering Away Feb 19, 2024" [ref=e277]:
+                  - cell "EP Ethan Park Frontend Developer" [ref=e278]:
+                    - generic [ref=e279]:
+                      - generic [ref=e280]: EP
+                      - generic [ref=e281]:
+                        - paragraph [ref=e282]: Ethan Park
+                        - paragraph [ref=e283]: Frontend Developer
+                  - cell "ethan.park@worksync.io" [ref=e284]
+                  - cell "Engineering" [ref=e285]:
+                    - generic [ref=e286]: Engineering
+                  - cell "Away" [ref=e287]:
+                    - generic [ref=e288]: Away
+                  - cell "Feb 19, 2024" [ref=e290]
+                  - cell [ref=e291]:
+                    - button [ref=e293]:
+                      - img
+            - generic [ref=e294]:
+              - paragraph [ref=e295]: Showing 1–8 of 12 members
+              - generic [ref=e296]:
+                - button [disabled]:
+                  - img
+                - generic [ref=e297]: 1 / 2
+                - button [ref=e298]:
+                  - img
+  - button "Open Next.js Dev Tools" [ref=e304] [cursor=pointer]:
+    - img [ref=e305]

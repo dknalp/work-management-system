@@ -1,229 +1,389 @@
 "use client"
 
 import React, { useState } from "react"
-import { TeamMember } from "@/app/team/page"
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  ColumnDef,
+  ColumnFiltersState,
+  SortingState,
+  VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { 
-    PencilIcon, 
-    Trash2Icon,
-    ChevronDownIcon,
-    MailIcon,
-    AtSignIcon,
-    CalendarIcon,
-    BriefcaseIcon,
-    PhoneIcon,
-    LayoutDashboardIcon
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuTrigger,
-} from "@/components/ui/context-menu"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  MoreHorizontalIcon,
+  Pencil,
+  Trash2,
+  Mail,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ArrowUpDownIcon,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+import { TeamMember } from "@/app/team/page"
 
-interface TeamTableProps {
-    members: TeamMember[]
-    onEdit: (member: TeamMember) => void
-    onDelete: (id: string) => void
+const avatarColors = [
+  "bg-violet-500",
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-indigo-500",
+  "bg-cyan-500",
+  "bg-pink-500",
+  "bg-teal-500",
+]
+
+const statusConfig: Record<
+  TeamMember["status"],
+  { label: string; color: string; dot: string }
+> = {
+  active: {
+    label: "Active",
+    color:
+      "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    dot: "bg-emerald-500",
+  },
+  away: {
+    label: "Away",
+    color:
+      "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    dot: "bg-amber-500",
+  },
+  offline: {
+    label: "Offline",
+    color: "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/20",
+    dot: "bg-zinc-400",
+  },
 }
 
-const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-        case "active": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-        case "inactive": return "bg-slate-500/10 text-slate-600 border-slate-500/20"
-        case "banned": return "bg-rose-500/10 text-rose-600 border-rose-500/20"
-        case "pending": return "bg-amber-500/10 text-amber-600 border-amber-500/20"
-        case "suspended": return "bg-orange-500/10 text-orange-600 border-orange-500/20"
-        default: return "bg-slate-500/10 text-slate-600 border-slate-500/20"
-    }
+const departmentColors: Record<string, string> = {
+  Engineering:
+    "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  Product:
+    "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+  Design: "bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20",
+  Analytics:
+    "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
+  Marketing:
+    "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+  "Human Resources":
+    "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
+interface TeamTableProps {
+  members: TeamMember[]
+  onEdit: (member: TeamMember) => void
+  onDelete: (id: string) => void
 }
 
 export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
-    const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
+  const [rowSelection, setRowSelection] = useState({})
 
-    const toggleExpand = (id: string) => {
-        setExpandedId(expandedId === id ? null : id)
-    }
+  const columns: ColumnDef<TeamMember>[] = [
+    {
+      accessorKey: "name",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-3 h-8 gap-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Member
+          <ArrowUpDownIcon className="size-3" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const name = row.getValue("name") as string
+        const initials = name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+        const colorIndex = name.charCodeAt(0) % avatarColors.length
+        return (
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                "flex size-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ring-2 ring-background",
+                avatarColors[colorIndex]
+              )}
+            >
+              {initials}
+            </div>
+            <div>
+              <p className="text-sm leading-tight font-semibold">{name}</p>
+              <p className="text-xs leading-tight text-muted-foreground">
+                {row.original.role}
+              </p>
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: "email",
+      header: "Email",
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {row.getValue("email")}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "department",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-3 h-8 gap-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Department
+          <ArrowUpDownIcon className="size-3" />
+        </Button>
+      ),
+      cell: ({ row }) => {
+        const dept = row.getValue("department") as string
+        const colorClass =
+          departmentColors[dept] ??
+          "bg-muted/50 text-muted-foreground border-border/40"
+        return (
+          <Badge
+            variant="outline"
+            className={cn("border text-xs font-medium", colorClass)}
+          >
+            {dept}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as TeamMember["status"]
+        const cfg = statusConfig[status]
+        return (
+          <Badge
+            variant="outline"
+            className={cn("gap-1.5 border text-xs font-medium", cfg.color)}
+          >
+            <span className={cn("size-1.5 rounded-full", cfg.dot)} />
+            {cfg.label}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: "joinedAt",
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-3 h-8 gap-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        >
+          Joined
+          <ArrowUpDownIcon className="size-3" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {formatDate(row.getValue("joinedAt"))}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => {
+        const member = row.original
+        return (
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8">
+                  <MoreHorizontalIcon className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => onEdit(member)}>
+                  <Pencil className="mr-2 size-3.5" />
+                  Edit Member
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    window.open(`mailto:${member.email}`)
+                  }}
+                >
+                  <Mail className="mr-2 size-3.5" />
+                  Send Email
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => onDelete(member.id)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 size-3.5" />
+                  Remove Member
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
+      },
+    },
+  ]
 
-    return (
-        <div className="rounded-xl border border-border/50 bg-background/50 overflow-hidden shadow-sm">
-            <Table>
-                <TableHeader className="bg-muted/30">
-                    <TableRow className="hover:bg-transparent border-b border-border/50">
-                        <TableHead className="w-[40px] px-0"></TableHead>
-                        <TableHead className="w-[240px] text-[11px] font-bold uppercase tracking-wider px-6 text-muted-foreground/70">Full Name</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">Phone Number</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">Status</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">Role</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">Last Active</TableHead>
-                        <TableHead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 text-right pr-6">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {members.map((member) => {
-                        const isExpanded = expandedId === member.id
-                        return (
-                            <React.Fragment key={member.id}>
-                                <ContextMenu>
-                                    <ContextMenuTrigger asChild>
-                                        <TableRow 
-                                            className={cn(
-                                                "group cursor-pointer hover:bg-muted/20 transition-colors border-b border-border/40 last:border-0",
-                                                isExpanded && "bg-muted/30"
-                                            )}
-                                            onClick={() => toggleExpand(member.id)}
-                                        >
-                                            <TableCell className="px-0 py-3 text-center">
-                                                <ChevronDownIcon className={cn("size-4 text-muted-foreground/40 transition-transform duration-200", isExpanded && "rotate-180")} />
-                                            </TableCell>
-                                            <TableCell className="py-2.5 px-6">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="size-8 ring-1 ring-border">
-                                                        <AvatarImage src={member.avatar} />
-                                                        <AvatarFallback className="text-[10px]">{member.name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="text-sm font-semibold text-foreground/90">{member.name}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground font-medium">
-                                                {member.phone}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className={cn("text-[10px] font-bold uppercase tracking-tight h-5 px-2 rounded-full", getStatusColor(member.status))}>
-                                                    {member.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {member.role}
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground font-sans">
-                                                {member.lastActive}
-                                            </TableCell>
-                                            <TableCell className="text-right pr-6">
-                                                <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        className="size-8 text-muted-foreground/60 hover:text-primary hover:bg-primary/10 transition-colors"
-                                                        onClick={() => onEdit(member)}
-                                                    >
-                                                        <PencilIcon className="size-3.5" />
-                                                    </Button>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        className="size-8 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                                        onClick={() => onDelete(member.id)}
-                                                    >
-                                                        <Trash2Icon className="size-3.5" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    </ContextMenuTrigger>
-                                    <ContextMenuContent className="w-40">
-                                        <ContextMenuItem className="gap-2" onClick={() => onEdit(member)}>
-                                            <PencilIcon className="size-3.5" /> Edit Member
-                                        </ContextMenuItem>
-                                        <ContextMenuItem variant="destructive" className="gap-2" onClick={() => onDelete(member.id)}>
-                                            <Trash2Icon className="size-3.5" /> Delete Member
-                                        </ContextMenuItem>
-                                    </ContextMenuContent>
-                                </ContextMenu>
+  const table = useReactTable({
+    data: members,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
+    initialState: {
+      pagination: { pageSize: 8 },
+    },
+  })
 
-                                {/* Expanded Detail Box */}
-                                <TableRow className={cn(
-                                    "border-0 hover:bg-transparent overflow-hidden",
-                                    !isExpanded && "invisible"
-                                )}>
-                                    <TableCell colSpan={7} className={cn("p-0 border-0 transition-all duration-300", isExpanded ? "h-auto" : "h-0")}>
-                                        <div className={cn(
-                                            "grid transition-[grid-template-rows] duration-300 ease-out",
-                                            isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                                        )}>
-                                            <div className="overflow-hidden">
-                                                <div className="grid grid-cols-3 gap-6 bg-muted/10 p-6 border-b border-border/40 shadow-inner">
-                                                    <div className="space-y-4">
-                                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Contact Information</h4>
-                                                        <div className="space-y-3">
-                                                            <div className="flex items-center gap-3 text-sm text-foreground/80">
-                                                                <div className="size-8 rounded-lg bg-background flex items-center justify-center border border-border/50">
-                                                                    <MailIcon className="size-3.5 text-primary" />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Email Address</span>
-                                                                    <span>{member.email}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-3 text-sm text-foreground/80">
-                                                                <div className="size-8 rounded-lg bg-background flex items-center justify-center border border-border/50">
-                                                                    <AtSignIcon className="size-3.5 text-primary" />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Username</span>
-                                                                    <span className="font-mono text-xs">{member.username}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+  const totalRows = table.getFilteredRowModel().rows.length
+  const pageIndex = table.getState().pagination.pageIndex
+  const pageSize = table.getState().pagination.pageSize
+  const from = totalRows === 0 ? 0 : pageIndex * pageSize + 1
+  const to = Math.min((pageIndex + 1) * pageSize, totalRows)
 
-                                                    <div className="space-y-4 border-l border-border/30 pl-6">
-                                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Member Details</h4>
-                                                        <div className="space-y-3">
-                                                            <div className="flex items-center gap-3 text-sm text-foreground/80">
-                                                                <div className="size-8 rounded-lg bg-background flex items-center justify-center border border-border/50">
-                                                                    <CalendarIcon className="size-3.5 text-primary" />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Joined Date</span>
-                                                                    <span>{member.joinedDate}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-3 text-sm text-foreground/80">
-                                                                <div className="size-8 rounded-lg bg-background flex items-center justify-center border border-border/50">
-                                                                    <BriefcaseIcon className="size-3.5 text-primary" />
-                                                                </div>
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Position</span>
-                                                                    <span>{member.role}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow
+                key={headerGroup.id}
+                className="border-b border-border/40 hover:bg-transparent"
+              >
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="h-10 px-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="border-b border-border/20 transition-colors hover:bg-muted/30"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="px-4 py-3">
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center text-sm text-muted-foreground"
+                >
+                  No team members found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-                                                    <div className="space-y-4 border-l border-border/30 pl-6">
-                                                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Performance Summary</h4>
-                                                        <div className="bg-background/40 rounded-xl p-4 border border-border/50 flex items-center gap-4">
-                                                            <div className="size-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                                                                <LayoutDashboardIcon className="size-5 text-emerald-600" />
-                                                            </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="text-2xl font-bold tracking-tight">{member.tasksCompleted}</span>
-                                                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Tasks Finished</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            </React.Fragment>
-                        )
-                    })}
-                </TableBody>
-            </Table>
+      {/* Pagination */}
+      <div className="flex items-center justify-between px-1 text-sm text-muted-foreground">
+        <p>
+          {totalRows === 0
+            ? "No results"
+            : `Showing ${from}–${to} of ${totalRows} member${totalRows !== 1 ? "s" : ""}`}
+        </p>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-7 rounded-md"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronLeftIcon className="size-3.5" />
+          </Button>
+          <span className="px-2 text-xs tabular-nums">
+            {pageIndex + 1} / {table.getPageCount() || 1}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-7 rounded-md"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            <ChevronRightIcon className="size-3.5" />
+          </Button>
         </div>
-    )
+      </div>
+    </div>
+  )
 }

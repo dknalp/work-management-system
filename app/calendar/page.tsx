@@ -4,71 +4,87 @@ import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { CalendarGrid } from "@/components/calendar/calendar-grid"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { FilterIcon, SearchIcon, SlidersHorizontalIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { SearchIcon } from "lucide-react"
+import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
 
 export default function CalendarPage() {
-    return (
-        <SidebarProvider
-            style={
-                {
-                    "--sidebar-width": "calc(var(--spacing) * 64)",
-                    "--header-height": "calc(var(--spacing) * 14)",
-                } as React.CSSProperties
-            }
-        >
-            <AppSidebar variant="inset" />
-            <SidebarInset>
-                <SiteHeader />
-                <main className="flex flex-1 flex-col overflow-hidden bg-background">
-                    <div className="flex flex-1 gap-6 p-6 overflow-hidden">
-                        {/* Left Sidebar for Filters */}
-                        <div className="hidden lg:flex w-64 flex-col gap-6 shrink-0 overflow-y-auto pr-2 scrollbar-thin">
-                            <div className="space-y-4">
-                                <div className="relative">
-                                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                                    <Input placeholder="Search events..." className="pl-9 h-9 text-xs" />
-                                </div>
+  return (
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 64)",
+          "--header-height": "calc(var(--spacing) * 14)",
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+        <main className="flex flex-1 flex-col overflow-hidden bg-background">
+          <div className="flex min-h-0 flex-1 gap-5 overflow-hidden p-5">
+            {/* Left sidebar — filters & mini-info */}
+            <aside className="hidden w-56 shrink-0 flex-col gap-5 overflow-y-auto lg:flex">
+              {/* Search */}
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search events..."
+                  className="h-9 pl-9 text-xs"
+                />
+              </div>
 
-                                <div className="space-y-3">
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">My Calendars</h3>
-                                    <div className="space-y-2">
-                                        {["Team Events", "Personal Tasks", "Deadlines"].map((cal, i) => (
-                                            <div key={cal} className="flex items-center gap-2 group cursor-pointer">
-                                                <div className={cn(
-                                                    "size-3 rounded-sm border",
-                                                    i === 0 && "bg-blue-500/20 border-blue-500",
-                                                    i === 1 && "bg-orange-500/20 border-orange-500",
-                                                    i === 2 && "bg-rose-500/20 border-rose-500"
-                                                )} />
-                                                <span className="text-sm font-medium transition-colors group-hover:text-primary">{cal}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 border-t border-border">
-                                    <Card className="bg-primary/5 border-primary/10 shadow-none">
-                                        <CardContent className="p-4 space-y-3">
-                                            <p className="text-xs text-primary font-medium leading-relaxed">
-                                                Tip: Drag events to reschedule them instantly across the calendar.
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Main Calendar View */}
-                        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                            <CalendarGrid />
-                        </div>
+              {/* My Calendars */}
+              <div className="space-y-2.5">
+                <h3 className="px-0.5 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
+                  My Calendars
+                </h3>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Team Events", color: "bg-blue-500" },
+                    { label: "Personal Tasks", color: "bg-orange-500" },
+                    { label: "Deadlines", color: "bg-rose-500" },
+                    { label: "Research", color: "bg-violet-500" },
+                    { label: "Partners", color: "bg-emerald-500" },
+                  ].map(({ label, color }) => (
+                    <div
+                      key={label}
+                      className="group flex cursor-pointer items-center gap-2.5 rounded-md px-1 py-1 transition-colors hover:bg-muted/50"
+                    >
+                      <div className={cn("size-2.5 rounded-sm", color)} />
+                      <span className="text-sm font-medium text-foreground/80 transition-colors group-hover:text-foreground">
+                        {label}
+                      </span>
                     </div>
-                </main>
-            </SidebarInset>
-        </SidebarProvider>
-    )
+                  ))}
+                </div>
+              </div>
+
+              {/* Tip card */}
+              <div className="mt-auto">
+                <Card className="border-primary/10 bg-primary/5 shadow-none">
+                  <CardContent className="p-3.5">
+                    <p className="text-xs leading-relaxed font-medium text-primary/80">
+                      Tip: Click any day to see its events. Click the{" "}
+                      <span className="font-bold">+</span> icon on a day to
+                      quickly add a new event.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </aside>
+
+            {/* Main calendar area */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <CalendarGrid />
+            </div>
+          </div>
+        </main>
+      </SidebarInset>
+
+      {/* Toast notifications */}
+      <Toaster position="bottom-right" richColors />
+    </SidebarProvider>
+  )
 }
