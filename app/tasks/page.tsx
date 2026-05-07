@@ -1,11 +1,24 @@
-import React from "react"
+"use client"
+
+import React, { useState } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TaskTable } from "@/components/tasks/task-table"
-import { MOCK_TASKS } from "@/components/tasks/task-types"
+import { MOCK_TASKS, Task } from "@/components/tasks/task-types"
+import { TaskDetailModal } from "@/components/tasks/task-detail-modal"
+import { QuickAddTask } from "@/components/tasks/quick-add-task"
+import { toast } from "sonner"
 
 export default function TasksPage() {
+  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+
+  const handleAdd = (task: Task) => {
+    setTasks(prev => [task, ...prev])
+    toast.success("Task created", { description: task.title })
+  }
+
   return (
     <SidebarProvider
       style={
@@ -20,10 +33,33 @@ export default function TasksPage() {
         <SiteHeader />
         <main className="flex flex-1 flex-col overflow-auto bg-background">
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
-            <TaskTable initialData={MOCK_TASKS} />
+            <div className="mb-6">
+              <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
+              <p className="text-sm text-muted-foreground mt-1">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
+            </div>
+            <div className="mb-6">
+              <QuickAddTask onAdd={handleAdd} />
+            </div>
+            <TaskTable
+              initialData={tasks}
+              onRowClick={(task) => setSelectedTask(task)}
+            />
           </div>
         </main>
       </SidebarInset>
+      <TaskDetailModal
+        task={selectedTask}
+        open={selectedTask !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTask(null)
+        }}
+        onTaskChange={(updated) => {
+          setTasks((prev) =>
+            prev.map((t) => (t.id === updated.id ? updated : t))
+          )
+          setSelectedTask(updated)
+        }}
+      />
     </SidebarProvider>
   )
 }

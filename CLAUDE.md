@@ -52,7 +52,11 @@ Next.js 16 App Router project. All routes live under `app/`, all reusable UI und
 
 **Drag and drop:** `@dnd-kit/core` + `@dnd-kit/sortable` used for the Kanban board and file drag interactions.
 
-**UI components:** shadcn/ui with `radix-nova` style, Tailwind CSS v4, CSS variables for theming. Add new shadcn components with `pnpm dlx shadcn add <component>`. Icons from `lucide-react`.
+**Generic reorderable table:** `components/data-table.tsx` is a standalone drag-to-reorder table (dnd-kit vertical sort) — distinct from the Tasks and Team tables which use `@tanstack/react-table`.
+
+**UI components:** shadcn/ui with `radix-nova` style, Tailwind CSS v4, CSS variables for theming. Add new shadcn components with `pnpm dlx shadcn add <component>`. Icons from `lucide-react`. Toasts via `sonner`. Drawers via `vaul`.
+
+**Design tokens:** `brand-style.md` in the project root documents the full color palette, typography, spacing, and component style rules derived from `app/globals.css`. All colors use `oklch`. Consult it before adding new colors or overriding tokens.
 
 **Path alias:** `@/*` maps to the project root (e.g. `@/components/ui/button`).
 

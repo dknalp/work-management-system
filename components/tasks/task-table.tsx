@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import {
   useReactTable,
   getCoreRowModel,
@@ -41,35 +41,27 @@ import {
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import { Task } from "./task-types"
 import { createColumns } from "./task-columns"
 import { TaskToolbar } from "./task-toolbar"
-import { AddTaskForm } from "./add-task-form"
-import { EditTaskDialog } from "./edit-task-dialog"
-import { Button as Btn } from "@/components/ui/button"
-import { PlusIcon } from "lucide-react"
 
 interface TaskTableProps {
   initialData: Task[]
+  onRowClick?: (task: Task) => void
 }
 
-export function TaskTable({ initialData }: TaskTableProps) {
+export function TaskTable({ initialData, onRowClick }: TaskTableProps) {
   const [tasks, setTasks] = useState<Task[]>(initialData)
+  useEffect(() => {
+    setTasks(initialData)
+  }, [initialData])
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [globalFilter, setGlobalFilter] = useState("")
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
-
-  const [addOpen, setAddOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
-
-  const handleEdit = useCallback((task: Task) => {
-    setEditingTask(task)
-    setEditOpen(true)
-  }, [])
 
   const handleDelete = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))
@@ -87,25 +79,9 @@ export function TaskTable({ initialData }: TaskTableProps) {
     )
   }, [rowSelection])
 
-  const handleAdd = useCallback((task: Task) => {
-    setTasks((prev) => [task, ...prev])
-    toast.success("Task created", {
-      description: `"${task.title}" has been added.`,
-    })
-  }, [])
-
-  const handleSave = useCallback((updatedTask: Task) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t))
-    )
-    toast.success("Task updated", {
-      description: `"${updatedTask.title}" has been saved.`,
-    })
-  }, [])
-
   const columns = useMemo(
-    () => createColumns(handleEdit, handleDelete),
-    [handleEdit, handleDelete]
+    () => createColumns(handleDelete),
+    [handleDelete]
   )
 
   const table = useReactTable({
@@ -146,20 +122,6 @@ export function TaskTable({ initialData }: TaskTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header: title + add button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {tasks.length} total task{tasks.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <Btn size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-          <PlusIcon className="size-4" />
-          Add Task
-        </Btn>
-      </div>
-
       {/* Toolbar */}
       <TaskToolbar
         table={table}
@@ -205,7 +167,11 @@ export function TaskTable({ initialData }: TaskTableProps) {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="border-border/40 transition-colors hover:bg-muted/30 data-[state=selected]:bg-primary/5"
+                  className={cn(
+                    "border-border/40 transition-colors hover:bg-muted/30 data-[state=selected]:bg-primary/5",
+                    onRowClick && "cursor-pointer"
+                  )}
+                  onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-3">
@@ -314,7 +280,7 @@ export function TaskTable({ initialData }: TaskTableProps) {
               variant="outline"
               size="icon"
               className="hidden size-8 sm:flex"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              onClick={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))}
               disabled={!table.getCanNextPage()}
             >
               <ChevronsRightIcon className="size-4" />
@@ -322,15 +288,6 @@ export function TaskTable({ initialData }: TaskTableProps) {
           </div>
         </div>
       </div>
-
-      {/* Dialogs */}
-      <AddTaskForm open={addOpen} onOpenChange={setAddOpen} onAdd={handleAdd} />
-      <EditTaskDialog
-        task={editingTask}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        onSave={handleSave}
-      />
     </div>
   )
 }

@@ -4,7 +4,6 @@ import { ColumnDef, Column } from "@tanstack/react-table"
 import {
   ArrowUpDownIcon,
   MoreHorizontalIcon,
-  PencilIcon,
   Trash2Icon,
   CheckIcon,
   CircleDotIcon,
@@ -17,7 +16,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Task } from "./task-types"
@@ -93,7 +91,6 @@ const priorityConfig: Record<
 }
 
 export function createColumns(
-  onEdit: (task: Task) => void,
   onDelete: (id: string) => void
 ): ColumnDef<Task>[] {
   return [
@@ -270,14 +267,6 @@ export function createColumns(
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">
-            <DropdownMenuItem
-              className="cursor-pointer gap-2"
-              onClick={() => onEdit(row.original)}
-            >
-              <PencilIcon className="size-3.5" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
               className="cursor-pointer gap-2"

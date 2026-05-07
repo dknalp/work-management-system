@@ -1,6 +1,29 @@
 export type TaskStatus = "todo" | "in-progress" | "done"
 export type TaskPriority = "low" | "medium" | "high"
 
+export type SubTask = {
+  id: string
+  title: string
+  completed: boolean
+}
+
+export type Reply = {
+  id: string
+  authorName: string
+  authorAvatar?: string
+  body: string
+  createdAt: string
+}
+
+export type Comment = {
+  id: string
+  authorName: string
+  authorAvatar?: string
+  body: string
+  createdAt: string
+  replies?: Reply[]
+}
+
 export type Task = {
   id: string
   title: string
@@ -10,6 +33,9 @@ export type Task = {
   dueDate: string
   tags: string[]
   createdAt: string
+  subTasks?: SubTask[]
+  description?: string
+  comments?: Comment[]
 }
 
 export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
@@ -34,6 +60,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-10",
     tags: ["design", "ux"],
     createdAt: "2026-04-20",
+    subTasks: [],
   },
   {
     id: "TASK-002",
@@ -44,6 +71,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-08",
     tags: ["backend", "security"],
     createdAt: "2026-04-21",
+    subTasks: [],
   },
   {
     id: "TASK-003",
@@ -54,6 +82,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-15",
     tags: ["testing", "backend"],
     createdAt: "2026-04-22",
+    subTasks: [],
   },
   {
     id: "TASK-004",
@@ -64,6 +93,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-12",
     tags: ["database", "devops"],
     createdAt: "2026-04-18",
+    subTasks: [],
   },
   {
     id: "TASK-005",
@@ -74,6 +104,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-04-30",
     tags: ["ui", "frontend"],
     createdAt: "2026-04-15",
+    subTasks: [],
   },
   {
     id: "TASK-006",
@@ -84,6 +115,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-04-28",
     tags: ["devops", "ci-cd"],
     createdAt: "2026-04-14",
+    subTasks: [],
   },
   {
     id: "TASK-007",
@@ -94,6 +126,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-20",
     tags: ["ui", "design"],
     createdAt: "2026-04-23",
+    subTasks: [],
   },
   {
     id: "TASK-008",
@@ -104,6 +137,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-18",
     tags: ["performance", "frontend"],
     createdAt: "2026-04-24",
+    subTasks: [],
   },
   {
     id: "TASK-009",
@@ -114,6 +148,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-06",
     tags: ["backend", "payments"],
     createdAt: "2026-04-25",
+    subTasks: [],
   },
   {
     id: "TASK-010",
@@ -124,6 +159,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-22",
     tags: ["a11y", "frontend"],
     createdAt: "2026-04-26",
+    subTasks: [],
   },
   {
     id: "TASK-011",
@@ -134,6 +170,7 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-04-29",
     tags: ["documentation", "backend"],
     createdAt: "2026-04-16",
+    subTasks: [],
   },
   {
     id: "TASK-012",
@@ -144,5 +181,6 @@ export const MOCK_TASKS: Task[] = [
     dueDate: "2026-05-25",
     tags: ["backend", "realtime"],
     createdAt: "2026-04-27",
+    subTasks: [],
   },
 ]
