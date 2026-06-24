@@ -38,6 +38,12 @@ export type Task = {
   comments?: Comment[]
 }
 
+export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+]
+
 export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
   { value: "todo", label: "Todo" },
   { value: "in-progress", label: "In Progress" },

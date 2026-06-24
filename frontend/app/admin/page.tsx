@@ -1,254 +1,120 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { ShieldIcon, UserPlusIcon, LoaderIcon, CheckCircleIcon, XCircleIcon } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { apiClient } from "@/lib/api"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAuth } from "@/contexts/auth-context"
+import { useTasks } from "@/contexts/task-context"
+import { useTeam } from "@/contexts/team-context"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
-import { toast } from "sonner"
-
-type AdminUser = {
-  id: string
-  name: string
-  email: string
-  is_active: boolean
-  is_admin: boolean
-  created_at: string
-}
+import { ShieldIcon, UsersIcon, CheckSquareIcon, ActivityIcon } from "lucide-react"
+import { redirect } from "next/navigation"
 
 export default function AdminPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
+  const { user } = useAuth()
+  const { tasks, activity } = useTasks()
+  const { members } = useTeam()
 
-  const [users, setUsers] = useState<AdminUser[]>([])
-  const [usersLoading, setUsersLoading] = useState(true)
-
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [formLoading, setFormLoading] = useState(false)
-
-  useEffect(() => {
-    if (!loading && (!user || !user.is_admin)) {
-      router.replace("/dashboard")
-    }
-  }, [user, loading, router])
-
-  useEffect(() => {
-    if (!user?.is_admin) return
-    apiClient<AdminUser[]>("/admin/users")
-      .then(setUsers)
-      .catch(() => toast.error("Failed to load users"))
-      .finally(() => setUsersLoading(false))
-  }, [user])
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    setFormError(null)
-    setFormLoading(true)
-    try {
-      const newUser = await apiClient<AdminUser>("/admin/users", {
-        method: "POST",
-        body: JSON.stringify({ name, email, password, is_admin: isAdmin }),
-      })
-      setUsers((prev) => [newUser, ...prev])
-      setName("")
-      setEmail("")
-      setPassword("")
-      setIsAdmin(false)
-      toast.success(`User "${newUser.name}" created`)
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to create user")
-    } finally {
-      setFormLoading(false)
-    }
+  if (user && !user.is_admin) {
+    redirect("/dashboard")
   }
 
-  async function handleToggleActive(userId: string) {
-    try {
-      const updated = await apiClient<AdminUser>(`/admin/users/${userId}/toggle-active`, {
-        method: "PATCH",
-      })
-      setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)))
-      toast.success(`User ${updated.is_active ? "activated" : "deactivated"}`)
-    } catch {
-      toast.error("Failed to update user")
-    }
-  }
-
-  if (loading || !user?.is_admin) {
-    return null
+  const tasksByStatus = {
+    todo: tasks.filter((t) => t.status === "todo").length,
+    "in-progress": tasks.filter((t) => t.status === "in-progress").length,
+    done: tasks.filter((t) => t.status === "done").length,
   }
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "16rem",
-          "--header-height": "3.5rem",
-        } as React.CSSProperties
-      }
-    >
+    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
-        <main className="flex flex-col gap-6 p-6 lg:p-8">
-          {/* Page title */}
+        <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <ShieldIcon className="size-5" />
+              <ShieldIcon className="size-4" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Admin Panel</h1>
-              <p className="text-sm text-muted-foreground">Manage user accounts</p>
+              <h1 className="text-2xl font-semibold tracking-tight">Admin Panel</h1>
+              <p className="text-sm text-muted-foreground">Workspace overview and management.</p>
+            </div>
+            <Badge variant="outline" className="ml-auto border-primary/30 text-primary bg-primary/5">
+              Admin
+            </Badge>
+          </div>
+
+          {/* Stats grid */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: "Total Tasks", value: tasks.length, icon: CheckSquareIcon, color: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/40" },
+              { label: "Team Members", value: members.length, icon: UsersIcon, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40" },
+              { label: "In Progress", value: tasksByStatus["in-progress"], icon: ActivityIcon, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/40" },
+              { label: "Completed", value: tasksByStatus.done, icon: CheckSquareIcon, color: "text-violet-600 bg-violet-50 dark:text-violet-400 dark:bg-violet-950/40" },
+            ].map(({ label, value, icon: Icon, color }) => (
+              <div key={label} className="rounded-xl border border-border/60 bg-card p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                  <div className={`flex size-8 items-center justify-center rounded-lg ${color}`}>
+                    <Icon className="size-4" />
+                  </div>
+                </div>
+                <p className="mt-2 text-3xl font-bold tracking-tight">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Recent activity */}
+          <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+            <div className="border-b border-border/60 px-5 py-4">
+              <h2 className="text-sm font-semibold">Recent Activity</h2>
+            </div>
+            <div className="divide-y divide-border/40">
+              {activity.length === 0 ? (
+                <p className="px-5 py-8 text-center text-sm text-muted-foreground">No activity yet.</p>
+              ) : (
+                activity.slice(0, 15).map((entry) => (
+                  <div key={entry.id} className="flex items-start gap-3 px-5 py-3">
+                    <div className="mt-0.5 size-1.5 shrink-0 rounded-full bg-primary/60 mt-2" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground">{entry.message}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-            {/* Create user form */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <UserPlusIcon className="size-4" />
-                  Create User
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreate} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="admin-name">Full name</Label>
-                    <Input
-                      id="admin-name"
-                      required
-                      placeholder="Alex Johnson"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
+          {/* Team list */}
+          <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+            <div className="border-b border-border/60 px-5 py-4">
+              <h2 className="text-sm font-semibold">Team Members</h2>
+            </div>
+            <div className="divide-y divide-border/40">
+              {members.map((m) => {
+                const initials = m.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+                return (
+                  <div key={m.id} className="flex items-center gap-3 px-5 py-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{m.name}</p>
+                      <p className="text-xs text-muted-foreground">{m.role}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs capitalize">
+                      active
+                    </Badge>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="admin-email">Email</Label>
-                    <Input
-                      id="admin-email"
-                      type="email"
-                      required
-                      placeholder="user@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="admin-password">Password</Label>
-                    <Input
-                      id="admin-password"
-                      type="password"
-                      required
-                      minLength={8}
-                      placeholder="Min. 8 characters"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="admin-is-admin"
-                      checked={isAdmin}
-                      onCheckedChange={(v) => setIsAdmin(v === true)}
-                    />
-                    <Label htmlFor="admin-is-admin" className="cursor-pointer font-normal">
-                      Grant admin access
-                    </Label>
-                  </div>
-
-                  {formError && (
-                    <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                      {formError}
-                    </p>
-                  )}
-
-                  <Button type="submit" className="w-full" disabled={formLoading}>
-                    {formLoading && <LoaderIcon className="mr-2 size-4 animate-spin" />}
-                    Create account
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* User list */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">
-                  All Users
-                  {!usersLoading && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      ({users.length})
-                    </span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {usersLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <LoaderIcon className="size-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : users.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-muted-foreground">No users found</p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {users.map((u) => (
-                      <div key={u.id} className="flex items-center justify-between px-6 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium">{u.name}</span>
-                            {u.is_admin && (
-                              <Badge variant="secondary" className="shrink-0 text-xs">
-                                Admin
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="truncate text-xs text-muted-foreground">{u.email}</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-3 pl-4">
-                          {u.is_active ? (
-                            <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-                              <CheckCircleIcon className="size-3.5" />
-                              Active
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <XCircleIcon className="size-3.5" />
-                              Inactive
-                            </span>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => handleToggleActive(u.id)}
-                            disabled={u.id === user.id}
-                          >
-                            {u.is_active ? "Deactivate" : "Activate"}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                )
+              })}
+            </div>
           </div>
         </main>
       </SidebarInset>
     </SidebarProvider>
   )
-}
+}</content>
