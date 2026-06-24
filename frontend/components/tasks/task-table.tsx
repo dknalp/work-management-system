@@ -51,6 +51,7 @@ interface TaskTableProps {
   onRowClick?: (task: Task) => void
   onDelete?: (id: string) => void
   onDeleteMany?: (ids: string[]) => void
+  onStatusChange?: (id: string, status: TaskStatus) => void
 }
 
 export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany }: TaskTableProps) {
@@ -83,9 +84,17 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany }: T
     )
   }, [rowSelection, onDeleteMany])
 
+  const handleStatusChange = useCallback(
+    (id: string, status: TaskStatus) => {
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+      onStatusChange?.(id, status)
+    },
+    [onStatusChange]
+  )
+
   const columns = useMemo(
-    () => createColumns(handleDelete),
-    [handleDelete]
+    () => createColumns(handleDelete, handleStatusChange),
+    [handleDelete, handleStatusChange]
   )
 
   const table = useReactTable({

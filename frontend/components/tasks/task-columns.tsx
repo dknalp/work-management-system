@@ -84,7 +84,8 @@ const priorityConfig: Record<
 }
 
 export function createColumns(
-  onDelete: (id: string) => void
+  onDelete: (id: string) => void,
+  onStatusChange?: (id: string, status: TaskStatus) => void
 ): ColumnDef<Task>[] {
   return [
     {

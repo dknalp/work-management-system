@@ -46,6 +46,7 @@ export default function TasksPage() {
               onRowClick={(task) => setSelectedTask(task)}
               onDelete={deleteTask}
               onDeleteMany={deleteTasks}
+              onStatusChange={(id, status) => updateTask(id, { status })}
             />
           </div>
         </main>
