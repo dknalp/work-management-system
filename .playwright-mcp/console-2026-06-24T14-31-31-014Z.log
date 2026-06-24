@@ -122,3 +122,5 @@ Ecmascript file had an error
 the name `CommandPalette` is defined multiple times @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:3127
 [ 1964732ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
 [ 1964839ms] [LOG] [Fast Refresh] done in 66ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2003184ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2003211ms] [LOG] [Fast Refresh] done in 127ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
