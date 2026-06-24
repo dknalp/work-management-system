@@ -73,7 +73,6 @@ const navSecondary = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user } = useAuth()
-  const { user } = useAuth()
 
   const navMainWithActive = navMain.map((item) => ({
     ...item,

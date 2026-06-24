@@ -11,7 +11,14 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Task } from "./task-types"
+import { Task, TaskStatus, TASK_STATUSES } from "./task-types"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 
@@ -137,18 +144,47 @@ export function createColumns(
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} label="Status" />,
       cell: ({ row }) => {
-        const cfg = statusConfig[row.original.status]
+        const status = row.original.status
+        const cfg = statusConfig[status]
+        if (!onStatusChange) {
+          return (
+            <Badge
+              variant="outline"
+              className={cn("h-6 gap-1.5 px-2 text-xs font-medium", cfg.className)}
+            >
+              {cfg.icon}
+              {cfg.label}
+            </Badge>
+          )
+        }
         return (
-          <Badge
-            variant="outline"
-            className={cn(
-              "h-6 gap-1.5 px-2 text-xs font-medium",
-              cfg.className
-            )}
+          <Select
+            value={status}
+            onValueChange={(val) => onStatusChange(row.original.id, val as TaskStatus)}
           >
-            {cfg.icon}
-            {cfg.label}
-          </Badge>
+            <SelectTrigger
+              className={cn(
+                "h-7 w-auto gap-1 border px-2 py-0 text-xs font-medium focus:ring-0 focus:ring-offset-0",
+                cfg.className
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent onClick={(e) => e.stopPropagation()}>
+              {TASK_STATUSES.map((s) => {
+                const c = statusConfig[s.value]
+                return (
+                  <SelectItem key={s.value} value={s.value} className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      {c.icon}
+                      {c.label}
+                    </span>
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
         )
       },
       filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
