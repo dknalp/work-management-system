@@ -40,7 +40,7 @@ import {
   ArrowUpDownIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { TeamMember } from "@/app/team/page"
+import { TeamMember } from "@/contexts/team-context"
 
 const avatarColors = [
   "bg-violet-500",
