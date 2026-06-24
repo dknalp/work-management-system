@@ -1,7 +1,8 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback } from "react"
+import React, { createContext, useContext, useCallback } from "react"
 import { Task, MOCK_TASKS } from "@/components/tasks/task-types"
+import { useLocalStorage } from "@/lib/use-local-storage"
 
 export type ActivityType =
   | "task_created"
@@ -47,8 +48,8 @@ function makeActivity(
 }
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS)
-  const [activity, setActivity] = useState<ActivityEntry[]>([])
+  const [tasks, setTasks] = useLocalStorage<Task[]>("wms:tasks", MOCK_TASKS)
+  const [activity, setActivity] = useLocalStorage<ActivityEntry[]>("wms:activity", [])
 
   const pushActivity = useCallback((entry: ActivityEntry) => {
     setActivity((prev) => [entry, ...prev].slice(0, 50))

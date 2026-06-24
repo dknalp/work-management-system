@@ -49,10 +49,15 @@ export function SiteHeader() {
           <div className="relative w-full max-w-md">
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="h-9 w-full rounded-lg border-border bg-muted/50 pr-16 pl-9 text-sm placeholder:text-muted-foreground focus-visible:bg-background focus-visible:ring-1"
+              className="h-9 w-full cursor-pointer rounded-lg border-border bg-muted/50 pr-16 pl-9 text-sm placeholder:text-muted-foreground focus-visible:bg-background focus-visible:ring-1"
               placeholder="Search anything..."
               aria-label="Global search"
               readOnly
+              onClick={() => {
+                document.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true })
+                )
+              }}
             />
             <div className="pointer-events-none absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-1">
               <kbd className="inline-flex h-5 items-center gap-0.5 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground select-none">

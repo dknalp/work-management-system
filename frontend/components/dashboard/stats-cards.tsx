@@ -1,120 +1,84 @@
 "use client"
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card"
-import {
-  ClipboardListIcon,
-  UsersIcon,
-  TrendingUpIcon,
-  ArrowUpIcon,
-  AlertCircleIcon,
-  CheckCircleIcon,
-} from "lucide-react"
-import { useTasks } from "@/contexts/task-context"
-import { useTeam } from "@/contexts/team-context"
 import { useMemo } from "react"
+import { CheckCircle2, Clock, AlertCircle, ListTodo } from "lucide-react"
+import { useTasks } from "@/contexts/task-context"
+import { cn } from "@/lib/utils"
+import { isAfter, parseISO, startOfToday } from "date-fns"
 
 export function StatsCards() {
   const { tasks } = useTasks()
-  const { members } = useTeam()
 
-  const computed = useMemo(() => {
-    const now = new Date()
-    const todayStr = now.toISOString().slice(0, 10)
-    const totalTasks = tasks.length
-    const doneTasks = tasks.filter((t) => t.status === "done").length
-    const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
-    const overdueTasks = tasks.filter(
-      (t) => t.status !== "done" && t.dueDate && t.dueDate < todayStr
+  const stats = useMemo(() => {
+    const today = startOfToday()
+    const total = tasks.length
+    const done = tasks.filter((t) => t.status === "done").length
+    const inProgress = tasks.filter((t) => t.status === "in-progress").length
+    const overdue = tasks.filter(
+      (t) => t.status !== "done" && t.dueDate && isAfter(today, parseISO(t.dueDate))
     ).length
-    const dueTodayTasks = tasks.filter(
-      (t) => t.status !== "done" && t.dueDate === todayStr
-    ).length
-    const activeMembers = members.filter((m) => m.status === "active").length
-    return { totalTasks, doneTasks, completionRate, overdueTasks, dueTodayTasks, activeMembers }
-  }, [tasks, members])
+    const completionRate = total > 0 ? Math.round((done / total) * 100) : 0
+    return { total, done, inProgress, overdue, completionRate }
+  }, [tasks])
 
   const cards = [
     {
       label: "Total Tasks",
-      value: `${computed.totalTasks}`,
-      icon: ClipboardListIcon,
-      foot: (
-        <>
-          <CheckCircleIcon className="size-3 text-emerald-500" />
-          {computed.doneTasks} completed
-        </>
-      ),
+      value: stats.total,
+      sub: `${stats.completionRate}% complete`,
+      icon: ListTodo,
+      color: "text-violet-500",
+      bg: "bg-violet-500/10",
     },
     {
-      label: "Due Today",
-      value: `${computed.dueTodayTasks}`,
-      icon: ClipboardListIcon,
-      foot: (
-        <>
-          <AlertCircleIcon className="size-3 text-destructive" />
-          {computed.overdueTasks} overdue
-        </>
-      ),
+      label: "In Progress",
+      value: stats.inProgress,
+      sub: "active right now",
+      icon: Clock,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
     },
     {
-      label: "Team Members",
-      value: `${members.length}`,
-      icon: UsersIcon,
-      foot: (
-        <>
-          <ArrowUpIcon className="size-3" />
-          {computed.activeMembers} active now
-        </>
-      ),
+      label: "Completed",
+      value: stats.done,
+      sub: `of ${stats.total} total`,
+      icon: CheckCircle2,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
     },
     {
-      label: "Completion Rate",
-      value: `${computed.completionRate}%`,
-      icon: TrendingUpIcon,
-      foot: (
-        <>
-          <ArrowUpIcon className="size-3" />
-          {computed.doneTasks} of {computed.totalTasks} tasks done
-        </>
-      ),
+      label: "Overdue",
+      value: stats.overdue,
+      sub: stats.overdue === 0 ? "all on track" : "past due date",
+      icon: AlertCircle,
+      color: stats.overdue > 0 ? "text-rose-500" : "text-muted-foreground",
+      bg: stats.overdue > 0 ? "bg-rose-500/10" : "bg-muted/40",
     },
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map((stat) => {
-        const Icon = stat.icon
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {cards.map((card) => {
+        const Icon = card.icon
         return (
-          <Card
-            key={stat.label}
-            className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5 dark:hover:shadow-primary/10"
+          <div
+            key={card.label}
+            className="relative flex items-center gap-4 overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-sm"
           >
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardDescription className="text-xs font-medium tracking-wider uppercase">
-                  {stat.label}
-                </CardDescription>
-                <div className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors duration-150 group-hover:bg-primary/10 group-hover:text-primary">
-                  <Icon className="size-4" />
-                </div>
-              </div>
-              <CardTitle className="text-3xl font-bold tracking-tight tabular-nums">
-                {stat.value}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 pb-4">
-              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                {stat.foot}
-              </div>
-            </CardContent>
-          </Card>
+            <div
+              className={cn(
+                "flex size-11 flex-shrink-0 items-center justify-center rounded-xl",
+                card.bg
+              )}
+            >
+              <Icon className={cn("size-5", card.color)} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold tabular-nums">{card.value}</p>
+              <p className="mt-0.5 text-xs font-medium text-muted-foreground">{card.label}</p>
+              <p className="text-[11px] text-muted-foreground/60">{card.sub}</p>
+            </div>
+          </div>
         )
       })}
     </div>
