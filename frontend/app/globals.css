@@ -300,3 +300,19 @@
     }
   }
 }
+
+/* react-day-picker: dot indicator for days with tasks */
+.rdp-day.has-tasks {
+  position: relative;
+}
+.rdp-day.has-tasks::after {
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: hsl(var(--primary));
+}
