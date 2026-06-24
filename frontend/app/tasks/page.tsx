@@ -5,26 +5,19 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TaskTable } from "@/components/tasks/task-table"
-import { MOCK_TASKS, Task } from "@/components/tasks/task-types"
+import { Task } from "@/components/tasks/task-types"
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal"
 import { QuickAddTask } from "@/components/tasks/quick-add-task"
+import { useTasks } from "@/contexts/task-context"
 import { toast } from "sonner"
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS)
+  const { tasks, addTask, updateTask, deleteTask, deleteTasks } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   const handleAdd = (task: Task) => {
-    setTasks(prev => [task, ...prev])
+    addTask(task)
     toast.success("Task created", { description: task.title })
-  }
-
-  const handleDelete = (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id))
-  }
-
-  const handleDeleteMany = (ids: string[]) => {
-    setTasks(prev => prev.filter(t => !ids.includes(t.id)))
   }
 
   return (
@@ -51,8 +44,8 @@ export default function TasksPage() {
             <TaskTable
               initialData={tasks}
               onRowClick={(task) => setSelectedTask(task)}
-              onDelete={handleDelete}
-              onDeleteMany={handleDeleteMany}
+              onDelete={deleteTask}
+              onDeleteMany={deleteTasks}
             />
           </div>
         </main>
@@ -64,9 +57,7 @@ export default function TasksPage() {
           if (!open) setSelectedTask(null)
         }}
         onTaskChange={(updated) => {
-          setTasks((prev) =>
-            prev.map((t) => (t.id === updated.id ? updated : t))
-          )
+          updateTask(updated.id, updated)
           setSelectedTask(updated)
         }}
       />

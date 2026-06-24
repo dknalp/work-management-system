@@ -4,6 +4,8 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthProvider } from "@/contexts/auth-context"
+import { TaskProvider } from "@/contexts/task-context"
+import { TeamProvider } from "@/contexts/team-context"
 import { cn } from "@/lib/utils"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
@@ -38,9 +40,9 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <AuthProvider>
+          <AuthProvider><TaskProvider><TeamProvider>
             <TooltipProvider>{children}</TooltipProvider>
-          </AuthProvider>
+          </TeamProvider></TaskProvider></AuthProvider>
         </ThemeProvider>
       </body>
     </html>
