@@ -37,7 +37,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
       status: "todo",
       priority,
       assignee: assignee || "Unassigned",
-      dueDate: dueDate || undefined,
+      dueDate: dueDate || "",
       tags: [],
       createdAt: new Date().toISOString(),
     }

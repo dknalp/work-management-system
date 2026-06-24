@@ -34,7 +34,7 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   const id = React.useId()
-  const { localTasks, addTask, updateTask, deleteTask } = useTasks()
+  const { tasks, addTask, updateTask, deleteTask } = useTasks()
   const [columns, setColumns] = useState<Column[]>(defaultColumns)
   const columnsId = useMemo(() => columns.map((col) => col.id), [columns])
   const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -42,11 +42,11 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   const [orderedIds, setOrderedIds] = useState<string[]>([])
 
   const displayTasks = useMemo(() => {
-    const contextIds = localTasks.map((t) => t.id)
+    const contextIds = tasks.map((t) => t.id)
     const filtered = orderedIds.filter((id) => contextIds.includes(id))
     const newIds = contextIds.filter((id) => !filtered.includes(id))
     const merged = [...filtered, ...newIds]
-    return merged.map((id) => localTasks.find((t) => t.id === id)!).filter(Boolean)
+    return merged.map((id) => tasks.find((t) => t.id === id)!).filter(Boolean)
   }, [tasks, orderedIds])
 
   const tasksByColumn = useMemo(() => {
@@ -102,7 +102,7 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
     toast.success(`Column "${trimmed}" added`)
   }, [])
 
-  useEffect(() => {
+  React.useEffect(() => {
     onAddColumn?.(addColumn)
   }, [onAddColumn, addColumn])
 

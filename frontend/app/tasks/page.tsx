@@ -44,8 +44,6 @@ export default function TasksPage() {
             <TaskTable
               initialData={tasks}
               onRowClick={(task) => setSelectedTask(task)}
-              onDelete={(id) => deleteTask(id)}
-              onDeleteMany={(ids) => ids.forEach(deleteTask)}
               onDelete={deleteTask}
               onDeleteMany={deleteTasks}
             />
