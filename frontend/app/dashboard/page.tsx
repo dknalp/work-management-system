@@ -9,8 +9,12 @@ import { UpcomingTasks } from "@/components/dashboard/upcoming-tasks"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
 import { TaskOverviewChart } from "@/components/dashboard/task-overview-chart"
 import { TeamWorkloadChart } from "@/components/dashboard/team-workload-chart"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function DashboardPage() {
+  const { user } = useAuth()
+  const firstName = user?.name?.split(" ")[0] ?? "there"
+
   return (
     <SidebarProvider
       style={
@@ -26,9 +30,9 @@ export default function DashboardPage() {
         <main className="flex flex-1 flex-col overflow-auto bg-background">
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10 space-y-6">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Good morning, {firstName} 👋</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Overview of your team's progress
+                Here's what's happening with your team today.
               </p>
             </div>
             <StatsCards />
