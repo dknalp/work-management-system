@@ -4,6 +4,20 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { apiClient, API_BASE_URL } from "@/lib/api"
 import { tokenStorage } from "@/lib/auth"
 
+const MOCK_AUTH = process.env.NEXT_PUBLIC_MOCK_AUTH === "true"
+const MOCK_USER_KEY = "wms:mock_user"
+
+const DEMO_USER: User = {
+  id: "demo-1",
+  email: "demo@workos.app",
+  name: "Demo User",
+  bio: null,
+  avatar_url: null,
+  is_active: true,
+  is_admin: false,
+  created_at: new Date().toISOString(),
+}
+
 export type User = {
   id: string
   email: string
@@ -29,13 +43,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Restore session on mount
   useEffect(() => {
-    const token = tokenStorage.getAccess()
-    if (!token) {
+    if (MOCK_AUTH) {
+      const stored = localStorage.getItem(MOCK_USER_KEY)
+      if (stored) {
+        try { setUser(JSON.parse(stored)) } catch { /* ignore */ }
+      }
       setLoading(false)
       return
     }
+    const token = tokenStorage.getAccess()
+    if (!token) { setLoading(false); return }
     apiClient<User>("/users/me")
       .then(setUser)
       .catch(() => tokenStorage.clear())
@@ -43,6 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
+    if (MOCK_AUTH) {
+      if (!email.trim()) throw new Error("Email required")
+      const mockUser: User = { ...DEMO_USER, email, name: email.split("@")[0] }
+      localStorage.setItem(MOCK_USER_KEY, JSON.stringify(mockUser))
+      document.cookie = "has_session=1; path=/; max-age=86400"
+      setUser(mockUser)
+      return
+    }
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,6 +84,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    if (MOCK_AUTH) {
+      localStorage.removeItem(MOCK_USER_KEY)
+      document.cookie = "has_session=; path=/; max-age=0"
+      setUser(null)
+      return
+    }
     const refresh = tokenStorage.getRefresh()
     if (refresh) {
       await fetch(`${API_BASE_URL}/auth/logout`, {
@@ -71,7 +103,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const updateUser = useCallback((data: Partial<User>) => {
-    setUser((prev) => (prev ? { ...prev, ...data } : prev))
+    setUser((prev) => {
+      const next = prev ? { ...prev, ...data } : prev
+      if (MOCK_AUTH && next) localStorage.setItem(MOCK_USER_KEY, JSON.stringify(next))
+      return next
+    })
   }, [])
 
   return (
