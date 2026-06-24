@@ -13,7 +13,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { useAuth } from "@/contexts/auth-context"
 import {
   BriefcaseIcon,
   LayoutDashboardIcon,
