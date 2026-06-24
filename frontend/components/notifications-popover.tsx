@@ -1,153 +1,105 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { formatDistanceToNow, parseISO } from "date-fns"
-import {
-  CheckCircle2,
-  PlusCircle,
-  Trash2,
-  RefreshCw,
-  ArrowRightLeft,
-  Pencil,
-  BellIcon,
-  CheckCheckIcon,
-} from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useState } from "react"
+import { BellIcon, CheckCheckIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useTasks, ActivityType, ActivityEntry } from "@/contexts/task-context"
+import { useTasks } from "@/contexts/task-context"
 import { cn } from "@/lib/utils"
-
-const ACTIVITY_META: Record<
-  ActivityType,
-  { label: (title: string, detail?: string) => string; icon: React.ElementType; color: string }
-> = {
-  task_created: {
-    label: (t) => `Created "${t}"`,
-    icon: PlusCircle,
-    color: "text-blue-500",
-  },
-  task_completed: {
-    label: (t) => `Completed "${t}"`,
-    icon: CheckCircle2,
-    color: "text-emerald-500",
-  },
-  task_reopened: {
-    label: (t) => `Reopened "${t}"`,
-    icon: RefreshCw,
-    color: "text-amber-500",
-  },
-  task_status_changed: {
-    label: (t, d) => `Moved "${t}"${d ? ` (${d})` : ""}`,
-    icon: ArrowRightLeft,
-    color: "text-violet-500",
-  },
-  task_deleted: {
-    label: (t) => `Deleted "${t}"`,
-    icon: Trash2,
-    color: "text-rose-500",
-  },
-  task_updated: {
-    label: (t) => `Updated "${t}"`,
-    icon: Pencil,
-    color: "text-muted-foreground",
-  },
-}
+import { formatDistanceToNow } from "date-fns"
 
 export function NotificationsPopover() {
   const { activity } = useTasks()
-  const [lastSeenCount, setLastSeenCount] = useState(0)
+  const [readIds, setReadIds] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState(false)
 
-  const unreadCount = Math.max(0, activity.length - lastSeenCount)
+  const unreadCount = activity.filter((a) => !readIds.has(a.id)).length
 
-  const visible: ActivityEntry[] = useMemo(() => activity.slice(0, 20), [activity])
+  function markAllRead() {
+    setReadIds(new Set(activity.map((a) => a.id)))
+  }
 
-  function handleOpenChange(isOpen: boolean) {
-    setOpen(isOpen)
-    if (isOpen) {
-      setLastSeenCount(activity.length)
-    }
+  function markRead(id: string) {
+    setReadIds((prev) => new Set([...prev, id]))
   }
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
-          aria-label="Notifications"
-        >
+        <Button variant="ghost" size="icon" className="relative size-9">
           <BellIcon className="size-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground leading-none">
+            <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground leading-none">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        sideOffset={8}
-        className="w-80 p-0 rounded-xl shadow-xl border border-border/50"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <h3 className="text-sm font-semibold">Notifications</h3>
-          {activity.length > 0 && (
-            <button
-              onClick={() => setLastSeenCount(activity.length)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      <PopoverContent align="end" className="w-80 p-0">
+        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold">Notifications</h3>
+            {unreadCount > 0 && (
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold">
+                {unreadCount}
+              </Badge>
+            )}
+          </div>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={markAllRead}
             >
               <CheckCheckIcon className="size-3" />
               Mark all read
-            </button>
+            </Button>
           )}
         </div>
 
-        {visible.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <BellIcon className="size-8 text-muted-foreground/30 mb-2" />
-            <p className="text-sm text-muted-foreground">No activity yet</p>
-            <p className="text-xs text-muted-foreground/60 mt-0.5">
-              Task changes will appear here
-            </p>
+        {activity.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
+            <BellIcon className="size-8 opacity-20" />
+            <p className="text-sm">No notifications yet</p>
+            <p className="text-xs opacity-70">Activity from tasks will appear here.</p>
           </div>
         ) : (
-          <ScrollArea className="max-h-96">
+          <ScrollArea className="h-72">
             <div className="divide-y divide-border/40">
-              {visible.map((entry, idx) => {
-                const meta = ACTIVITY_META[entry.type]
-                const Icon = meta.icon
-                const isUnread = idx < unreadCount
+              {activity.slice(0, 30).map((entry) => {
+                const isRead = readIds.has(entry.id)
                 return (
-                  <div
+                  <button
                     key={entry.id}
+                    onClick={() => markRead(entry.id)}
                     className={cn(
-                      "flex items-start gap-3 px-4 py-3 transition-colors",
-                      isUnread ? "bg-primary/5" : "hover:bg-muted/30"
+                      "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40",
+                      !isRead && "bg-primary/3"
                     )}
                   >
-                    <div
-                      className={cn(
-                        "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
-                        isUnread ? "bg-primary/10" : "bg-muted/40"
-                      )}
-                    >
-                      <Icon className={cn("size-3.5", meta.color)} />
-                    </div>
+                    <div className={cn(
+                      "mt-1.5 size-1.5 shrink-0 rounded-full transition-colors",
+                      isRead ? "bg-muted-foreground/30" : "bg-primary"
+                    )} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs leading-snug">
-                        {meta.label(entry.taskTitle, entry.detail)}
+                      <p className={cn(
+                        "text-xs leading-snug",
+                        isRead ? "text-muted-foreground" : "text-foreground font-medium"
+                      )}>
+                        {entry.message}
                       </p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {formatDistanceToNow(parseISO(entry.timestamp), { addSuffix: true })}
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
                       </p>
                     </div>
-                    {isUnread && (
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                    )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -156,4 +108,4 @@ export function NotificationsPopover() {
       </PopoverContent>
     </Popover>
   )
-}
+}</content>
