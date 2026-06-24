@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Comment, Reply } from "@/components/tasks/task-types"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CommentsModalProps {
   open: boolean
@@ -32,6 +33,7 @@ export function CommentsModal({
   comments,
   onCommentsChange,
 }: CommentsModalProps) {
+  const { user } = useAuth()
   const [commentInput, setCommentInput] = useState("")
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyInput, setReplyInput] = useState("")
@@ -42,7 +44,7 @@ export function CommentsModal({
       ...comments,
       {
         id: crypto.randomUUID(),
-        authorName: "You",
+        authorName: user?.name ?? "You",
         body: commentInput.trim(),
         createdAt: new Date().toISOString(),
         replies: [],
@@ -57,7 +59,7 @@ export function CommentsModal({
       if (c.id !== commentId) return c
       const newReply: Reply = {
         id: crypto.randomUUID(),
-        authorName: "You",
+        authorName: user?.name ?? "You",
         body: replyInput.trim(),
         createdAt: new Date().toISOString(),
       }
