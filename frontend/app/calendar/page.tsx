@@ -181,19 +181,11 @@ export default function CalendarPage() {
                   day_outside: "text-muted-foreground/50",
                   day_disabled: "text-muted-foreground/30",
                 }}
-                components={{
-                  DayContent: ({ date }) => {
-                    const str = format(date, "yyyy-MM-dd")
-                    const hasTasks = datesWithTasks.has(str)
-                    return (
-                      <span className="relative flex flex-col items-center justify-center">
-                        {date.getDate()}
-                        {hasTasks && (
-                          <span className="absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-primary" />
-                        )}
-                      </span>
-                    )
-                  },
+                modifiers={{
+                  hasTasks: Array.from(datesWithTasks).map((s) => new Date(s + "T12:00:00")),
+                }}
+                modifiersClassNames={{
+                  hasTasks: "has-tasks",
                 }}
               />
 

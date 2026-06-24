@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { TeamMember } from "@/app/team/page"
+import { TeamMember } from "@/contexts/team-context"
 
 interface MemberDialogProps {
   member: TeamMember | null

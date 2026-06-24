@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { TeamMember } from "@/app/team/page"
+import { TeamMember } from "@/contexts/team-context"
 
 interface MemberGridProps {
   members: TeamMember[]
