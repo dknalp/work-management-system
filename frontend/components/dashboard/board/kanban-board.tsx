@@ -19,6 +19,7 @@ import { createPortal } from "react-dom"
 import { KanbanColumn, Column } from "./kanban-column"
 import { KanbanCard, Task } from "./kanban-card"
 import { TaskStatus } from "@/components/tasks/task-types"
+import { useTasks } from "@/contexts/task-context"
 import { toast } from "sonner"
 
 const defaultColumns: Column[] = [
@@ -27,120 +28,68 @@ const defaultColumns: Column[] = [
   { id: "done", title: "Completed" },
 ]
 
-const initialTasks: Task[] = [
-  {
-    id: "kb-1",
-    title: "Redesign onboarding flow for new users",
-    status: "in-progress",
-    priority: "high",
-    assignee: "Alex Johnson",
-    dueDate: "2026-05-10",
-    tags: ["design", "ux"],
-    createdAt: "2026-04-20",
-  },
-  {
-    id: "kb-2",
-    title: "Implement JWT refresh token mechanism",
-    status: "todo",
-    priority: "high",
-    assignee: "Sarah Chen",
-    dueDate: "2026-05-08",
-    tags: ["backend", "security"],
-    createdAt: "2026-04-21",
-  },
-  {
-    id: "kb-3",
-    title: "Write unit tests for payment module",
-    status: "todo",
-    priority: "medium",
-    assignee: "Marcus Webb",
-    dueDate: "2026-05-15",
-    tags: ["testing", "backend"],
-    createdAt: "2026-04-22",
-  },
-  {
-    id: "kb-4",
-    title: "Migrate database to PostgreSQL 16",
-    status: "in-progress",
-    priority: "high",
-    assignee: "Priya Nair",
-    dueDate: "2026-05-12",
-    tags: ["database", "devops"],
-    createdAt: "2026-04-18",
-  },
-  {
-    id: "kb-5",
-    title: "Set up CI/CD pipeline with GitHub Actions",
-    status: "done",
-    priority: "high",
-    assignee: "Marcus Webb",
-    dueDate: "2026-04-28",
-    tags: ["devops", "ci-cd"],
-    createdAt: "2026-04-14",
-  },
-  {
-    id: "kb-6",
-    title: "Integrate Stripe webhook handling",
-    status: "todo",
-    priority: "high",
-    assignee: "Alex Johnson",
-    dueDate: "2026-05-06",
-    tags: ["backend", "payments"],
-    createdAt: "2026-04-25",
-  },
-]
-
 interface KanbanBoardProps {
   onAddColumn?: (addColumnFn: (title: string) => void) => void
 }
 
 export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   const id = React.useId()
+  const { tasks, addTask, updateTask, deleteTask } = useTasks()
   const [columns, setColumns] = useState<Column[]>(defaultColumns)
   const columnsId = useMemo(() => columns.map((col) => col.id), [columns])
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  // Local ordering state — tracks display order without touching the context
+  const [orderedIds, setOrderedIds] = useState<string[]>([])
+
+  const displayTasks = useMemo(() => {
+    const contextIds = tasks.map((t) => t.id)
+    const filtered = orderedIds.filter((id) => contextIds.includes(id))
+    const newIds = contextIds.filter((id) => !filtered.includes(id))
+    const merged = [...filtered, ...newIds]
+    return merged.map((id) => tasks.find((t) => t.id === id)!).filter(Boolean)
+  }, [tasks, orderedIds])
 
   const tasksByColumn = useMemo(() => {
     const groups: Record<string, Task[]> = {}
     columns.forEach((col) => {
-      groups[col.id] = tasks.filter((t) => t.status === col.id)
+      groups[col.id] = displayTasks.filter((t) => t.status === col.id)
     })
     return groups
-  }, [tasks, columns])
+  }, [displayTasks, columns])
 
-  const addCard = useCallback((columnId: string, title: string) => {
-    const newTask: Task = {
-      id: `kb-${Date.now()}`,
-      title,
-      status: columnId as TaskStatus,
-      priority: "medium",
-      assignee: "",
-      dueDate: "",
-      tags: [],
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    setTasks((prev) => [...prev, newTask])
-    toast.success("Card added")
-  }, [])
-
-  const updateCard = useCallback(
-    (
-      taskId: string,
-      updates: Partial<Pick<Task, "title" | "priority" | "tags">>
-    ) => {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
-      )
-      toast.success("Card updated")
+  const addCard = useCallback(
+    (columnId: string, title: string) => {
+      const newTask: Task = {
+        id: `kb-${Date.now()}`,
+        title,
+        status: columnId as TaskStatus,
+        priority: "medium",
+        assignee: "",
+        dueDate: "",
+        tags: [],
+        createdAt: new Date().toISOString().slice(0, 10),
+      }
+      addTask(newTask)
+      toast.success("Card added")
     },
-    []
+    [addTask]
   )
 
-  const deleteCard = useCallback((taskId: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
-    toast.success("Card deleted")
-  }, [])
+  const updateCard = useCallback(
+    (taskId: string, updates: Partial<Pick<Task, "title" | "priority" | "tags">>) => {
+      updateTask(taskId, updates)
+      toast.success("Card updated")
+    },
+    [updateTask]
+  )
+
+  const deleteCard = useCallback(
+    (taskId: string) => {
+      deleteTask(taskId)
+      toast.success("Card deleted")
+    },
+    [deleteTask]
+  )
 
   const addColumn = useCallback((title: string) => {
     const trimmed = title.trim()
@@ -153,17 +102,12 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
     toast.success(`Column "${trimmed}" added`)
   }, [])
 
-  // Expose addColumn to parent via callback ref pattern
   React.useEffect(() => {
     onAddColumn?.(addColumn)
   }, [onAddColumn, addColumn])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
 
   function onDragStart(event: DragStartEvent) {
@@ -175,10 +119,8 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   function onDragOver(event: DragOverEvent) {
     const { active, over } = event
     if (!over) return
-
-    const activeId = active.id
-    const overId = over.id
-
+    const activeId = active.id as string
+    const overId = over.id as string
     if (activeId === overId) return
 
     const isActiveATask = active.data.current?.type === "Task"
@@ -186,85 +128,49 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
 
     if (!isActiveATask) return
 
-    // Dropping a Task over another Task
     if (isActiveATask && isOverATask) {
-      setTasks((tasks) => {
-        const activeIndex = tasks.findIndex((t) => t.id === activeId)
-        const overIndex = tasks.findIndex((t) => t.id === overId)
-
-        if (tasks[activeIndex].status !== tasks[overIndex].status) {
-          const newTasks = [...tasks]
-          newTasks[activeIndex] = {
-            ...newTasks[activeIndex],
-            status: tasks[overIndex].status,
-          }
-          return arrayMove(newTasks, activeIndex, overIndex)
-        }
-
-        return arrayMove(tasks, activeIndex, overIndex)
-      })
+      const ids = displayTasks.map((t) => t.id)
+      const activeIndex = ids.indexOf(activeId)
+      const overIndex = ids.indexOf(overId)
+      const activeTask = displayTasks[activeIndex]
+      const overTask = displayTasks[overIndex]
+      if (activeTask.status !== overTask.status) {
+        updateTask(activeId, { status: overTask.status })
+      }
+      setOrderedIds(arrayMove(ids, activeIndex, overIndex))
+      return
     }
 
     const isOverAColumn = over.data.current?.type === "Column"
-
-    // Dropping a Task over a Column
     if (isActiveATask && isOverAColumn) {
-      setTasks((tasks) => {
-        const activeIndex = tasks.findIndex((t) => t.id === activeId)
-
-        if (tasks[activeIndex].status === overId) {
-          return tasks
-        }
-
-        const newTasks = [...tasks]
-        newTasks[activeIndex] = {
-          ...newTasks[activeIndex],
-          status: overId as TaskStatus,
-        }
-        return arrayMove(newTasks, activeIndex, activeIndex)
-      })
+      const activeTask = displayTasks.find((t) => t.id === activeId)
+      if (activeTask && activeTask.status !== overId) {
+        updateTask(activeId, { status: overId as TaskStatus })
+      }
     }
   }
 
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveTask(null)
-
     if (!over) return
-
-    const activeId = active.id
-    const overId = over.id
-
+    const activeId = active.id as string
+    const overId = over.id as string
     if (activeId === overId) return
 
     const isActiveATask = active.data.current?.type === "Task"
     const isOverAColumn = over.data.current?.type === "Column"
-
     if (isActiveATask && isOverAColumn) {
-      setTasks((tasks) => {
-        const activeIndex = tasks.findIndex((t) => t.id === activeId)
-
-        if (tasks[activeIndex].status === overId) {
-          return tasks
-        }
-
-        const newTasks = [...tasks]
-        newTasks[activeIndex] = {
-          ...newTasks[activeIndex],
-          status: overId as TaskStatus,
-        }
-        return arrayMove(newTasks, activeIndex, activeIndex)
-      })
+      const activeTask = displayTasks.find((t) => t.id === activeId)
+      if (activeTask && activeTask.status !== overId) {
+        updateTask(activeId, { status: overId as TaskStatus })
+      }
     }
   }
 
   const dropAnimation: DropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({
-      styles: {
-        active: {
-          opacity: "0.5",
-        },
-      },
+      styles: { active: { opacity: "0.5" } },
     }),
   }
 
