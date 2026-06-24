@@ -21,14 +21,14 @@ import {
   TASK_STATUSES,
   TASK_PRIORITIES,
 } from "@/components/tasks/task-types";
-
-const TEAM_NAMES = ["Alex Johnson", "Sarah Chen", "Marcus Webb", "Priya Nair", "Jordan Kim"];
+import { useTeam } from "@/contexts/team-context";
 
 interface QuickAddTaskProps {
   onAdd: (task: Task) => void;
 }
 
 export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
+  const { members } = useTeam();
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
@@ -42,8 +42,10 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
   const [subTaskInput, setSubTaskInput] = useState("");
   const [description, setDescription] = useState("");
 
+  const teamNames = members.map((m) => m.name);
+
   const filteredNames = assignee.trim()
-    ? TEAM_NAMES.filter((n) => n.toLowerCase().includes(assignee.toLowerCase()))
+    ? teamNames.filter((n) => n.toLowerCase().includes(assignee.toLowerCase()))
     : [];
 
   function handleSubmit() {
@@ -242,7 +244,7 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
             className="mt-2 resize-none text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault(); // prevent bare Enter from submitting the task form; Shift+Enter allows newlines
+                e.preventDefault();
               }
             }}
           />
