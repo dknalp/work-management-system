@@ -1,0 +1,123 @@
+- generic [ref=e1]:
+  - generic [ref=e152] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e153]:
+      - img [ref=e154]
+    - generic [ref=e157]:
+      - button "Open issues overlay" [ref=e158]:
+        - generic [ref=e159]:
+          - generic [ref=e160]: "0"
+          - generic [ref=e161]: "1"
+        - generic [ref=e162]: Issue
+      - button "Collapse issues badge" [ref=e163]:
+        - img [ref=e164]
+  - generic [ref=e166]:
+    - generic [ref=e169]:
+      - list [ref=e171]:
+        - listitem [ref=e172]:
+          - link "WorkOS" [ref=e173] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e175]
+            - generic [ref=e178]: WorkOS
+      - generic [ref=e179]:
+        - list [ref=e182]:
+          - listitem [ref=e183]:
+            - link "Analytics" [ref=e184] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e185]
+              - generic [ref=e190]: Analytics
+          - listitem [ref=e191]:
+            - link "Pipeline board view" [ref=e192] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e193]
+              - generic [ref=e194]: Pipeline board view
+          - listitem [ref=e195]:
+            - link "Tasks" [ref=e196] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e197]
+              - generic [ref=e200]: Tasks
+          - listitem [ref=e201]:
+            - link "Calendar" [ref=e202] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e203]
+              - generic [ref=e205]: Calendar
+          - listitem [ref=e206]:
+            - link "Files" [ref=e207] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e208]
+              - generic [ref=e210]: Files
+          - listitem [ref=e211]:
+            - link "Team" [ref=e212] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e213]
+              - generic [ref=e218]: Team
+        - list [ref=e221]:
+          - listitem [ref=e222]:
+            - link "Settings" [ref=e223] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e224]
+              - generic [ref=e227]: Settings
+      - list [ref=e229]:
+        - listitem [ref=e230]:
+          - button "Alex Johnson Alex Johnson alex@workos.com" [ref=e231]:
+            - img "Alex Johnson" [ref=e233]
+            - generic [ref=e234]:
+              - generic [ref=e235]: Alex Johnson
+              - generic [ref=e236]: alex@workos.com
+            - img [ref=e237]
+    - main [ref=e241]:
+      - generic [ref=e243]:
+        - generic [ref=e244]:
+          - button "Toggle Sidebar" [ref=e245]:
+            - img
+            - generic [ref=e246]: Toggle Sidebar
+          - generic [ref=e247]: Settings
+        - generic [ref=e249]:
+          - img
+          - textbox "Global search" [ref=e250]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e251]:
+          - generic [ref=e252]:
+            - button "Notifications" [ref=e253]:
+              - img
+            - generic: "5"
+          - button "Create New" [ref=e254]:
+            - img
+            - generic [ref=e255]: Create New
+      - main [ref=e256]:
+        - generic [ref=e257]:
+          - generic [ref=e258]:
+            - heading "Settings" [level=1] [ref=e259]
+            - paragraph [ref=e260]: Uygulama görünüm tercihlerinizi yönetin.
+          - generic [ref=e261]:
+            - generic [ref=e262]:
+              - heading "Appearance" [level=2] [ref=e263]
+              - paragraph [ref=e264]:
+                - text: Tema seçiminiz tarayıcınızda kalıcı olarak saklanır.
+                - generic [ref=e265]: D
+                - text: tuşu ile de hızlıca aydınlık/karanlık geçişi yapabilirsiniz.
+            - generic [ref=e266]:
+              - button "Warm Krem beyaz, sıcak ve göz dostu aydınlık tema" [ref=e267]:
+                - generic [ref=e273]:
+                  - paragraph [ref=e274]: Warm
+                  - paragraph [ref=e275]: Krem beyaz, sıcak ve göz dostu aydınlık tema
+              - button "Slate Serin gri-mavi, Linear tarzı aydınlık tema" [ref=e279]:
+                - generic [ref=e285]:
+                  - paragraph [ref=e286]: Slate
+                  - paragraph [ref=e287]: Serin gri-mavi, Linear tarzı aydınlık tema
+              - button "Dark Nötr koyu karbon tonu, göz yormayan karanlık" [active] [ref=e288]:
+                - generic [ref=e293]:
+                  - generic [ref=e294]:
+                    - paragraph [ref=e295]: Dark
+                    - paragraph [ref=e296]: Nötr koyu karbon tonu, göz yormayan karanlık
+                  - img [ref=e317]
+              - button "Forest Koyu orman yeşili, developer dostu gece teması" [ref=e297]:
+                - generic [ref=e303]:
+                  - paragraph [ref=e304]: Forest
+                  - paragraph [ref=e305]: Koyu orman yeşili, developer dostu gece teması
+              - button "Midnight Derin lacivert, konsantre çalışma için gece teması" [ref=e306]:
+                - generic [ref=e312]:
+                  - paragraph [ref=e313]: Midnight
+                  - paragraph [ref=e314]: Derin lacivert, konsantre çalışma için gece teması
+  - alert [ref=e315]

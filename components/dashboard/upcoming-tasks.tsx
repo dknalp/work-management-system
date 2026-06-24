@@ -16,10 +16,7 @@ export function UpcomingTasks() {
           <CardTitle className="text-base font-semibold">
             Upcoming Tasks
           </CardTitle>
-          <CardDescription className="text-xs">
-            Tasks scheduled for the next 7 days
-          </CardDescription>
-        </div>
+                  </div>
         <Button
           variant="ghost"
           size="sm"
@@ -39,10 +36,7 @@ export function UpcomingTasks() {
           <p className="text-sm font-medium text-foreground">
             No upcoming tasks
           </p>
-          <p className="max-w-[200px] text-xs text-muted-foreground">
-            Tasks due in the next 7 days will appear here.
-          </p>
-        </div>
+                  </div>
         <Button size="sm" className="mt-2 gap-2">
           <PlusIcon className="size-4" />
           Add Task

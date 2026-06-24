@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -9,7 +10,26 @@ import { BellIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { NotificationsModal } from "@/components/notifications/notifications-modal"
 import { MOCK_NOTIFICATIONS, type Notification } from "@/components/notifications/notification-types"
 
+const routeLabels: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/dashboard/board": "Pipeline Board",
+  "/tasks": "Tasks",
+  "/calendar": "Calendar",
+  "/files": "Files",
+  "/team": "Team",
+  "/settings": "Settings",
+  "/profile": "Profile",
+  "/admin": "Admin Panel",
+}
+
+function getRouteLabel(pathname: string): string {
+  if (routeLabels[pathname]) return routeLabels[pathname]
+  if (pathname.startsWith("/files/")) return "Files"
+  return "Dashboard"
+}
+
 export function SiteHeader() {
+  const pathname = usePathname()
   const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const unreadCount = notifications.filter(n => !n.read).length
@@ -25,7 +45,7 @@ export function SiteHeader() {
             className="data-[orientation=vertical]:mx-1 data-[orientation=vertical]:h-4"
           />
           <span className="hidden text-sm font-medium text-foreground sm:block">
-            Dashboard
+            {getRouteLabel(pathname)}
           </span>
         </div>
 

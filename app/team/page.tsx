@@ -293,10 +293,7 @@ export default function TeamPage() {
             {/* Page Title */}
             <div className="flex flex-col gap-1">
               <h1 className="text-2xl font-bold tracking-tight">Team</h1>
-              <p className="text-sm text-muted-foreground">
-                Manage your team members, roles and departments.
-              </p>
-            </div>
+                          </div>
 
             {/* Stat Cards */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -323,13 +320,7 @@ export default function TeamPage() {
                         {card.label}
                       </p>
                     </div>
-                    <div
-                      className={cn(
-                        "absolute -top-4 -right-4 size-20 rounded-full opacity-10 blur-2xl",
-                        card.glow
-                      )}
-                    />
-                  </div>
+                                      </div>
                 )
               })}
             </div>

@@ -10,8 +10,8 @@ function ThemeProvider({
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
-      enableSystem
+      defaultTheme="warm"
+      themes={["warm", "slate", "dark", "forest", "midnight"]}
       disableTransitionOnChange
       {...props}
     >
@@ -34,6 +34,8 @@ function isTypingTarget(target: EventTarget | null) {
   )
 }
 
+const DARK_THEMES = ["dark", "forest", "midnight"]
+
 function ThemeHotkey() {
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -47,7 +49,7 @@ function ThemeHotkey() {
         return
       }
 
-      if (event.key.toLowerCase() !== "d") {
+      if (!event.key || event.key.toLowerCase() !== "d") {
         return
       }
 
@@ -55,7 +57,8 @@ function ThemeHotkey() {
         return
       }
 
-      setTheme(resolvedTheme === "dark" ? "light" : "dark")
+      const isDark = DARK_THEMES.includes(resolvedTheme ?? "")
+      setTheme(isDark ? "warm" : "dark")
     }
 
     window.addEventListener("keydown", onKeyDown)

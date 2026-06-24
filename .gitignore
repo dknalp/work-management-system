@@ -35,6 +35,13 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# backend
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.env
+backend/*.log
+
 # screenshots
 /.screenshots/*.png
 

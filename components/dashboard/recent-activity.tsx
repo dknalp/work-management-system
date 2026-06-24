@@ -16,10 +16,7 @@ export function RecentActivity() {
           <CardTitle className="text-base font-semibold">
             Recent Activity
           </CardTitle>
-          <CardDescription className="text-xs">
-            Team actions and project updates
-          </CardDescription>
-        </div>
+                  </div>
         <Button
           variant="ghost"
           size="sm"
@@ -44,10 +41,7 @@ export function RecentActivity() {
           <p className="text-sm font-medium text-foreground">
             No recent activity
           </p>
-          <p className="max-w-[220px] text-xs text-muted-foreground">
-            Actions taken by you or your team will appear here in real time.
-          </p>
-        </div>
+                  </div>
         <Button size="sm" variant="outline" className="mt-2 gap-2">
           <ZapIcon className="size-4" />
           Invite teammates

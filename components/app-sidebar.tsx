@@ -22,71 +22,81 @@ import {
   FolderIcon,
   UsersIcon,
   Settings2Icon,
+  ShieldIcon,
 } from "lucide-react"
 
 import { usePathname } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
-const data = {
-  user: {
-    name: "Alex Johnson",
-    email: "alex@workos.com",
-    avatar: "/avatars/alex.jpg",
+const navMain = [
+    {
+    title: "Analytics",
+    url: "/dashboard",
+    icon: <LayoutDashboardIcon />,
   },
-  navMain: [
-    {
-      title: "Analytics",
-      url: "/dashboard",
-      icon: <LayoutDashboardIcon />,
-    },
-    {
-      title: "Pipeline board view",
-      url: "/dashboard/board",
-      icon: <KanbanIcon />,
-    },
-    {
-      title: "Tasks",
-      url: "/tasks",
-      icon: <CheckSquareIcon />,
-    },
-    {
-      title: "Calendar",
-      url: "/calendar",
-      icon: <CalendarIcon />,
-    },
-    {
-      title: "Files",
-      url: "/files",
-      icon: <FolderIcon />,
-    },
-    {
-      title: "Team",
-      url: "/team",
-      icon: <UsersIcon />,
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "/settings",
-      icon: <Settings2Icon />,
-    },
-  ],
-}
+  {
+    title: "Pipeline board view",
+    url: "/dashboard/board",
+    icon: <KanbanIcon />,
+  },
+  {
+    title: "Tasks",
+    url: "/tasks",
+    icon: <CheckSquareIcon />,
+  },
+  {
+    title: "Calendar",
+    url: "/calendar",
+    icon: <CalendarIcon />,
+  },
+  {
+    title: "Files",
+    url: "/files",
+    icon: <FolderIcon />,
+  },
+  {
+    title: "Team",
+    url: "/team",
+    icon: <UsersIcon />,
+  },
+]
+
+const navSecondary = [
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: <Settings2Icon />,
+  },
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const { user } = useAuth()
 
-  const navMainWithActive = data.navMain.map((item) => ({
+  const navMainWithActive = navMain.map((item) => ({
     ...item,
     isActive:
       pathname === item.url ||
       (item.url !== "/dashboard" && pathname.startsWith(item.url)),
   }))
 
-  const navSecondaryWithActive = data.navSecondary.map((item) => ({
-    ...item,
-    isActive: pathname === item.url,
-  }))
+  const adminItem = user?.is_admin
+    ? [{ title: "Admin", url: "/admin", icon: <ShieldIcon />, isActive: pathname === "/admin" }]
+    : []
+
+  const navSecondaryWithActive = [
+    ...adminItem,
+    ...navSecondary.map((item) => ({
+      ...item,
+      isActive: pathname === item.url,
+    })),
+  ]
+
+  const sidebarUser = {
+    name: user?.name ?? "...",
+    email: user?.email ?? "",
+    avatar: user?.avatar_url ?? "",
+  }
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -116,7 +126,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        <NavUser user={data.user} />
+        <NavUser user={sidebarUser} />
       </SidebarFooter>
     </Sidebar>
   )

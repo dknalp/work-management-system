@@ -3,9 +3,6 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { CalendarGrid } from "@/components/calendar/calendar-grid"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { SearchIcon } from "lucide-react"
 import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
 
@@ -26,15 +23,6 @@ export default function CalendarPage() {
           <div className="flex min-h-0 flex-1 gap-5 overflow-hidden p-5">
             {/* Left sidebar — filters & mini-info */}
             <aside className="hidden w-56 shrink-0 flex-col gap-5 overflow-y-auto lg:flex">
-              {/* Search */}
-              <div className="relative">
-                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search events..."
-                  className="h-9 pl-9 text-xs"
-                />
-              </div>
-
               {/* My Calendars */}
               <div className="space-y-2.5">
                 <h3 className="px-0.5 text-[10px] font-bold tracking-widest text-muted-foreground uppercase">
@@ -61,18 +49,9 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              {/* Tip card */}
-              <div className="mt-auto">
-                <Card className="border-primary/10 bg-primary/5 shadow-none">
-                  <CardContent className="p-3.5">
-                    <p className="text-xs leading-relaxed font-medium text-primary/80">
-                      Tip: Click any day to see its events. Click the{" "}
-                      <span className="font-bold">+</span> icon on a day to
-                      quickly add a new event.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+              <p className="mt-auto text-xs text-muted-foreground">
+                Bir güne tıklayarak etkinliklerini görün. <span className="font-medium">+</span> ikonuyla hızlıca etkinlik ekleyin.
+              </p>
             </aside>
 
             {/* Main calendar area */}

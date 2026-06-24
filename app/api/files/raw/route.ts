@@ -2,22 +2,29 @@ import { NextRequest, NextResponse } from "next/server"
 import fs from "fs/promises"
 import path from "path"
 
-const ROOT_DIR = path.join(process.cwd(), "data")
+const ROOT_DIR = path.resolve(process.cwd(), "data")
 
-function getSafePath(relativePath: string) {
-  const safePath = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, "")
-  return path.join(ROOT_DIR, safePath)
+function getSafePath(relativePath: string): string | null {
+  const fullPath = path.resolve(ROOT_DIR, relativePath)
+  if (fullPath !== ROOT_DIR && !fullPath.startsWith(ROOT_DIR + path.sep)) {
+    return null
+  }
+  return fullPath
 }
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const relativePath = searchParams.get("path")
 
-  if (!relativePath) {
+  if (!relativePath || !relativePath.trim()) {
     return new NextResponse("Path is required", { status: 400 })
   }
 
   const fullPath = getSafePath(relativePath)
+
+  if (!fullPath) {
+    return new NextResponse("Forbidden", { status: 403 })
+  }
 
   try {
     const stats = await fs.stat(fullPath)

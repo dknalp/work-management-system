@@ -3,7 +3,6 @@
 import { ColumnDef, Column } from "@tanstack/react-table"
 import {
   ArrowUpDownIcon,
-  MoreHorizontalIcon,
   Trash2Icon,
   CheckIcon,
   CircleDotIcon,
@@ -12,12 +11,6 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Task } from "./task-types"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -103,7 +96,7 @@ export function createColumns(
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label="Select All"
           className="translate-y-px"
         />
       ),
@@ -133,7 +126,7 @@ export function createColumns(
       accessorKey: "title",
       header: ({ column }) => <SortableHeader column={column} label="Title" />,
       cell: ({ row }) => (
-        <span className="line-clamp-2 max-w-[320px] text-sm leading-snug font-medium">
+        <span className="line-clamp-2 max-w-[440px] text-sm leading-snug font-medium">
           {row.original.title}
         </span>
       ),
@@ -215,7 +208,7 @@ export function createColumns(
     {
       accessorKey: "dueDate",
       header: ({ column }) => (
-        <SortableHeader column={column} label="Due Date" />
+        <SortableHeader column={column} label="Deadline" />
       ),
       cell: ({ row }) => {
         const date = new Date(row.original.dueDate)
@@ -234,49 +227,63 @@ export function createColumns(
       },
     },
     {
+      accessorKey: "createdAt",
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Created At" />
+      ),
+      cell: ({ row }) => {
+        const date = new Date(row.original.createdAt)
+        return (
+          <span className="text-sm whitespace-nowrap text-muted-foreground">
+            {format(date, "MMM d, yyyy")}
+          </span>
+        )
+      },
+    },
+    {
       accessorKey: "tags",
       header: "Tags",
-      cell: ({ row }) => (
-        <div className="flex max-w-[180px] flex-wrap gap-1">
-          {row.original.tags.map((tag) => (
-            <Badge
-              key={tag}
-              variant="secondary"
-              className="h-5 border-primary/10 bg-primary/5 px-1.5 text-[10px] font-medium text-primary"
-            >
-              {tag}
-            </Badge>
-          ))}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const tags = row.original.tags
+        const visible = tags.slice(0, 2)
+        const overflow = tags.length - 2
+        return (
+          <div className="flex max-w-[180px] flex-wrap gap-1">
+            {visible.map((tag) => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="h-5 border-primary/10 bg-primary/5 px-1.5 text-[10px] font-medium text-primary"
+              >
+                {tag}
+              </Badge>
+            ))}
+            {overflow > 0 && (
+              <Badge
+                variant="secondary"
+                className="h-5 border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground"
+              >
+                +{overflow}
+              </Badge>
+            )}
+          </div>
+        )
+      },
       enableSorting: false,
     },
     {
       id: "actions",
       enableHiding: false,
       cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 text-muted-foreground data-[state=open]:bg-muted"
-            >
-              <MoreHorizontalIcon className="size-4" />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-36">
-            <DropdownMenuItem
-              variant="destructive"
-              className="cursor-pointer gap-2"
-              onClick={() => onDelete(row.original.id)}
-            >
-              <Trash2Icon className="size-3.5" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground hover:text-destructive"
+          onClick={() => onDelete(row.original.id)}
+          aria-label="Delete task"
+        >
+          <Trash2Icon className="size-4" />
+        </Button>
       ),
     },
   ]

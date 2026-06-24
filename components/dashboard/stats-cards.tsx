@@ -25,7 +25,6 @@ const stats = [
         <ArrowUpIcon className="size-3" /> 3 new this week
       </>
     ),
-    footNote: "Across all teams",
   },
   {
     label: "Tasks Due Today",
@@ -36,7 +35,6 @@ const stats = [
         <AlertCircleIcon className="size-3 text-destructive" /> 2 overdue
       </>
     ),
-    footNote: "Check your task list",
   },
   {
     label: "Team Members",
@@ -47,7 +45,6 @@ const stats = [
         <WifiIcon className="size-3" /> All members active
       </>
     ),
-    footNote: "Across 3 departments",
   },
   {
     label: "Completion Rate",
@@ -58,7 +55,6 @@ const stats = [
         <ArrowUpIcon className="size-3" /> Up 6% this week
       </>
     ),
-    footNote: "Above monthly target",
   },
 ]
 
@@ -88,12 +84,9 @@ export function StatsCards() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 pb-4">
-              <div className="flex items-center gap-1 text-xs font-medium text-foreground">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 {stat.foot}
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {stat.footNote}
-              </p>
             </CardContent>
           </Card>
         )
