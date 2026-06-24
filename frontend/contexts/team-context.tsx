@@ -1,6 +1,7 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback } from "react"
+import React, { createContext, useContext, useCallback } from "react"
+import { useLocalStorage } from "@/lib/use-local-storage"
 
 export type TeamMember = {
   id: string
@@ -39,7 +40,7 @@ interface TeamContextValue {
 const TeamContext = createContext<TeamContextValue | null>(null)
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
-  const [members, setMembers] = useState<TeamMember[]>(SEED_MEMBERS)
+  const [members, setMembers] = useLocalStorage<TeamMember[]>("wms:team", SEED_MEMBERS)
 
   const addMember = useCallback((member: TeamMember) => {
     setMembers((prev) => [member, ...prev])

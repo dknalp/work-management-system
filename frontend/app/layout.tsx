@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthProvider } from "@/contexts/auth-context"
 import { TaskProvider } from "@/contexts/task-context"
 import { CommandPalette } from "@/components/command-palette"
+import { CommandPalette } from "@/components/command-palette"
 import { TeamProvider } from "@/contexts/team-context"
 import { cn } from "@/lib/utils"
 
@@ -41,7 +42,7 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <AuthProvider><TaskProvider><TeamProvider>
+          <AuthProvider><TaskProvider><TeamProvider><CommandPalette />
             <TooltipProvider>{children}</TooltipProvider>
           </TeamProvider></TaskProvider></AuthProvider>
         </ThemeProvider>
