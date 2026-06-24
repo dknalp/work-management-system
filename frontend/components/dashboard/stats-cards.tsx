@@ -1,3 +1,5 @@
+"use client"
+
 import {
   Card,
   CardContent,
@@ -6,69 +8,93 @@ import {
   CardDescription,
 } from "@/components/ui/card"
 import {
-  FolderKanbanIcon,
   ClipboardListIcon,
   UsersIcon,
   TrendingUpIcon,
   ArrowUpIcon,
   AlertCircleIcon,
-  WifiIcon,
+  CheckCircleIcon,
 } from "lucide-react"
-
-const stats = [
-  {
-    label: "Active Projects",
-    value: "12",
-    icon: FolderKanbanIcon,
-    foot: (
-      <>
-        <ArrowUpIcon className="size-3" /> 3 new this week
-      </>
-    ),
-  },
-  {
-    label: "Tasks Due Today",
-    value: "5",
-    icon: ClipboardListIcon,
-    foot: (
-      <>
-        <AlertCircleIcon className="size-3 text-destructive" /> 2 overdue
-      </>
-    ),
-  },
-  {
-    label: "Team Members",
-    value: "8",
-    icon: UsersIcon,
-    foot: (
-      <>
-        <WifiIcon className="size-3" /> All members active
-      </>
-    ),
-  },
-  {
-    label: "Completion Rate",
-    value: "74%",
-    icon: TrendingUpIcon,
-    foot: (
-      <>
-        <ArrowUpIcon className="size-3" /> Up 6% this week
-      </>
-    ),
-  },
-]
+import { useTasks } from "@/contexts/task-context"
+import { useTeam } from "@/contexts/team-context"
+import { useMemo } from "react"
 
 export function StatsCards() {
+  const { tasks } = useTasks()
+  const { members } = useTeam()
+
+  const computed = useMemo(() => {
+    const now = new Date()
+    const todayStr = now.toISOString().slice(0, 10)
+    const totalTasks = tasks.length
+    const doneTasks = tasks.filter((t) => t.status === "done").length
+    const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0
+    const overdueTasks = tasks.filter(
+      (t) => t.status !== "done" && t.dueDate && t.dueDate < todayStr
+    ).length
+    const dueTodayTasks = tasks.filter(
+      (t) => t.status !== "done" && t.dueDate === todayStr
+    ).length
+    const activeMembers = members.filter((m) => m.status === "active").length
+    return { totalTasks, doneTasks, completionRate, overdueTasks, dueTodayTasks, activeMembers }
+  }, [tasks, members])
+
+  const cards = [
+    {
+      label: "Total Tasks",
+      value: `${computed.totalTasks}`,
+      icon: ClipboardListIcon,
+      foot: (
+        <>
+          <CheckCircleIcon className="size-3 text-emerald-500" />
+          {computed.doneTasks} completed
+        </>
+      ),
+    },
+    {
+      label: "Due Today",
+      value: `${computed.dueTodayTasks}`,
+      icon: ClipboardListIcon,
+      foot: (
+        <>
+          <AlertCircleIcon className="size-3 text-destructive" />
+          {computed.overdueTasks} overdue
+        </>
+      ),
+    },
+    {
+      label: "Team Members",
+      value: `${members.length}`,
+      icon: UsersIcon,
+      foot: (
+        <>
+          <ArrowUpIcon className="size-3" />
+          {computed.activeMembers} active now
+        </>
+      ),
+    },
+    {
+      label: "Completion Rate",
+      value: `${computed.completionRate}%`,
+      icon: TrendingUpIcon,
+      foot: (
+        <>
+          <ArrowUpIcon className="size-3" />
+          {computed.doneTasks} of {computed.totalTasks} tasks done
+        </>
+      ),
+    },
+  ]
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {stats.map((stat) => {
+      {cards.map((stat) => {
         const Icon = stat.icon
         return (
           <Card
             key={stat.label}
             className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5 dark:hover:shadow-primary/10"
           >
-            {/* Subtle top gradient accent */}
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
