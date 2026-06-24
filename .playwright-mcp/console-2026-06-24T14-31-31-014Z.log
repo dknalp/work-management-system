@@ -152,3 +152,20 @@ Fast Refresh requires at least one parent function component in your React tree.
 [ 6722506ms] [LOG] [HMR] connected @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
 [ 6960983ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
 [ 6961087ms] [LOG] [Fast Refresh] done in 174ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7140719ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7140726ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7140841ms] [LOG] [Fast Refresh] done in 62ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7140959ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7141512ms] [LOG] [Fast Refresh] done in 653ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7141519ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3001/login:0
+[ 7141566ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7141584ms] [LOG] [HMR] connected @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7169910ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7170002ms] [LOG] [Fast Refresh] done in 51ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
