@@ -32,6 +32,7 @@ import {
 import { SubtasksModal } from "./subtasks-modal"
 import { CommentsModal } from "./comments-modal"
 import { formatDistanceToNow } from "date-fns"
+import { useAuth } from "@/contexts/auth-context"
 
 interface TaskDetailModalProps {
   task: Task | null
@@ -58,6 +59,7 @@ export function TaskDetailModal({
   onOpenChange,
   onTaskChange,
 }: TaskDetailModalProps) {
+  const { user } = useAuth()
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Task>>({})
@@ -157,7 +159,7 @@ export function TaskDetailModal({
         ...(task.comments ?? []),
         {
           id: crypto.randomUUID(),
-          authorName: "You",
+          authorName: user?.name ?? "You",
           body: commentInput.trim(),
           createdAt: new Date().toISOString(),
           replies: [],
@@ -177,7 +179,7 @@ export function TaskDetailModal({
               ...(c.replies ?? []),
               {
                 id: crypto.randomUUID(),
-                authorName: "You",
+                authorName: user?.name ?? "You",
                 body: replyInput.trim(),
                 createdAt: new Date().toISOString(),
               },

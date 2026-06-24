@@ -19,6 +19,14 @@ export default function TasksPage() {
     toast.success("Task created", { description: task.title })
   }
 
+  const handleDelete = (id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  const handleDeleteMany = (ids: string[]) => {
+    setTasks(prev => prev.filter(t => !ids.includes(t.id)))
+  }
+
   return (
     <SidebarProvider
       style={
@@ -43,6 +51,8 @@ export default function TasksPage() {
             <TaskTable
               initialData={tasks}
               onRowClick={(task) => setSelectedTask(task)}
+              onDelete={handleDelete}
+              onDeleteMany={handleDeleteMany}
             />
           </div>
         </main>

@@ -49,9 +49,11 @@ import { TaskToolbar } from "./task-toolbar"
 interface TaskTableProps {
   initialData: Task[]
   onRowClick?: (task: Task) => void
+  onDelete?: (id: string) => void
+  onDeleteMany?: (ids: string[]) => void
 }
 
-export function TaskTable({ initialData, onRowClick }: TaskTableProps) {
+export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany }: TaskTableProps) {
   const [tasks, setTasks] = useState<Task[]>(initialData)
   useEffect(() => {
     setTasks(initialData)
@@ -65,19 +67,21 @@ export function TaskTable({ initialData, onRowClick }: TaskTableProps) {
 
   const handleDelete = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))
+    onDelete?.(id)
     toast.success("Task deleted", {
       description: `Task ${id} has been removed.`,
     })
-  }, [])
+  }, [onDelete])
 
   const handleDeleteSelected = useCallback(() => {
     const selectedIds = Object.keys(rowSelection)
     setTasks((prev) => prev.filter((t) => !selectedIds.includes(t.id)))
+    onDeleteMany?.(selectedIds)
     setRowSelection({})
     toast.success(
       `${selectedIds.length} task${selectedIds.length > 1 ? "s" : ""} deleted`
     )
-  }, [rowSelection])
+  }, [rowSelection, onDeleteMany])
 
   const columns = useMemo(
     () => createColumns(handleDelete),

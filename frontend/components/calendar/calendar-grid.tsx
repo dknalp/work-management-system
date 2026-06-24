@@ -101,8 +101,6 @@ const colorMap: Record<
 }
 
 // ─── Mock data ─────────────────────────────────────────────────────────────────
-// "Today" is anchored to 2026-05-01 per the project date context.
-// Events spread across April, May, and June 2026.
 
 const INITIAL_EVENTS: CalendarEvent[] = [
   {
@@ -542,12 +540,12 @@ function AddEventDialog({
 
 // ─── Main CalendarGrid ────────────────────────────────────────────────────────
 
-// "Today" is pinned to the project date: May 1, 2026
-const PROJECT_TODAY = new Date(2026, 4, 1)
+
+
 
 export function CalendarGrid() {
   const [currentMonth, setCurrentMonth] = React.useState(
-    () => new Date(2026, 4, 1)
+    () => new Date()
   )
   const [events, setEvents] = React.useState<CalendarEvent[]>(INITIAL_EVENTS)
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(null)
@@ -563,8 +561,9 @@ export function CalendarGrid() {
   const nextMonth = () => setCurrentMonth((m) => addMonths(m, 1))
   const prevMonth = () => setCurrentMonth((m) => subMonths(m, 1))
   const goToToday = () => {
-    setCurrentMonth(new Date(2026, 4, 1))
-    setSelectedDay(PROJECT_TODAY)
+    const today = new Date()
+    setCurrentMonth(today)
+    setSelectedDay(today)
   }
 
   function openAddDialog(date: Date) {
@@ -644,7 +643,7 @@ export function CalendarGrid() {
             size="sm"
             className="h-8 gap-2"
             onClick={() => {
-              setDialogDate(format(selectedDay ?? PROJECT_TODAY, "yyyy-MM-dd"))
+              setDialogDate(format(selectedDay ?? new Date(), "yyyy-MM-dd"))
               setDialogOpen(true)
             }}
           >
@@ -678,7 +677,7 @@ export function CalendarGrid() {
             )
             const isCurrentMonth = isSameMonth(day, currentMonth)
             const isSelected = selectedDay ? isSameDay(selectedDay, day) : false
-            const isTodayDay = isSameDay(day, PROJECT_TODAY)
+            const isTodayDay = isToday(day)
             const visible = dayEvents.slice(0, 3)
             const overflow = dayEvents.length - 3
             const colIndex = i % 7
