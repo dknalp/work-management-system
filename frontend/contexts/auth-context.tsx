@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { apiClient, API_BASE_URL } from "@/lib/api"
 import { tokenStorage } from "@/lib/auth"
 
-const MOCK_AUTH = process.env.NEXT_PUBLIC_MOCK_AUTH === "true"
+export const MOCK_AUTH = process.env.NEXT_PUBLIC_MOCK_AUTH === "true"
 const MOCK_USER_KEY = "wms:mock_user"
 
 const DEMO_USER: User = {
