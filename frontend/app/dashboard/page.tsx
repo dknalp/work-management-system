@@ -7,6 +7,8 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { UpcomingTasks } from "@/components/dashboard/upcoming-tasks"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
+import { TaskOverviewChart } from "@/components/dashboard/task-overview-chart"
+import { TeamWorkloadChart } from "@/components/dashboard/team-workload-chart"
 
 export default function DashboardPage() {
   return (
