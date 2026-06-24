@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useAuth } from "@/contexts/auth-context"
 import {
   BriefcaseIcon,
   LayoutDashboardIcon,
@@ -71,6 +72,7 @@ const navSecondary = [
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const { user } = useAuth()
   const { user } = useAuth()
 
   const navMainWithActive = navMain.map((item) => ({
