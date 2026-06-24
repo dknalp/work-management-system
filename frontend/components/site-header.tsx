@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { BellIcon, PlusIcon, SearchIcon } from "lucide-react"
-import { NotificationsModal } from "@/components/notifications/notifications-modal"
-import { MOCK_NOTIFICATIONS, type Notification } from "@/components/notifications/notification-types"
+import { PlusIcon, SearchIcon } from "lucide-react"
+import { NotificationsPopover } from "@/components/notifications-popover"
 
 const routeLabels: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -30,9 +29,6 @@ function getRouteLabel(pathname: string): string {
 
 export function SiteHeader() {
   const pathname = usePathname()
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const unreadCount = notifications.filter(n => !n.read).length
 
   return (
     <header className="sticky top-0 z-50 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-background/95 backdrop-blur-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
@@ -70,30 +66,7 @@ export function SiteHeader() {
         {/* Right: Notifications + Create */}
         <div className="flex shrink-0 items-center gap-2">
           {/* Notification bell */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-9 text-muted-foreground hover:text-foreground"
-              aria-label="Notifications"
-              onClick={() => setNotificationsOpen(true)}
-            >
-              <BellIcon className="size-4" />
-            </Button>
-            {unreadCount > 0 && (
-              <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-medium">
-                {unreadCount}
-              </span>
-            )}
-          </div>
-
-          <NotificationsModal
-            open={notificationsOpen}
-            onOpenChange={setNotificationsOpen}
-            notifications={notifications}
-            onMarkRead={(id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))}
-            onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
-          />
+          <NotificationsPopover />
 
           <Separator
             orientation="vertical"
