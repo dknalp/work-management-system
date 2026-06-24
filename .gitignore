@@ -1,5 +1,5 @@
 # dependencies
-/node_modules
+frontend/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,8 +12,8 @@
 /coverage
 
 # next.js
-/.next/
-/out/
+frontend/.next/
+frontend/out/
 
 # production
 /build
