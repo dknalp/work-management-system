@@ -1,52 +1,94 @@
+"use client"
+
+import { useMemo } from "react"
+import { formatDistanceToNow, parseISO } from "date-fns"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { ActivityIcon, ArrowRightIcon, ZapIcon } from "lucide-react"
+  CheckCircle2,
+  PlusCircle,
+  Trash2,
+  RefreshCw,
+  ArrowRightLeft,
+  Pencil,
+} from "lucide-react"
+import { useTasks, ActivityType } from "@/contexts/task-context"
+import { cn } from "@/lib/utils"
+
+const ACTIVITY_META: Record<
+  ActivityType,
+  { label: (title: string, detail?: string) => string; icon: React.ElementType; color: string }
+> = {
+  task_created: {
+    label: (t) => `Created "${t}"`,
+    icon: PlusCircle,
+    color: "text-blue-500",
+  },
+  task_completed: {
+    label: (t) => `Completed "${t}"`,
+    icon: CheckCircle2,
+    color: "text-emerald-500",
+  },
+  task_reopened: {
+    label: (t) => `Reopened "${t}"`,
+    icon: RefreshCw,
+    color: "text-amber-500",
+  },
+  task_status_changed: {
+    label: (t, d) => `Moved "${t}"${d ? ` (${d})` : ""}`,
+    icon: ArrowRightLeft,
+    color: "text-violet-500",
+  },
+  task_deleted: {
+    label: (t) => `Deleted "${t}"`,
+    icon: Trash2,
+    color: "text-rose-500",
+  },
+  task_updated: {
+    label: (t) => `Updated "${t}"`,
+    icon: Pencil,
+    color: "text-muted-foreground",
+  },
+}
 
 export function RecentActivity() {
-  return (
-    <Card className="flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <div className="space-y-1">
-          <CardTitle className="text-base font-semibold">
-            Recent Activity
-          </CardTitle>
-                  </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          See all
-          <ArrowRightIcon className="size-3" />
-        </Button>
-      </CardHeader>
+  const { activity } = useTasks()
 
-      <CardContent className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
-        {/* Empty state */}
-        <div className="relative flex size-16 items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40">
-          <ActivityIcon className="size-7 text-muted-foreground/60" />
-          {/* Pulse dot */}
-          <span className="absolute -top-1 -right-1 flex size-3">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/40 opacity-75" />
-            <span className="relative inline-flex size-3 rounded-full bg-primary/60" />
-          </span>
-        </div>
-        <div className="space-y-1 text-center">
-          <p className="text-sm font-medium text-foreground">
-            No recent activity
-          </p>
-                  </div>
-        <Button size="sm" variant="outline" className="mt-2 gap-2">
-          <ZapIcon className="size-4" />
-          Invite teammates
-        </Button>
-      </CardContent>
-    </Card>
+  const visible = useMemo(() => activity.slice(0, 8), [activity])
+
+  if (visible.length === 0) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
+        <p className="text-sm text-muted-foreground text-center py-6">
+          No activity yet. Start adding or updating tasks.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5">
+      <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
+      <div className="flex flex-col divide-y divide-border">
+        {visible.map((entry) => {
+          const meta = ACTIVITY_META[entry.type]
+          const Icon = meta.icon
+          return (
+            <div key={entry.id} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+              <div className={cn("mt-0.5 shrink-0", meta.color)}>
+                <Icon size={15} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm leading-snug truncate">
+                  {meta.label(entry.taskTitle, entry.detail)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formatDistanceToNow(parseISO(entry.timestamp), { addSuffix: true })}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
