@@ -77,7 +77,7 @@ export default function AdminPage() {
                   <div key={entry.id} className="flex items-start gap-3 px-5 py-3">
                     <div className="mt-0.5 size-1.5 shrink-0 rounded-full bg-primary/60 mt-2" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground">{entry.message}</p>
+                      <p className="text-sm text-foreground">{entry.taskTitle}{entry.detail ? ` — ${entry.detail}` : ""}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {new Date(entry.timestamp).toLocaleString()}
                       </p>

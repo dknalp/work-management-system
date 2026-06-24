@@ -93,7 +93,8 @@ export function NotificationsPopover() {
                         "text-xs leading-snug",
                         isRead ? "text-muted-foreground" : "text-foreground font-medium"
                       )}>
-                        {entry.message}
+                        {entry.taskTitle}
+                        {entry.detail ? ` — ${entry.detail}` : ""}
                       </p>
                       <p className="mt-0.5 text-[10px] text-muted-foreground">
                         {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
