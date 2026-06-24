@@ -494,3 +494,53 @@ Import traces:
     ./contexts/task-context.tsx [Server Component]
     ./app/layout.tsx [Server Component] @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:3127
 [ 7499224ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7518481ms] [ERROR] ./components/tasks/task-types.ts:53:14
+Ecmascript file had an error
+  51 | ]
+  52 |
+> 53 | export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
+     |              ^^^^^^^^^^^^^^^
+  54 |   { value: "low", label: "Low" },
+  55 |   { value: "medium", label: "Medium" },
+  56 |   { value: "high", label: "High" },
+
+the name `TASK_PRIORITIES` is defined multiple times
+
+Import traces:
+  Client Component Browser:
+    ./components/tasks/task-types.ts [Client Component Browser]
+    ./contexts/task-context.tsx [Client Component Browser]
+    ./contexts/task-context.tsx [Server Component]
+    ./app/layout.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/tasks/task-types.ts [Client Component SSR]
+    ./contexts/task-context.tsx [Client Component SSR]
+    ./contexts/task-context.tsx [Server Component]
+    ./app/layout.tsx [Server Component] @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:3127
+[ 7518508ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 7530056ms] [ERROR] ./components/tasks/task-types.ts:53:14
+Ecmascript file had an error
+  51 | ]
+  52 |
+> 53 | export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
+     |              ^^^^^^^^^^^^^^^
+  54 |   { value: "low", label: "Low" },
+  55 |   { value: "medium", label: "Medium" },
+  56 |   { value: "high", label: "High" },
+
+the name `TASK_PRIORITIES` is defined multiple times
+
+Import traces:
+  Client Component Browser:
+    ./components/tasks/task-types.ts [Client Component Browser]
+    ./contexts/task-context.tsx [Client Component Browser]
+    ./contexts/task-context.tsx [Server Component]
+    ./app/layout.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/tasks/task-types.ts [Client Component SSR]
+    ./contexts/task-context.tsx [Client Component SSR]
+    ./contexts/task-context.tsx [Server Component]
+    ./app/layout.tsx [Server Component] @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:3127
+[ 7530074ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
