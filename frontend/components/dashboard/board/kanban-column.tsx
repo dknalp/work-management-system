@@ -21,11 +21,11 @@ export type Column = {
 interface KanbanColumnProps {
   column: Column
   tasks: Task[]
-  onAddCard: (columnId: string, content: string) => void
+  onAddCard: (columnId: string, title: string) => void
   onDeleteCard: (taskId: string) => void
   onUpdateCard: (
     taskId: string,
-    updates: Partial<Pick<Task, "content" | "priority" | "tags">>
+    updates: Partial<Pick<Task, "title" | "priority" | "tags">>
   ) => void
 }
 
@@ -38,7 +38,7 @@ export function KanbanColumn({
 }: KanbanColumnProps) {
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks])
   const [isAddingCard, setIsAddingCard] = useState(false)
-  const [newCardContent, setNewCardContent] = useState("")
+  const [newCardTitle, setNewCardTitle] = useState("")
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const { setNodeRef } = useSortable({
@@ -59,23 +59,23 @@ export function KanbanColumn({
   }, [isAddingCard])
 
   function startAddingCard() {
-    setNewCardContent("")
+    setNewCardTitle("")
     setIsAddingCard(true)
   }
 
   function cancelAddingCard() {
     setIsAddingCard(false)
-    setNewCardContent("")
+    setNewCardTitle("")
   }
 
   function commitAddCard() {
-    const trimmed = newCardContent.trim()
+    const trimmed = newCardTitle.trim()
     if (!trimmed) {
       cancelAddingCard()
       return
     }
     onAddCard(column.id, trimmed)
-    setNewCardContent("")
+    setNewCardTitle("")
     setIsAddingCard(false)
   }
 
@@ -145,8 +145,8 @@ export function KanbanColumn({
           <div className="space-y-2 rounded-xl border border-primary/30 bg-background p-3 shadow-sm">
             <textarea
               ref={inputRef}
-              value={newCardContent}
-              onChange={(e) => setNewCardContent(e.target.value)}
+              value={newCardTitle}
+              onChange={(e) => setNewCardTitle(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Card title… (Enter to save, Esc to cancel)"
               rows={2}
@@ -160,7 +160,7 @@ export function KanbanColumn({
                 size="sm"
                 className="h-7 px-3 text-xs"
                 onClick={commitAddCard}
-                disabled={!newCardContent.trim()}
+                disabled={!newCardTitle.trim()}
               >
                 Add card
               </Button>

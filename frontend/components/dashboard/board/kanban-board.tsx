@@ -18,56 +18,75 @@ import { arrayMove, SortableContext } from "@dnd-kit/sortable"
 import { createPortal } from "react-dom"
 import { KanbanColumn, Column } from "./kanban-column"
 import { KanbanCard, Task } from "./kanban-card"
+import { TaskStatus } from "@/components/tasks/task-types"
 import { toast } from "sonner"
 
 const defaultColumns: Column[] = [
   { id: "todo", title: "To-Do" },
   { id: "in-progress", title: "In Progress" },
-  { id: "completed", title: "Completed" },
+  { id: "done", title: "Completed" },
 ]
 
 const initialTasks: Task[] = [
   {
-    id: "task-1",
-    columnId: "todo",
-    content: "Ali'yi ara - Proje detaylarını konuş",
+    id: "kb-1",
+    title: "Redesign onboarding flow for new users",
+    status: "in-progress",
     priority: "high",
-    tags: ["Müşteri", "Arama"],
+    assignee: "Alex Johnson",
+    dueDate: "2026-05-10",
+    tags: ["design", "ux"],
+    createdAt: "2026-04-20",
   },
   {
-    id: "task-2",
-    columnId: "todo",
-    content: "Yeni dashboard tasarımlarını incele",
-    priority: "medium",
-    tags: ["Tasarım", "Analiz"],
-  },
-  {
-    id: "task-3",
-    columnId: "in-progress",
-    content: "Backend API entegrasyonu",
+    id: "kb-2",
+    title: "Implement JWT refresh token mechanism",
+    status: "todo",
     priority: "high",
-    tags: ["Geliştirme", "API"],
+    assignee: "Sarah Chen",
+    dueDate: "2026-05-08",
+    tags: ["backend", "security"],
+    createdAt: "2026-04-21",
   },
   {
-    id: "task-4",
-    columnId: "completed",
-    content: "Logo revizyonu tamamlandı",
-    priority: "low",
-    tags: ["Tasarım"],
-  },
-  {
-    id: "task-5",
-    columnId: "todo",
-    content: "Dokümantasyon güncelleme",
-    priority: "low",
-    tags: ["Yazım"],
-  },
-  {
-    id: "task-6",
-    columnId: "in-progress",
-    content: "Dnd-kit kütüphanesi entegrasyonu",
+    id: "kb-3",
+    title: "Write unit tests for payment module",
+    status: "todo",
     priority: "medium",
-    tags: ["Geliştirme"],
+    assignee: "Marcus Webb",
+    dueDate: "2026-05-15",
+    tags: ["testing", "backend"],
+    createdAt: "2026-04-22",
+  },
+  {
+    id: "kb-4",
+    title: "Migrate database to PostgreSQL 16",
+    status: "in-progress",
+    priority: "high",
+    assignee: "Priya Nair",
+    dueDate: "2026-05-12",
+    tags: ["database", "devops"],
+    createdAt: "2026-04-18",
+  },
+  {
+    id: "kb-5",
+    title: "Set up CI/CD pipeline with GitHub Actions",
+    status: "done",
+    priority: "high",
+    assignee: "Marcus Webb",
+    dueDate: "2026-04-28",
+    tags: ["devops", "ci-cd"],
+    createdAt: "2026-04-14",
+  },
+  {
+    id: "kb-6",
+    title: "Integrate Stripe webhook handling",
+    status: "todo",
+    priority: "high",
+    assignee: "Alex Johnson",
+    dueDate: "2026-05-06",
+    tags: ["backend", "payments"],
+    createdAt: "2026-04-25",
   },
 ]
 
@@ -85,18 +104,21 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   const tasksByColumn = useMemo(() => {
     const groups: Record<string, Task[]> = {}
     columns.forEach((col) => {
-      groups[col.id] = tasks.filter((t) => t.columnId === col.id)
+      groups[col.id] = tasks.filter((t) => t.status === col.id)
     })
     return groups
   }, [tasks, columns])
 
-  const addCard = useCallback((columnId: string, content: string) => {
+  const addCard = useCallback((columnId: string, title: string) => {
     const newTask: Task = {
-      id: `task-${Date.now()}`,
-      columnId,
-      content,
+      id: `kb-${Date.now()}`,
+      title,
+      status: columnId as TaskStatus,
       priority: "medium",
+      assignee: "",
+      dueDate: "",
       tags: [],
+      createdAt: new Date().toISOString().slice(0, 10),
     }
     setTasks((prev) => [...prev, newTask])
     toast.success("Card added")
@@ -105,7 +127,7 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   const updateCard = useCallback(
     (
       taskId: string,
-      updates: Partial<Pick<Task, "content" | "priority" | "tags">>
+      updates: Partial<Pick<Task, "title" | "priority" | "tags">>
     ) => {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, ...updates } : t))
@@ -170,11 +192,11 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
         const activeIndex = tasks.findIndex((t) => t.id === activeId)
         const overIndex = tasks.findIndex((t) => t.id === overId)
 
-        if (tasks[activeIndex].columnId !== tasks[overIndex].columnId) {
+        if (tasks[activeIndex].status !== tasks[overIndex].status) {
           const newTasks = [...tasks]
           newTasks[activeIndex] = {
             ...newTasks[activeIndex],
-            columnId: tasks[overIndex].columnId,
+            status: tasks[overIndex].status,
           }
           return arrayMove(newTasks, activeIndex, overIndex)
         }
@@ -190,14 +212,14 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
       setTasks((tasks) => {
         const activeIndex = tasks.findIndex((t) => t.id === activeId)
 
-        if (tasks[activeIndex].columnId === overId) {
+        if (tasks[activeIndex].status === overId) {
           return tasks
         }
 
         const newTasks = [...tasks]
         newTasks[activeIndex] = {
           ...newTasks[activeIndex],
-          columnId: overId as string,
+          status: overId as TaskStatus,
         }
         return arrayMove(newTasks, activeIndex, activeIndex)
       })
@@ -222,14 +244,14 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
       setTasks((tasks) => {
         const activeIndex = tasks.findIndex((t) => t.id === activeId)
 
-        if (tasks[activeIndex].columnId === overId) {
+        if (tasks[activeIndex].status === overId) {
           return tasks
         }
 
         const newTasks = [...tasks]
         newTasks[activeIndex] = {
           ...newTasks[activeIndex],
-          columnId: overId as string,
+          status: overId as TaskStatus,
         }
         return arrayMove(newTasks, activeIndex, activeIndex)
       })

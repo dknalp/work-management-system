@@ -5,7 +5,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -29,18 +29,9 @@ import {
   PencilIcon,
   Trash2Icon,
 } from "lucide-react"
+import { Task } from "@/components/tasks/task-types"
 
-export type Task = {
-  id: string
-  content: string
-  columnId: string
-  priority: "low" | "medium" | "high"
-  tags: string[]
-  assignee?: {
-    name: string
-    avatar: string
-  }
-}
+export type { Task }
 
 interface KanbanCardProps {
   task: Task
@@ -48,7 +39,7 @@ interface KanbanCardProps {
   onDelete?: (taskId: string) => void
   onUpdate?: (
     taskId: string,
-    updates: Partial<Pick<Task, "content" | "priority" | "tags">>
+    updates: Partial<Pick<Task, "title" | "priority" | "tags">>
   ) => void
 }
 
@@ -65,7 +56,7 @@ export function KanbanCard({
   onUpdate,
 }: KanbanCardProps) {
   const [detailOpen, setDetailOpen] = useState(false)
-  const [editContent, setEditContent] = useState(task.content)
+  const [editTitle, setEditTitle] = useState(task.title)
   const [editPriority, setEditPriority] = useState<Task["priority"]>(
     task.priority
   )
@@ -96,7 +87,7 @@ export function KanbanCard({
   }
 
   function openDetail() {
-    setEditContent(task.content)
+    setEditTitle(task.title)
     setEditPriority(task.priority)
     setEditTagsInput(task.tags.join(", "))
     setDetailOpen(true)
@@ -107,7 +98,7 @@ export function KanbanCard({
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean)
-    onUpdate?.(task.id, { content: editContent, priority: editPriority, tags })
+    onUpdate?.(task.id, { title: editTitle, priority: editPriority, tags })
     setDetailOpen(false)
   }
 
@@ -115,6 +106,15 @@ export function KanbanCard({
     setDetailOpen(false)
     onDelete?.(task.id)
   }
+
+  const assigneeInitials = task.assignee
+    ? task.assignee
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : null
 
   if (isDragging) {
     return (
@@ -159,7 +159,7 @@ export function KanbanCard({
               </div>
 
               <p className="text-sm leading-tight font-medium text-foreground/90">
-                {task.content}
+                {task.title}
               </p>
 
               <div className="flex flex-wrap gap-1">
@@ -185,11 +185,10 @@ export function KanbanCard({
                     <span className="text-[10px]">1</span>
                   </div>
                 </div>
-                {task.assignee && (
+                {assigneeInitials && (
                   <Avatar className="size-6 border-2 border-background">
-                    <AvatarImage src={task.assignee.avatar} />
                     <AvatarFallback className="text-[8px]">
-                      {task.assignee.name.slice(0, 2).toUpperCase()}
+                      {assigneeInitials}
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -224,15 +223,15 @@ export function KanbanCard({
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label
-                htmlFor="card-content"
+                htmlFor="card-title"
                 className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
               >
-                Content
+                Title
               </Label>
               <Textarea
-                id="card-content"
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
+                id="card-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
                 rows={3}
                 className="resize-none text-sm"
               />
@@ -304,7 +303,7 @@ export function KanbanCard({
               <Button
                 size="sm"
                 onClick={handleSave}
-                disabled={!editContent.trim()}
+                disabled={!editTitle.trim()}
               >
                 Save changes
               </Button>

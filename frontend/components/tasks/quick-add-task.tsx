@@ -22,7 +22,7 @@ import {
   TASK_PRIORITIES,
 } from "@/components/tasks/task-types";
 
-const TEAM_NAMES = ["Alex Johnson", "Sarah Chen", "Marcus Webb", "Priya Patel", "Jordan Kim"];
+const TEAM_NAMES = ["Alex Johnson", "Sarah Chen", "Marcus Webb", "Priya Nair", "Jordan Kim"];
 
 interface QuickAddTaskProps {
   onAdd: (task: Task) => void;
