@@ -20,3 +20,5 @@ Fast Refresh requires at least one parent function component in your React tree.
 [ 1301944ms] [LOG] [Fast Refresh] done in 168ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
 [ 1338530ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
 [ 1338573ms] [LOG] [Fast Refresh] done in 114ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1691253ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1691289ms] [LOG] [Fast Refresh] done in 107ms @ http://localhost:3001/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
