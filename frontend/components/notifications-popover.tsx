@@ -108,4 +108,4 @@ export function NotificationsPopover() {
       </PopoverContent>
     </Popover>
   )
-}</content>
+}

@@ -117,4 +117,4 @@ export default function AdminPage() {
       </SidebarInset>
     </SidebarProvider>
   )
-}</content>
+}

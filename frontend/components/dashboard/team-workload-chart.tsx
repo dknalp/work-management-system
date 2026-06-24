@@ -85,4 +85,4 @@ export function TeamWorkloadChart() {
       </div>
     </div>
   )
-}</content>
+}
