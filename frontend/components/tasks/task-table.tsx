@@ -54,7 +54,7 @@ interface TaskTableProps {
   onStatusChange?: (id: string, status: TaskStatus) => void
 }
 
-export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany }: TaskTableProps) {
+export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onStatusChange }: TaskTableProps) {
   const [tasks, setTasks] = useState<Task[]>(initialData)
   useEffect(() => {
     setTasks(initialData)
