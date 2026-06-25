@@ -18,7 +18,7 @@ import { arrayMove, SortableContext } from "@dnd-kit/sortable"
 import { createPortal } from "react-dom"
 import { KanbanColumn, Column } from "./kanban-column"
 import { KanbanCard, Task } from "./kanban-card"
-import { TaskStatus } from "@/components/tasks/task-types"
+import { TaskStatus } from "@/types/task"
 import { useTasks } from "@/contexts/task-context"
 import { toast } from "sonner"
 

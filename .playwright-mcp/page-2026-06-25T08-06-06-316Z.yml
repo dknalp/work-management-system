@@ -1,0 +1,265 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analytics" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analytics
+          - listitem [ref=e30]:
+            - link "Pipeline board view" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline board view
+          - listitem [ref=e34]:
+            - link "Tasks" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Tasks
+          - listitem [ref=e40]:
+            - link "Calendar" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Calendar
+          - listitem [ref=e45]:
+            - link "Files" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Files
+          - listitem [ref=e50]:
+            - link "Team" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Team
+        - list [ref=e60]:
+          - listitem [ref=e61]:
+            - link "Settings" [ref=e62] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e63]
+              - generic [ref=e66]: Settings
+      - list [ref=e68]:
+        - listitem [ref=e69]:
+          - button ". ..." [ref=e70]:
+            - generic [ref=e72]: .
+            - generic [ref=e74]: ...
+            - img [ref=e75]
+    - main [ref=e79]:
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - button "Toggle Sidebar" [ref=e83]:
+            - img
+            - generic [ref=e84]: Toggle Sidebar
+          - generic [ref=e85]: Team
+        - generic [ref=e87]:
+          - img
+          - textbox "Global search" [ref=e88] [cursor=pointer]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e89]:
+          - button [ref=e90]:
+            - img
+          - button "Create New" [ref=e91]:
+            - img
+            - generic [ref=e92]: Create New
+      - main [ref=e93]:
+        - generic [ref=e94]:
+          - heading "Team" [level=1] [ref=e96]
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - img [ref=e100]
+              - generic [ref=e105]:
+                - paragraph [ref=e106]: "12"
+                - paragraph [ref=e107]: Total Members
+            - generic [ref=e108]:
+              - img [ref=e110]
+              - generic [ref=e114]:
+                - paragraph [ref=e115]: "9"
+                - paragraph [ref=e116]: Active Now
+            - generic [ref=e117]:
+              - img [ref=e119]
+              - generic [ref=e122]:
+                - paragraph [ref=e123]: "5"
+                - paragraph [ref=e124]: Departments
+          - generic [ref=e125]:
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - img [ref=e128]
+                - textbox "Search members..." [ref=e131]
+              - combobox [ref=e132]:
+                - img
+              - combobox [ref=e133]
+            - generic [ref=e135]:
+              - button [ref=e136]:
+                - img
+              - button [ref=e137]:
+                - img
+          - generic [ref=e138]:
+            - table [ref=e141]:
+              - rowgroup [ref=e142]:
+                - row "Member Email Department Status Joined" [ref=e143]:
+                  - columnheader "Member" [ref=e144]:
+                    - button "Member" [ref=e145]:
+                      - text: Member
+                      - img
+                  - columnheader "Email" [ref=e146]
+                  - columnheader "Department" [ref=e147]:
+                    - button "Department" [ref=e148]:
+                      - text: Department
+                      - img
+                  - columnheader "Status" [ref=e149]
+                  - columnheader "Joined" [ref=e150]:
+                    - button "Joined" [ref=e151]:
+                      - text: Joined
+                      - img
+                  - columnheader [ref=e152]
+              - rowgroup [ref=e153]:
+                - row "AJ Alex Johnson Frontend Lead alex@company.com Engineering Active Jan 15, 2023" [ref=e154]:
+                  - cell "AJ Alex Johnson Frontend Lead" [ref=e155]:
+                    - generic [ref=e156]:
+                      - generic [ref=e157]: AJ
+                      - generic [ref=e158]:
+                        - paragraph [ref=e159]: Alex Johnson
+                        - paragraph [ref=e160]: Frontend Lead
+                  - cell "alex@company.com" [ref=e161]
+                  - cell "Engineering" [ref=e162]:
+                    - generic [ref=e163]: Engineering
+                  - cell "Active" [ref=e164]:
+                    - generic [ref=e165]: Active
+                  - cell "Jan 15, 2023" [ref=e167]
+                  - cell [ref=e168]:
+                    - button [ref=e170]:
+                      - img
+                - row "SC Sarah Chen Backend Engineer sarah@company.com Engineering Active Mar 1, 2023" [ref=e171]:
+                  - cell "SC Sarah Chen Backend Engineer" [ref=e172]:
+                    - generic [ref=e173]:
+                      - generic [ref=e174]: SC
+                      - generic [ref=e175]:
+                        - paragraph [ref=e176]: Sarah Chen
+                        - paragraph [ref=e177]: Backend Engineer
+                  - cell "sarah@company.com" [ref=e178]
+                  - cell "Engineering" [ref=e179]:
+                    - generic [ref=e180]: Engineering
+                  - cell "Active" [ref=e181]:
+                    - generic [ref=e182]: Active
+                  - cell "Mar 1, 2023" [ref=e184]
+                  - cell [ref=e185]:
+                    - button [ref=e187]:
+                      - img
+                - row "MW Marcus Webb DevOps Engineer marcus@company.com Infrastructure Away Feb 10, 2023" [ref=e188]:
+                  - cell "MW Marcus Webb DevOps Engineer" [ref=e189]:
+                    - generic [ref=e190]:
+                      - generic [ref=e191]: MW
+                      - generic [ref=e192]:
+                        - paragraph [ref=e193]: Marcus Webb
+                        - paragraph [ref=e194]: DevOps Engineer
+                  - cell "marcus@company.com" [ref=e195]
+                  - cell "Infrastructure" [ref=e196]:
+                    - generic [ref=e197]: Infrastructure
+                  - cell "Away" [ref=e198]:
+                    - generic [ref=e199]: Away
+                  - cell "Feb 10, 2023" [ref=e201]
+                  - cell [ref=e202]:
+                    - button [ref=e204]:
+                      - img
+                - row "PN Priya Nair Database Admin priya@company.com Engineering Active Apr 5, 2023" [ref=e205]:
+                  - cell "PN Priya Nair Database Admin" [ref=e206]:
+                    - generic [ref=e207]:
+                      - generic [ref=e208]: PN
+                      - generic [ref=e209]:
+                        - paragraph [ref=e210]: Priya Nair
+                        - paragraph [ref=e211]: Database Admin
+                  - cell "priya@company.com" [ref=e212]
+                  - cell "Engineering" [ref=e213]:
+                    - generic [ref=e214]: Engineering
+                  - cell "Active" [ref=e215]:
+                    - generic [ref=e216]: Active
+                  - cell "Apr 5, 2023" [ref=e218]
+                  - cell [ref=e219]:
+                    - button [ref=e221]:
+                      - img
+                - row "JK Jordan Kim Product Manager jordan@company.com Product Active Nov 20, 2022" [ref=e222]:
+                  - cell "JK Jordan Kim Product Manager" [ref=e223]:
+                    - generic [ref=e224]:
+                      - generic [ref=e225]: JK
+                      - generic [ref=e226]:
+                        - paragraph [ref=e227]: Jordan Kim
+                        - paragraph [ref=e228]: Product Manager
+                  - cell "jordan@company.com" [ref=e229]
+                  - cell "Product" [ref=e230]:
+                    - generic [ref=e231]: Product
+                  - cell "Active" [ref=e232]:
+                    - generic [ref=e233]: Active
+                  - cell "Nov 20, 2022" [ref=e235]
+                  - cell [ref=e236]:
+                    - button [ref=e238]:
+                      - img
+                - row "ET Emily Torres UX Designer emily@company.com Design Active May 15, 2023" [ref=e239]:
+                  - cell "ET Emily Torres UX Designer" [ref=e240]:
+                    - generic [ref=e241]:
+                      - generic [ref=e242]: ET
+                      - generic [ref=e243]:
+                        - paragraph [ref=e244]: Emily Torres
+                        - paragraph [ref=e245]: UX Designer
+                  - cell "emily@company.com" [ref=e246]
+                  - cell "Design" [ref=e247]:
+                    - generic [ref=e248]: Design
+                  - cell "Active" [ref=e249]:
+                    - generic [ref=e250]: Active
+                  - cell "May 15, 2023" [ref=e252]
+                  - cell [ref=e253]:
+                    - button [ref=e255]:
+                      - img
+                - row "LP Liam Patel QA Engineer liam@company.com Engineering Offline Jun 1, 2023" [ref=e256]:
+                  - cell "LP Liam Patel QA Engineer" [ref=e257]:
+                    - generic [ref=e258]:
+                      - generic [ref=e259]: LP
+                      - generic [ref=e260]:
+                        - paragraph [ref=e261]: Liam Patel
+                        - paragraph [ref=e262]: QA Engineer
+                  - cell "liam@company.com" [ref=e263]
+                  - cell "Engineering" [ref=e264]:
+                    - generic [ref=e265]: Engineering
+                  - cell "Offline" [ref=e266]:
+                    - generic [ref=e267]: Offline
+                  - cell "Jun 1, 2023" [ref=e269]
+                  - cell [ref=e270]:
+                    - button [ref=e272]:
+                      - img
+                - row "AO Aisha Okonkwo Data Analyst aisha@company.com Analytics Active Jul 10, 2023" [ref=e273]:
+                  - cell "AO Aisha Okonkwo Data Analyst" [ref=e274]:
+                    - generic [ref=e275]:
+                      - generic [ref=e276]: AO
+                      - generic [ref=e277]:
+                        - paragraph [ref=e278]: Aisha Okonkwo
+                        - paragraph [ref=e279]: Data Analyst
+                  - cell "aisha@company.com" [ref=e280]
+                  - cell "Analytics" [ref=e281]:
+                    - generic [ref=e282]: Analytics
+                  - cell "Active" [ref=e283]:
+                    - generic [ref=e284]: Active
+                  - cell "Jul 10, 2023" [ref=e286]
+                  - cell [ref=e287]:
+                    - button [ref=e289]:
+                      - img
+            - generic [ref=e290]:
+              - paragraph [ref=e291]: Showing 1–8 of 12 members
+              - generic [ref=e292]:
+                - button [disabled]:
+                  - img
+                - generic [ref=e293]: 1 / 2
+                - button [ref=e294]:
+                  - img
+  - button "Open Next.js Dev Tools" [ref=e300] [cursor=pointer]:
+    - img [ref=e301]

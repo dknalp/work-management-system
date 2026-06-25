@@ -1,0 +1,81 @@
+[     166ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     168ms] [LOG] [Fast Refresh] done in 102ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     406ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     447ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     585ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <SegmentViewNode type="page" pagePath="settings/p...">
+      <SegmentTrieNode>
+      <ClientPageRoot Component={function SettingsPage} serverProvidedParams={{...}}>
+        <SettingsPage params={Promise} searchParams={Promise}>
+          <SidebarProvider style={{...}}>
+            <div data-slot="sidebar-wr..." style={{...}} className="group/side...">
+              <AppSidebar>
+              <SidebarInset>
+                <main data-slot="sidebar-inset" className="relative f...">
+                  <SiteHeader>
+                  <main className="flex flex-...">
+                    <div>
+                    <div className="flex flex-...">
+                      <nav>
+                      <div className="flex-1 spa...">
+                        <div className="rounded-xl...">
+                          <div>
+                          <Separator>
+                          <div className="space-y-2">
+                            <Label>
+                            <p>
+                            <div className="mt-3 grid ...">
+                              <button
+                                onClick={function onClick}
++                               className="flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all bor..."
+-                               className="flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all bor..."
+                              >
+                                <div className="relative f..." style={{...}}>
+                                  <div>
+                                  <div>
++                                 <div className="absolute right-1 top-1">
+                                ...
+                              ...
+                          ...
+    ...
+
+    at throwOnHydrationMismatch (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:3348:56)
+    at beginWork (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:6775:918)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:9562:97)
+    at workLoopConcurrentByScheduler (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:9558:58)
+    at renderRootConcurrent (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:9541:71)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:9068:150)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:10230:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_24abeeee._.js:2647:64)
+[   34206ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[   34273ms] [LOG] [Fast Refresh] done in 167ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[   99187ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[   99204ms] [LOG] [Fast Refresh] done in 117ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  373738ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  373948ms] [LOG] [Fast Refresh] done in 281ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  630340ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  630369ms] [LOG] [Fast Refresh] done in 68ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  643681ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  643802ms] [LOG] [Fast Refresh] done in 48ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  721609ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  721682ms] [LOG] [Fast Refresh] done in 95ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  721793ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  721853ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/settings?_rsc=uobuh:0
+[  721856ms] [LOG] [Fast Refresh] done in 164ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  721953ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/settings?_rsc=uobuh:0
+[  722005ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/settings:0
+[  722075ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  722096ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297

@@ -1,8 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useCallback } from "react"
-import { Task, MOCK_TASKS } from "@/components/tasks/task-types"
-import { useLocalStorage } from "@/lib/use-local-storage"
+import { Task, MOCK_TASKS } from "@/types/task"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 
 export type ActivityType =
   | "task_created"

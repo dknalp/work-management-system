@@ -1,8 +1,8 @@
 "use client"
 
 import React from "react"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SiteHeader } from "@/components/layout/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { UpcomingTasks } from "@/components/dashboard/upcoming-tasks"

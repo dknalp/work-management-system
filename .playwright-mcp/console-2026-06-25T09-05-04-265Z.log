@@ -1,0 +1,144 @@
+[     115ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     494ms] [LOG] [Fast Refresh] done in 479ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     585ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     603ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  145861ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  145926ms] [LOG] [Fast Refresh] done in 136ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  150943ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  150991ms] [LOG] [Fast Refresh] done in 51ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  161416ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  161422ms] [LOG] [Fast Refresh] done in 105ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  255013ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  255145ms] [ERROR] ./components/files/file-explorer.tsx:697:26
+Parsing ecmascript source code failed
+  695 |             <DialogTitle>Move to</DialogTitle>
+  696 |           </DialogHeader>
+> 697 |           <div className="space
+      |                          ^^^^^^
+
+Unterminated string constant
+
+Import traces:
+  Client Component Browser:
+    ./components/files/file-explorer.tsx [Client Component Browser]
+    ./components/files/file-client-page.tsx [Client Component Browser]
+    ./components/files/file-client-page.tsx [Server Component]
+    ./app/files/[[...path]]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/files/file-explorer.tsx [Client Component SSR]
+    ./components/files/file-client-page.tsx [Client Component SSR]
+    ./components/files/file-client-page.tsx [Server Component]
+    ./app/files/[[...path]]/page.tsx [Server Component] @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:3127
+[  298130ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  298188ms] [LOG] [Fast Refresh] done in 58ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  450169ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[  450278ms] [LOG] [Fast Refresh] done in 210ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1195149ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1195525ms] [LOG] [Fast Refresh] done in 209ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1195663ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1195720ms] [LOG] [Fast Refresh] done in 158ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1195967ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1195987ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1216724ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1216763ms] [LOG] [Fast Refresh] done in 82ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1222106ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1222212ms] [LOG] [Fast Refresh] done in 53ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1222322ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1222370ms] [LOG] [Fast Refresh] done in 149ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1254682ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1254813ms] [LOG] [Fast Refresh] done in 51ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1268923ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1268925ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1268926ms] [WARNING] [Fast Refresh] performing full reload
+
+Fast Refresh will perform a full reload when you edit a file that's imported by modules outside of the React rendering tree.
+You might have a file which exports a React component but also exports a value that is imported by a non-React component file.
+Consider migrating the non-React component export to a separate file and importing it into both files.
+
+It is also possible the parent component of the component you edited is a class component, which disables Fast Refresh.
+Fast Refresh requires at least one parent function component in your React tree. @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1269042ms] [LOG] [Fast Refresh] done in 80ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1269926ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1269949ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1270760ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1270788ms] [LOG] [Fast Refresh] done in 40ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1271702ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1271723ms] [LOG] [Fast Refresh] done in 55ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1519964ms] [ERROR] ./components/files/file-explorer.tsx:62:1
+Module not found: Can't resolve '@/lib/use-local-storage'
+  60 | import { FileItem, deleteItem, moveItem, renameItem } from "@/lib/actions/files"
+  61 | import { cn } from "@/lib/utils"
+> 62 | import { useLocalStorage } from "@/lib/use-local-storage"
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  63 | import { FileGrid } from "./file-grid"
+  64 | import { FilePreviewPanel } from "./file-preview-panel"
+  65 | import { SelectionLasso } from "./selection-lasso"
+
+Import map: aliased to relative './lib/use-local-storage' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./components/files/file-explorer.tsx [Client Component Browser]
+    ./components/files/file-client-page.tsx [Client Component Browser]
+    ./components/files/file-client-page.tsx [Server Component]
+    ./app/files/[[...path]]/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/files/file-explorer.tsx [Client Component SSR]
+    ./components/files/file-client-page.tsx [Client Component SSR]
+    ./components/files/file-client-page.tsx [Server Component]
+    ./app/files/[[...path]]/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:3127
+[ 1519982ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1561816ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1561939ms] [LOG] [Fast Refresh] done in 69ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1562044ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1562098ms] [LOG] [Fast Refresh] done in 154ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1603595ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1603769ms] [LOG] [Fast Refresh] done in 132ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1615470ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1615645ms] [LOG] [Fast Refresh] done in 69ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1642582ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1643448ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1643466ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1667361ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1667388ms] [LOG] [Fast Refresh] done in 101ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1717637ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1717665ms] [LOG] [Fast Refresh] done in 66ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1767877ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1767984ms] [LOG] [Fast Refresh] done in 178ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1815605ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1815799ms] [LOG] [Fast Refresh] done in 86ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1820516ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 1820692ms] [LOG] [Fast Refresh] done in 68ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2062305ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2062331ms] [LOG] [Fast Refresh] done in 127ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2069648ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2069890ms] [LOG] [Fast Refresh] done in 343ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2069991ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2070011ms] [LOG] [Fast Refresh] done in 121ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2077152ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2077424ms] [LOG] [Fast Refresh] done in 373ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2296702ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2296818ms] [LOG] [Fast Refresh] done in 216ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2301492ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2301633ms] [LOG] [Fast Refresh] done in 241ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2303414ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2303463ms] [LOG] [Fast Refresh] done in 149ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2514506ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 2514861ms] [LOG] [Fast Refresh] done in 454ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 5440829ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 5440846ms] [LOG] [Fast Refresh] done in 122ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 5512914ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 5513213ms] [LOG] [Fast Refresh] done in 378ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 5524998ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[ 5525156ms] [LOG] [Fast Refresh] done in 198ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297

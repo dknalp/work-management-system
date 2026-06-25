@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { BellIcon, CheckCheckIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,11 @@ export function NotificationsPopover() {
   const { activity } = useTasks()
   const [readIds, setReadIds] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const unreadCount = activity.filter((a) => !readIds.has(a.id)).length
 
@@ -34,7 +39,7 @@ export function NotificationsPopover() {
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative size-9">
           <BellIcon className="size-4" />
-          {unreadCount > 0 && (
+          {mounted && unreadCount > 0 && (
             <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground leading-none">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
@@ -45,13 +50,13 @@ export function NotificationsPopover() {
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">Notifications</h3>
-            {unreadCount > 0 && (
+            {mounted && unreadCount > 0 && (
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold">
                 {unreadCount}
               </Badge>
             )}
           </div>
-          {unreadCount > 0 && (
+          {mounted && unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"

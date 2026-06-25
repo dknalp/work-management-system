@@ -20,7 +20,7 @@ import {
   SubTask,
   TASK_STATUSES,
   TASK_PRIORITIES,
-} from "@/components/tasks/task-types";
+} from "@/types/task";
 import { useTeam } from "@/contexts/team-context";
 
 interface QuickAddTaskProps {

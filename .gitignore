@@ -47,3 +47,8 @@ backend/*.log
 
 # dev-loop runtime artifacts
 /.dev-loop/
+
+# file storage
+/data/
+/frontend/data/
+frontend/config/storage.json

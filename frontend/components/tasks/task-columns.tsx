@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Task, TaskStatus, TASK_STATUSES } from "./task-types"
+import { Task, TaskStatus, TASK_STATUSES } from "@/types/task"
 import {
   Select,
   SelectContent,

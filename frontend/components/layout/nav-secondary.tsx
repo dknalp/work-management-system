@@ -10,28 +10,23 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-export function NavMain({
+export function NavSecondary({
   items,
+  ...props
 }: {
   items: {
     title: string
     url: string
-    icon?: React.ReactNode
-    isActive?: boolean
+    icon: React.ReactNode
   }[]
-}) {
+} & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   return (
-    <SidebarGroup className="pt-4">
+    <SidebarGroup {...props}>
       <SidebarGroupContent>
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton
-                tooltip={item.title}
-                asChild
-                isActive={item.isActive}
-                className="transition-colors duration-150"
-              >
+              <SidebarMenuButton asChild>
                 <a href={item.url}>
                   {item.icon}
                   <span>{item.title}</span>

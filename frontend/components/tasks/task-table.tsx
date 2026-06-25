@@ -42,7 +42,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { Task, TaskStatus } from "./task-types"
+import { Task, TaskStatus } from "@/types/task"
 import { createColumns } from "./task-columns"
 import { TaskToolbar } from "./task-toolbar"
 

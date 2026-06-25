@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { SearchIcon, Trash2Icon, SlidersHorizontalIcon } from "lucide-react"
-import { Task } from "./task-types"
+import { Task } from "@/types/task"
 
 interface TaskToolbarProps {
   table: Table<Task>

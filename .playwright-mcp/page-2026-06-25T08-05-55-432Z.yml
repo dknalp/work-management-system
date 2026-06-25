@@ -1,0 +1,173 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - banner [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - link "WorkSync" [ref=e9] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e10]: WorkSync
+          - navigation [ref=e11]:
+            - link "Features" [ref=e12] [cursor=pointer]:
+              - /url: "#features"
+            - link "FAQ" [ref=e13] [cursor=pointer]:
+              - /url: "#faq"
+        - generic [ref=e14]:
+          - button "Choose theme" [ref=e15]:
+            - img
+            - generic [ref=e16]: Choose theme
+          - link "GitHub" [ref=e17] [cursor=pointer]:
+            - /url: https://github.com/parsherr/work-management-system
+            - img [ref=e18]
+            - generic [ref=e21]: GitHub
+          - link "Try Demo" [ref=e22] [cursor=pointer]:
+            - /url: /dashboard
+    - main [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - img [ref=e27]
+            - generic [ref=e30]: 100% Open Source on GitHub
+          - heading "Effortless team management by WorkSync" [level=1] [ref=e31]:
+            - text: Effortless team management
+            - text: by WorkSync
+          - paragraph [ref=e32]: Unify your organization with a workspace designed for absolute clarity. Shared cloud storage, seamless task pipelines, and intelligent calendars.
+          - generic [ref=e33]:
+            - link "Try Demo" [ref=e34] [cursor=pointer]:
+              - /url: /dashboard
+            - link "Star on GitHub" [ref=e35] [cursor=pointer]:
+              - /url: https://github.com/parsherr/work-management-system
+              - img
+              - text: Star on GitHub
+        - img "WorkSync Task Management" [ref=e40]
+      - generic [ref=e42]:
+        - heading "Confidence backed by results" [level=2] [ref=e43]
+        - generic [ref=e44]:
+          - generic [ref=e47]: Acme Corp
+          - generic [ref=e50]: GlobalTech
+          - generic [ref=e53]: Nexus
+          - generic [ref=e56]: Stark Ind.
+          - generic [ref=e59]: Wayne Ent.
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - heading "Built for absolute clarity and focused work" [level=2] [ref=e62]:
+            - text: Built for absolute clarity
+            - text: and focused work
+          - paragraph [ref=e63]: Everything you need to manage your team, securely stored and seamlessly connected in one intelligent workspace.
+        - generic [ref=e64]:
+          - generic [ref=e66]:
+            - img [ref=e68]
+            - heading "Shared Cloud Storage" [level=3] [ref=e70]
+            - paragraph [ref=e71]: Centralize your team's files with secure, lightning-fast cloud storage. Organize, search, and collaborate on documents without leaving your workspace.
+          - generic [ref=e83]:
+            - img [ref=e85]
+            - heading "Intelligent Tasks" [level=3] [ref=e87]
+            - paragraph [ref=e88]: Break down complex projects into manageable tasks. Assign, track, and conquer together.
+          - generic [ref=e97]:
+            - img [ref=e99]
+            - heading "Visual Pipelines" [level=3] [ref=e101]
+            - paragraph [ref=e102]: Map out your workflows with custom kanban boards. See exactly where everything stands at a glance.
+          - generic [ref=e103]:
+            - generic [ref=e104]:
+              - generic [ref=e105]:
+                - img [ref=e107]
+                - img [ref=e110]
+              - heading "Team & Analytics" [level=3] [ref=e113]
+              - paragraph [ref=e114]: Manage roles, access, and team capacity. Leverage real-time analytics to measure velocity and optimize your operations continuously.
+              - link "See all capabilities" [ref=e116] [cursor=pointer]:
+                - /url: /features
+                - text: See all capabilities
+                - img
+            - generic [ref=e131]: +24 team
+      - generic [ref=e133]:
+        - img [ref=e135]
+        - blockquote [ref=e137]: "\"In just a few minutes, we transformed our data into actionable insights. This process was so smooth and incredibly efficient.\""
+        - generic [ref=e138]:
+          - generic [ref=e139]: Jane Doe
+          - generic [ref=e140]: VP of Operations, TechCorp
+      - generic [ref=e141]:
+        - heading "Frequently Asked Questions" [level=2] [ref=e142]
+        - generic [ref=e143]:
+          - generic [ref=e144]:
+            - heading "What is WorkSync?" [level=3] [ref=e145] [cursor=pointer]:
+              - text: What is WorkSync?
+              - img [ref=e146]
+            - paragraph [ref=e148]: WorkSync is an all-in-one team management platform designed to unify your cloud storage, task pipelines, and member analytics in one beautiful workspace.
+          - generic [ref=e149]:
+            - heading "How secure is the cloud storage?" [level=3] [ref=e150] [cursor=pointer]:
+              - text: How secure is the cloud storage?
+              - img [ref=e151]
+            - paragraph [ref=e153]: We use enterprise-grade end-to-end encryption to ensure that your files and data are always secure and compliant with industry standards.
+          - generic [ref=e154]:
+            - heading "Can I migrate from my current tools?" [level=3] [ref=e155] [cursor=pointer]:
+              - text: Can I migrate from my current tools?
+              - img [ref=e156]
+            - paragraph [ref=e158]: Yes, we offer one-click integrations and import tools for popular platforms like Jira, Trello, and Google Drive to make your transition seamless.
+          - generic [ref=e159]:
+            - heading "Is there a free trial available?" [level=3] [ref=e160] [cursor=pointer]:
+              - text: Is there a free trial available?
+              - img [ref=e161]
+            - paragraph [ref=e163]: Yes, you can try all Professional and Enterprise features free for 14 days without entering a credit card.
+      - generic [ref=e166]:
+        - heading "Ready to transform your business?" [level=2] [ref=e167]
+        - paragraph [ref=e168]: Join thousands of modern teams that use WorkSync to manage their projects, people, and operations with absolute clarity.
+        - link "Try Demo" [ref=e169] [cursor=pointer]:
+          - /url: /dashboard
+    - contentinfo [ref=e170]:
+      - generic [ref=e171]:
+        - generic [ref=e172]:
+          - link "WorkSync" [ref=e173] [cursor=pointer]:
+            - /url: /
+          - paragraph [ref=e174]: Making team management effortless, powerful, and beautifully simple.
+          - link "GitHub" [ref=e176] [cursor=pointer]:
+            - /url: https://github.com/parsherr/work-management-system
+            - img [ref=e177]
+            - generic [ref=e180]: GitHub
+          - generic [ref=e181]: © 2026 WorkSync Inc.
+        - generic [ref=e182]:
+          - heading "Product" [level=4] [ref=e183]
+          - list [ref=e184]:
+            - listitem [ref=e185]:
+              - link "Features" [ref=e186] [cursor=pointer]:
+                - /url: "#features"
+            - listitem [ref=e187]:
+              - link "Pricing" [ref=e188] [cursor=pointer]:
+                - /url: "#pricing"
+            - listitem [ref=e189]:
+              - link "GitHub (Open Source)" [ref=e190] [cursor=pointer]:
+                - /url: https://github.com/parsherr/work-management-system
+            - listitem [ref=e191]:
+              - link "Changelog" [ref=e192] [cursor=pointer]:
+                - /url: "#"
+        - generic [ref=e193]:
+          - heading "Company" [level=4] [ref=e194]
+          - list [ref=e195]:
+            - listitem [ref=e196]:
+              - link "About Us" [ref=e197] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e198]:
+              - link "Careers" [ref=e199] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e200]:
+              - link "Blog" [ref=e201] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e202]:
+              - link "Contact" [ref=e203] [cursor=pointer]:
+                - /url: "#"
+        - generic [ref=e204]:
+          - heading "Legal" [level=4] [ref=e205]
+          - list [ref=e206]:
+            - listitem [ref=e207]:
+              - link "Privacy Policy" [ref=e208] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e209]:
+              - link "Terms of Service" [ref=e210] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e211]:
+              - link "Cookie Policy" [ref=e212] [cursor=pointer]:
+                - /url: "#"
+  - button "Open Next.js Dev Tools" [ref=e218] [cursor=pointer]:
+    - img [ref=e219]
+  - alert [ref=e222]

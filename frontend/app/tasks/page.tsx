@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useState } from "react"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import React, { useState, useEffect } from "react"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SiteHeader } from "@/components/layout/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TaskTable } from "@/components/tasks/task-table"
-import { Task } from "@/components/tasks/task-types"
+import { Task } from "@/types/task"
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal"
 import { QuickAddTask } from "@/components/tasks/quick-add-task"
 import { useTasks } from "@/contexts/task-context"
@@ -14,6 +14,9 @@ import { toast } from "sonner"
 export default function TasksPage() {
   const { tasks, addTask, updateTask, deleteTask, deleteTasks } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   const handleAdd = (task: Task) => {
     addTask(task)
@@ -36,7 +39,7 @@ export default function TasksPage() {
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
             <div className="mb-6">
               <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
-              <p className="text-sm text-muted-foreground mt-1">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>
+              {mounted && <p className="text-sm text-muted-foreground mt-1">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>}
             </div>
             <div className="mb-6">
               <QuickAddTask onAdd={handleAdd} />

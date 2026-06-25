@@ -1,0 +1,85 @@
+[     111ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[     129ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[   18410ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   19412ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   20414ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   21416ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   22419ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   27421ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   32424ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   37427ms] [ERROR] WebSocket connection to 'ws://localhost:3000/_next/webpack-hmr?id=trDjqlxTY7eY_DkXyZRdj' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:10878
+[   41633ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/dashboard?_rsc=970e3:0
+[   41633ms] [ERROR] Failed to fetch RSC payload for http://localhost:3000/dashboard. Falling back to browser navigation. TypeError: Failed to fetch
+    at createFetch (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:2588:24)
+    at fetchServerResponse (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:2490:27)
+    at navigateDynamicallyWithNoPrefetch (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:7943:90)
+    at navigate (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:7728:15)
+    at navigateReducer (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:8239:45)
+    at clientReducer (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9065:61)
+    at Object.action (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9310:55)
+    at runAction (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9215:38)
+    at dispatchAction (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9278:9)
+    at Object.dispatch (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9308:40)
+    at http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:1489:29
+    at startTransition (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_react-dom_8e8691bf._.js:5500:31)
+    at dispatch (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:1488:13)
+    at dispatchAppRouterAction (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:1470:5)
+    at dispatchNavigateAction (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9362:49)
+    at http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9419:13
+    at startTransition (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_compiled_24abeeee._.js:1279:31)
+    at Object.replace (http://localhost:3000/_next/static/chunks/5d2cf_next_dist_client_a690c487._.js:9418:36)
+    at handleSubmit (http://localhost:3000/_next/static/chunks/_b04d7921._.js:82:20) @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:3127
+[   41640ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3000/__nextjs_original-stack-frames:0
+[   77726ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/dashboard:0
+[   77806ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/56fc9_react-dom_0076cfe2._.js:15305
+[   77859ms] Error: ./proxy.ts
+Proxy is missing expected function export name
+This function is what Next.js runs for every request handled by this proxy (previously called middleware).
+
+Why this happens:
+- You are migrating from `middleware` to `proxy`, but haven't updated the exported function.
+- The file exists but doesn't export a function.
+- The export is not a function (e.g., an object or constant).
+- There's a syntax error preventing the export from being recognized.
+
+To fix it:
+- Ensure this file has either a default or "proxy" function export.
+
+Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+
+    at Object.getCompilationErrors (file:///home/dogukan/Documents/github/work-management-system/frontend/node_modules/.pnpm/next@16.1.7_@babel+core@7.29.0_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/next/dist/server/dev/hot-reloader-turbopack.js:1008:59)
+    at DevBundlerService.getCompilationError (file:///home/dogukan/Documents/github/work-management-system/frontend/node_modules/.pnpm/next@16.1.7_@babel+core@7.29.0_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/next/dist/server/lib/dev-bundler-service.js:44:55)
+    at DevServer.getCompilationError (file:///home/dogukan/Documents/github/work-management-system/frontend/node_modules/.pnpm/next@16.1.7_@babel+core@7.29.0_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/next/dist/server/dev/next-dev-server.js:706:42)
+    at DevServer.findPageComponents (file:///home/dogukan/Documents/github/work-management-system/frontend/node_modules/.pnpm/next@16.1.7_@babel+core@7.29.0_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/next/dist/server/dev/next-dev-server.js:676:43)
+    at async DevServer.renderErrorToResponseImpl (file:///home/dogukan/Documents/github/work-management-system/frontend/node_modules/.pnpm/next@16.1.7_@babel+core@7.29.0_react-dom@19.2.5_react@19.2.5__react@19.2.5/node_modules/next/dist/server/base-server.js:1719:26)
+[   77860ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_f8386896._.js:1206
+[   77862ms] [ERROR] ./proxy.ts
+Proxy is missing expected function export name
+This function is what Next.js runs for every request handled by this proxy (previously called middleware).
+
+Why this happens:
+- You are migrating from `middleware` to `proxy`, but haven't updated the exported function.
+- The file exists but doesn't export a function.
+- The export is not a function (e.g., an object or constant).
+- There's a syntax error preventing the export from being recognized.
+
+To fix it:
+- Ensure this file has either a default or "proxy" function export.
+
+Learn more: https://nextjs.org/docs/messages/middleware-to-proxy @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_f8386896._.js:1920
+[   77928ms] [ERROR] ./proxy.ts
+Proxy is missing expected function export name
+This function is what Next.js runs for every request handled by this proxy (previously called middleware).
+
+Why this happens:
+- You are migrating from `middleware` to `proxy`, but haven't updated the exported function.
+- The file exists but doesn't export a function.
+- The export is not a function (e.g., an object or constant).
+- There's a syntax error preventing the export from being recognized.
+
+To fix it:
+- Ensure this file has either a default or "proxy" function export.
+
+Learn more: https://nextjs.org/docs/messages/middleware-to-proxy @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_f8386896._.js:1920
+[   77967ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_f8386896._.js:1206

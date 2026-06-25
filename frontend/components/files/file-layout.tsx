@@ -29,8 +29,8 @@ function FileSidebar({ currentPath }: FileSidebarProps) {
     { label: "All Files", path: "/files", icon: FolderIcon },
     { label: "Documents", path: "/files/Documents", icon: FileTextIcon },
     { label: "Images", path: "/files/Images", icon: ImageIcon },
-    { label: "Recent", path: "#", icon: ClockIcon },
-    { label: "Starred", path: "#", icon: StarIcon },
+    { label: "Recent", path: "/files?sort=recent", icon: ClockIcon },
+    { label: "Starred", path: "/files?filter=starred", icon: StarIcon },
   ]
 
   return (
@@ -57,9 +57,7 @@ function FileSidebar({ currentPath }: FileSidebarProps) {
                 <Icon
                   className={cn(
                     "size-4 shrink-0",
-                    isActive
-                      ? "text-primary"
-                      : "text-muted-foreground group-hover:text-foreground"
+                    isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
                   )}
                 />
                 {link.label}
@@ -79,6 +77,8 @@ interface FileLayoutProps {
   viewMode?: "grid" | "list"
   onTogglePreview?: () => void
   showPreview?: boolean
+  searchQuery: string
+  onSearchChange: (query: string) => void
 }
 
 export function FileLayout({
@@ -88,6 +88,8 @@ export function FileLayout({
   viewMode = "list",
   onTogglePreview,
   showPreview,
+  searchQuery,
+  onSearchChange,
 }: FileLayoutProps) {
   return (
     <div className="flex h-full overflow-hidden bg-background">
@@ -101,6 +103,8 @@ export function FileLayout({
               <SearchIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search files..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
                 className="h-8 border-none bg-muted/40 pl-8 text-xs focus-visible:ring-1 focus-visible:ring-primary/20"
               />
             </div>
@@ -111,10 +115,7 @@ export function FileLayout({
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn(
-                  "size-7",
-                  viewMode === "list" && "bg-background shadow-sm"
-                )}
+                className={cn("size-7", viewMode === "list" && "bg-background shadow-sm")}
                 onClick={() => onViewModeChange?.("list")}
               >
                 <ListIcon className="size-3.5" />
@@ -122,10 +123,7 @@ export function FileLayout({
               <Button
                 variant="ghost"
                 size="icon"
-                className={cn(
-                  "size-7",
-                  viewMode === "grid" && "bg-background shadow-sm"
-                )}
+                className={cn("size-7", viewMode === "grid" && "bg-background shadow-sm")}
                 onClick={() => onViewModeChange?.("grid")}
               >
                 <LayoutGridIcon className="size-3.5" />
@@ -135,10 +133,7 @@ export function FileLayout({
             <Button
               variant="outline"
               size="icon"
-              className={cn(
-                "size-8",
-                showPreview && "border-primary/20 bg-primary/5 text-primary"
-              )}
+              className={cn("size-8", showPreview && "border-primary/20 bg-primary/5 text-primary")}
               onClick={onTogglePreview}
             >
               <PanelRightIcon className="size-4" />

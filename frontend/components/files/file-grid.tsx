@@ -2,25 +2,26 @@
 
 import * as React from "react"
 import {
-  FolderIcon,
-  FileIcon,
   ImageIcon,
-  FileTextIcon,
-  FileBoxIcon,
   ExternalLinkIcon,
   PencilIcon,
   Trash2Icon,
+  DownloadIcon,
+  MoveIcon,
 } from "lucide-react"
-import { FileItem, moveItem } from "@/lib/actions/files"
+import { FileItem } from "@/lib/actions/files"
 import { cn } from "@/lib/utils"
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { getFileIcon, isImageFile } from "./file-utils"
+import { moveItem } from "@/lib/actions/files"
 
 interface FileGridProps {
   items: FileItem[]
@@ -28,6 +29,33 @@ interface FileGridProps {
   selectedPaths: Set<string>
   onSelect: (item: FileItem, isMulti?: boolean) => void
   onNavigate: (path: string) => void
+  onRename: (item: FileItem) => void
+  onDelete: (path: string) => void
+  onMoveTo: (paths: string[]) => void
+}
+
+function downloadFile(path: string, name: string) {
+  const a = document.createElement("a")
+  a.href = `/api/files/raw?path=${encodeURIComponent(path)}`
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
+function ImageThumbnail({ item }: { item: FileItem }) {
+  const [error, setError] = React.useState(false)
+  if (error) return <ImageIcon className="size-12 text-orange-500" />
+  return (
+    <div className="size-14 overflow-hidden rounded-lg border border-border/50 bg-muted/30">
+      <img
+        src={`/api/files/raw?path=${encodeURIComponent(item.path)}`}
+        alt={item.name}
+        className="size-full object-cover"
+        onError={() => setError(true)}
+      />
+    </div>
+  )
 }
 
 export function FileGrid({
@@ -35,72 +63,32 @@ export function FileGrid({
   selectedPaths,
   onSelect,
   onNavigate,
+  onRename,
+  onDelete,
+  onMoveTo,
 }: FileGridProps) {
   const router = useRouter()
-
-  const getFileIcon = (item: FileItem) => {
-    if (item.isDirectory)
-      return (
-        <FolderIcon className="size-12 fill-blue-500/10 text-blue-500 transition-colors group-hover:fill-blue-500/20" />
-      )
-    const ext = item.name.split(".").pop()?.toLowerCase()
-    switch (ext) {
-      case "txt":
-      case "md":
-        return <FileTextIcon className="size-12 text-muted-foreground" />
-      case "png":
-      case "jpg":
-      case "jpeg":
-      case "svg":
-        return <ImageIcon className="size-12 text-orange-500" />
-      case "zip":
-      case "rar":
-        return <FileBoxIcon className="size-12 text-purple-500" />
-      default:
-        return <FileIcon className="size-12 text-muted-foreground" />
-    }
-  }
 
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
     e.dataTransfer.setData("application/workos-file", item.path)
     e.dataTransfer.effectAllowed = "move"
-
-    // Create drag ghost
     const ghost = document.createElement("div")
     ghost.className =
       "bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold shadow-xl border border-white/20"
     ghost.innerText =
-      selectedPaths.size > 1
-        ? `Moving ${selectedPaths.size} items`
-        : `Moving ${item.name}`
+      selectedPaths.size > 1 ? `Moving ${selectedPaths.size} items` : `Moving ${item.name}`
     document.body.appendChild(ghost)
     e.dataTransfer.setDragImage(ghost, 0, 0)
     setTimeout(() => document.body.removeChild(ghost), 0)
   }
 
-  const handleDragOver = (e: React.DragEvent, item: FileItem) => {
-    if (item.isDirectory) {
-      e.preventDefault()
-    }
-  }
-
   const handleDrop = async (e: React.DragEvent, targetItem: FileItem) => {
     e.preventDefault()
     if (!targetItem.isDirectory) return
-
     const sourcePath = e.dataTransfer.getData("application/workos-file")
     if (!sourcePath || sourcePath === targetItem.path) return
-
-    // If we have a multi-selection and the source is part of it, move all
-    const itemsToMove = selectedPaths.has(sourcePath)
-      ? Array.from(selectedPaths)
-      : [sourcePath]
-
-    const movePromises = itemsToMove.map((path) =>
-      moveItem(path, targetItem.path)
-    )
-    const results = await Promise.all(movePromises)
-
+    const itemsToMove = selectedPaths.has(sourcePath) ? Array.from(selectedPaths) : [sourcePath]
+    const results = await Promise.all(itemsToMove.map((path) => moveItem(path, targetItem.path)))
     const successCount = results.filter((r) => r.success).length
     if (successCount > 0) {
       toast.success(`${successCount} item(s) moved to ${targetItem.name}`)
@@ -121,28 +109,21 @@ export function FileGrid({
             data-drag-handle={!isParentDir ? "true" : undefined}
             draggable={!isParentDir}
             onDragStart={(e) => handleDragStart(e, item)}
-            onDragOver={(e) => {
-              if (item.isDirectory) e.preventDefault()
-            }}
+            onDragOver={(e) => { if (item.isDirectory) e.preventDefault() }}
             onDragEnter={(e) => {
               if (item.isDirectory) {
                 e.preventDefault()
                 e.currentTarget.setAttribute("data-drop-target", "true")
               }
             }}
-            onDragLeave={(e) => {
-              e.currentTarget.removeAttribute("data-drop-target")
-            }}
+            onDragLeave={(e) => e.currentTarget.removeAttribute("data-drop-target")}
             onDrop={(e) => {
               e.currentTarget.removeAttribute("data-drop-target")
               handleDrop(e, item)
             }}
             className={cn(
               "group flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-transparent p-3 transition-all select-none",
-              isSelected
-                ? "border-primary/20 bg-primary/10"
-                : "hover:bg-muted/50",
-              // Drop target styling
+              isSelected ? "border-primary/20 bg-primary/10" : "hover:bg-muted/50",
               "data-[drop-target=true]:border-primary/50 data-[drop-target=true]:bg-primary/20",
               isParentDir && "opacity-60"
             )}
@@ -159,7 +140,13 @@ export function FileGrid({
               }
             }}
           >
-            <div className="relative">{getFileIcon(item)}</div>
+            <div className="relative">
+              {!isParentDir && isImageFile(item.name) ? (
+                <ImageThumbnail item={item} />
+              ) : (
+                getFileIcon(item, "size-12")
+              )}
+            </div>
             <span
               className={cn(
                 "w-full truncate px-1 text-center text-xs font-medium",
@@ -169,6 +156,11 @@ export function FileGrid({
             >
               {item.name}
             </span>
+            {item.isDirectory && item.childCount !== undefined && (
+              <span className="text-[10px] text-muted-foreground/60">
+                {item.childCount} items
+              </span>
+            )}
           </div>
         )
 
@@ -188,10 +180,29 @@ export function FileGrid({
               >
                 <ExternalLinkIcon className="size-4" /> Open
               </ContextMenuItem>
-              <ContextMenuItem className="gap-2">
+              {!item.isDirectory && (
+                <ContextMenuItem
+                  className="gap-2"
+                  onClick={() => downloadFile(item.path, item.name)}
+                >
+                  <DownloadIcon className="size-4" /> Download
+                </ContextMenuItem>
+              )}
+              <ContextMenuSeparator />
+              <ContextMenuItem className="gap-2" onClick={() => onRename(item)}>
                 <PencilIcon className="size-4" /> Rename
               </ContextMenuItem>
-              <ContextMenuItem className="gap-2 text-destructive focus:text-destructive">
+              <ContextMenuItem
+                className="gap-2"
+                onClick={() => onMoveTo([item.path])}
+              >
+                <MoveIcon className="size-4" /> Move to
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                className="gap-2 text-destructive focus:text-destructive"
+                onClick={() => onDelete(item.path)}
+              >
                 <Trash2Icon className="size-4" /> Delete
               </ContextMenuItem>
             </ContextMenuContent>

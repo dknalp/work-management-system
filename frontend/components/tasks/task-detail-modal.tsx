@@ -28,7 +28,7 @@ import {
   TASK_STATUSES,
   TASK_PRIORITIES,
   Comment,
-} from "@/components/tasks/task-types"
+} from "@/types/task"
 import { SubtasksModal } from "./subtasks-modal"
 import { CommentsModal } from "./comments-modal"
 import { formatDistanceToNow } from "date-fns"

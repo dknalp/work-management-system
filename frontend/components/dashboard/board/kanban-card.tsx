@@ -29,7 +29,7 @@ import {
   PencilIcon,
   Trash2Icon,
 } from "lucide-react"
-import { Task } from "@/components/tasks/task-types"
+import { Task } from "@/types/task"
 
 export type { Task }
 

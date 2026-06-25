@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useMemo } from "react"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SiteHeader } from "@/components/layout/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TeamTable } from "@/components/team/team-table"
 import { MemberGrid } from "@/components/team/member-grid"
@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  PlusIcon,
   SearchIcon,
   LayoutGridIcon,
   TableIcon,
@@ -75,11 +74,6 @@ export default function TeamPage() {
       return matchesSearch && matchesDept
     })
   }, [members, searchQuery, departmentFilter])
-
-  const handleOpenAdd = () => {
-    setEditingMember(null)
-    setIsDialogOpen(true)
-  }
 
   const handleOpenEdit = (member: TeamMember) => {
     setEditingMember(member)
@@ -254,15 +248,6 @@ export default function TeamPage() {
                     {filteredMembers.length} result{filteredMembers.length !== 1 ? "s" : ""}
                   </Badge>
                 )}
-
-                <Button
-                  size="sm"
-                  onClick={handleOpenAdd}
-                  className="h-9 gap-2 rounded-lg bg-primary px-4 font-medium shadow-sm hover:bg-primary/90"
-                >
-                  <PlusIcon className="size-4" />
-                  Add Member
-                </Button>
               </div>
             </div>
 

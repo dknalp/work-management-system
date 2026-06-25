@@ -6,17 +6,7 @@ import { tokenStorage } from "@/lib/auth"
 
 export const MOCK_AUTH = process.env.NEXT_PUBLIC_MOCK_AUTH === "true"
 const MOCK_USER_KEY = "wms:mock_user"
-
-const DEMO_USER: User = {
-  id: "demo-1",
-  email: "demo@workos.app",
-  name: "Demo User",
-  bio: null,
-  avatar_url: null,
-  is_active: true,
-  is_admin: false,
-  created_at: new Date().toISOString(),
-}
+const MOCK_USERS_KEY = "wms:mock_users"
 
 export type User = {
   id: string
@@ -27,6 +17,43 @@ export type User = {
   is_active: boolean
   is_admin: boolean
   created_at: string
+}
+
+const MOCK_USERS_SEED: User[] = [
+  {
+    id: "user-1",
+    email: "admin@workos.com",
+    name: "Admin",
+    bio: null,
+    avatar_url: null,
+    is_active: true,
+    is_admin: true,
+    created_at: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "user-2",
+    email: "demo@workos.app",
+    name: "Demo User",
+    bio: null,
+    avatar_url: null,
+    is_active: true,
+    is_admin: false,
+    created_at: "2024-01-01T00:00:00.000Z",
+  },
+]
+
+function getMockRegistry(): User[] {
+  if (typeof window === "undefined") return MOCK_USERS_SEED
+  try {
+    const raw = localStorage.getItem(MOCK_USERS_KEY)
+    return raw ? JSON.parse(raw) : MOCK_USERS_SEED
+  } catch {
+    return MOCK_USERS_SEED
+  }
+}
+
+function saveMockRegistry(users: User[]) {
+  localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users))
 }
 
 type AuthContextValue = {
@@ -63,9 +90,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     if (MOCK_AUTH) {
       if (!email.trim()) throw new Error("Email required")
-      const mockUser: User = { ...DEMO_USER, email, name: email.split("@")[0] }
+      const registry = getMockRegistry()
+      const found = registry.find((u) => u.email.toLowerCase() === email.toLowerCase())
+      if (found && !found.is_active) throw new Error("This account has been deactivated.")
+      const mockUser: User = found ?? {
+        id: `user-${Date.now()}`,
+        email,
+        name: email.split("@")[0],
+        bio: null,
+        avatar_url: null,
+        is_active: true,
+        is_admin: false,
+        created_at: new Date().toISOString(),
+      }
       localStorage.setItem(MOCK_USER_KEY, JSON.stringify(mockUser))
       document.cookie = "has_session=1; path=/; max-age=86400"
+      document.cookie = `is_admin=${mockUser.is_admin ? "1" : "0"}; path=/; max-age=86400`
       setUser(mockUser)
       return
     }
@@ -87,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (MOCK_AUTH) {
       localStorage.removeItem(MOCK_USER_KEY)
       document.cookie = "has_session=; path=/; max-age=0"
+      document.cookie = "is_admin=; path=/; max-age=0"
       setUser(null)
       return
     }
@@ -121,4 +162,24 @@ export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error("useAuth must be used within AuthProvider")
   return ctx
+}
+
+export function useMockUsers() {
+  const { user: currentUser, updateUser } = useAuth()
+  const [mockUsers, setMockUsers] = useState<User[]>(() => getMockRegistry())
+
+  const updateMockUser = useCallback((id: string, patch: Partial<User>) => {
+    const registry = getMockRegistry()
+    const updated = registry.map((u) => (u.id === id ? { ...u, ...patch } : u))
+    saveMockRegistry(updated)
+    setMockUsers(updated)
+    if (currentUser?.id === id) {
+      updateUser(patch)
+      if (patch.is_admin !== undefined) {
+        document.cookie = `is_admin=${patch.is_admin ? "1" : "0"}; path=/; max-age=86400`
+      }
+    }
+  }, [currentUser, updateUser])
+
+  return { mockUsers, updateMockUser }
 }

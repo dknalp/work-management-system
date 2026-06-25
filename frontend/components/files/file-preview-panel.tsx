@@ -14,28 +14,67 @@ import { FileItem } from "@/lib/actions/files"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { isImageFile, isTextFile, formatSize } from "./file-utils"
 
 interface FilePreviewPanelProps {
   item: FileItem | null
   onClose: () => void
 }
 
+function TextPreview({ url }: { url: string }) {
+  const [content, setContent] = React.useState<string | null>(null)
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    let cancelled = false
+    fetch(url)
+      .then((res) => res.text())
+      .then((text) => {
+        if (cancelled) return
+        setContent(text.length > 10240 ? text.slice(0, 10240) + "\n\n… (truncated)" : text)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setContent("Failed to load preview.")
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [url])
+
+  if (loading) {
+    return (
+      <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">
+        Loading…
+      </div>
+    )
+  }
+
+  let display = content ?? ""
+  // Pretty-print JSON
+  if (url.includes(".json") && content) {
+    try {
+      display = JSON.stringify(JSON.parse(content), null, 2)
+    } catch {
+      display = content
+    }
+  }
+
+  return (
+    <pre className="scrollbar-thin max-h-48 overflow-auto rounded-lg bg-muted/30 p-3 text-[10px] leading-relaxed text-foreground/80 whitespace-pre-wrap break-words font-mono">
+      {display}
+    </pre>
+  )
+}
+
 export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
   if (!item) return null
 
-  const isImage = /\.(jpg|jpeg|png|svg|gif|webp)$/i.test(item.name)
-  const isPDF = /\.pdf$/i.test(item.name)
-  const isText = /\.(txt|md|json|js|ts|css|html)$/i.test(item.name)
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return "0 B"
-    const k = 1024
-    const sizes = ["B", "KB", "MB", "GB", "TB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
-  }
-
   const previewUrl = `/api/files/raw?path=${encodeURIComponent(item.path)}`
+  const isImage = isImageFile(item.name)
+  const isText = isTextFile(item.name)
+  const isPDF = /\.pdf$/i.test(item.name)
 
   return (
     <div className="flex w-80 shrink-0 animate-in flex-col border-l border-border bg-card duration-300 slide-in-from-right">
@@ -44,46 +83,35 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
           <InfoIcon className="size-4 text-primary" />
           Details
         </h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
-          onClick={onClose}
-        >
+        <Button variant="ghost" size="icon" className="size-8" onClick={onClose}>
           <XIcon className="size-4" />
         </Button>
       </div>
 
       <div className="scrollbar-thin flex-1 space-y-6 overflow-y-auto p-6">
         {/* Preview Area */}
-        <div className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/30 shadow-inner">
+        <div
+          className={cn(
+            "group relative flex items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/30 shadow-inner",
+            isText || isPDF ? "p-0" : "aspect-square"
+          )}
+        >
           {isImage ? (
             <img
               src={previewUrl}
               alt={item.name}
               className="max-h-full max-w-full object-contain drop-shadow-md"
             />
+          ) : isText ? (
+            <TextPreview url={previewUrl} />
+          ) : isPDF ? (
+            <iframe
+              src={previewUrl}
+              className="h-64 w-full rounded-2xl border-0"
+              title={item.name}
+            />
           ) : (
             <FileIcon className="size-16 text-muted-foreground/40" />
-          )}
-
-          {isPDF && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 p-4 text-center backdrop-blur-sm">
-              <FileIcon className="mb-3 size-12 text-rose-500" />
-              <p className="px-4 text-xs font-medium">
-                PDF Preview is handled via download or browser viewer.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-4 gap-2"
-                asChild
-              >
-                <a href={previewUrl} target="_blank" rel="noreferrer">
-                  Open PDF
-                </a>
-              </Button>
-            </div>
           )}
         </div>
 
@@ -92,9 +120,7 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
           <div>
             <h4 className="mb-1 truncate text-sm font-bold">{item.name}</h4>
             <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-              {item.isDirectory
-                ? "Folder"
-                : item.name.split(".").pop() + " File"}
+              {item.isDirectory ? "Folder" : item.name.split(".").pop() + " File"}
             </p>
           </div>
 

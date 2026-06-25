@@ -32,14 +32,18 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 **Pages:**
 - `/` — Landing page (marketing, no sidebar)
-- `/dashboard` — Overview with KPI cards, upcoming tasks, recent activity
+- `/dashboard` — Overview with KPI cards, charts, upcoming tasks, recent activity
 - `/dashboard/board` — Kanban pipeline board
 - `/calendar` — Calendar view
 - `/tasks` — Task list
 - `/team` — Team member management
 - `/files/[[...path]]` — File explorer (catch-all route for nested directories)
+- `/profile` — User profile page
+- `/settings` — App settings page
+- `/admin` — Admin panel
+- `/(auth)/login`, `/(auth)/register`, `/(auth)/forgot-password`, `/(auth)/reset-password` — Auth pages (no sidebar, own layout)
 
-**Sidebar layout pattern:** Every app page (not landing) wraps content in:
+**Sidebar layout pattern:** Every app page (not landing/auth) wraps content in:
 ```tsx
 <SidebarProvider style={{ "--sidebar-width": "...", "--header-height": "..." }}>
   <AppSidebar variant="inset" />
@@ -52,7 +56,11 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 **File system:** Files are stored locally under `frontend/data/`. `frontend/lib/actions/files.ts` contains Server Actions for list/delete/rename/move/createFolder. `frontend/lib/actions/upload.ts` handles uploads. `frontend/app/api/files/raw/route.ts` serves raw file bytes for preview. Path traversal is prevented via `getSafePath()` in each action. Server Actions bodySizeLimit is set to 10mb in `frontend/next.config.mjs`.
 
-**State:** No database or auth. All page state is in-memory React state — data resets on page refresh. Kanban initial data is hardcoded in `frontend/components/dashboard/board/kanban-board.tsx`. Task mock data lives in `frontend/components/tasks/task-types.ts` (exported as `MOCK_TASKS`). Team member seed data is hardcoded in `frontend/app/team/page.tsx`. Dashboard chart data comes from `frontend/app/dashboard/data.json`. File explorer is the only server-rendered page, refreshed via `revalidatePath`.
+**State:** No real database. Kanban state is in-memory React state (resets on refresh); hardcoded in `frontend/components/dashboard/board/kanban-board.tsx`. Tasks and activity log are persisted to `localStorage` via `useLocalStorage` (`wms:tasks`, `wms:activity`) — initial seed comes from `MOCK_TASKS` in `frontend/components/tasks/task-types.ts`. Team member seed data is hardcoded in `frontend/app/team/page.tsx`. Dashboard chart data comes from `frontend/app/dashboard/data.json`. File explorer is the only server-rendered page, refreshed via `revalidatePath`.
+
+**Auth:** `frontend/contexts/auth-context.tsx` provides `AuthProvider` / `useAuth()` (exposes `user`, `loading`, `login`, `logout`, `updateUser`). When `NEXT_PUBLIC_MOCK_AUTH=true`, auth bypasses the real API and stores a mock user in `localStorage` (`wms:mock_user`). In real mode, `frontend/lib/auth.ts` stores JWT tokens in `localStorage` (`wos_access_token`, `wos_refresh_token`) and syncs a `has_session` cookie. `frontend/middleware.ts` reads that cookie to gate all protected routes and redirect away from auth pages when already logged in. `frontend/lib/api.ts` is the typed API client (base URL from `NEXT_PUBLIC_API_URL`, defaults to `http://localhost:8000`) with automatic token refresh on 401.
+
+**Contexts:** Three global providers wrap the app in `frontend/app/layout.tsx`: `AuthProvider`, `TaskProvider` (`frontend/contexts/task-context.tsx` — shared task CRUD + activity log, use `useTasks()`), and `TeamProvider` (`frontend/contexts/team-context.tsx`, use `useTeam()`). Always use these hooks instead of prop-drilling.
 
 **Naming collision:** There are two unrelated `Task` types. `frontend/components/tasks/task-types.ts` defines the Tasks-page `Task` (fields: `title`, `status`, `assignee`, `dueDate`, `tags`). `frontend/components/dashboard/board/kanban-card.tsx` defines the Kanban `Task` (fields: `content`, `columnId`, `priority`, `tags`). Never import one where the other is expected.
 
@@ -72,6 +80,6 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 **Path alias:** `@/*` maps to the `frontend/` root (e.g. `@/components/ui/button`).
 
-**Fonts:** Inter (sans), Instrument Serif, Geist Mono — loaded via `next/font/google` and exposed as CSS variables in `frontend/app/layout.tsx`.
+**Fonts:** Geist (sans), Instrument Serif, Geist Mono — loaded via `next/font/google` and exposed as CSS variables (`--font-sans`, `--font-instrument-serif`, `--font-mono`) in `frontend/app/layout.tsx`. (Note: the variable is named `--font-sans` even though the font is Geist, not Inter.)
 
 **Theme:** Dark/light via `next-themes` (`frontend/components/theme-provider.tsx`). Toggle in `frontend/components/mode-toggle.tsx`.

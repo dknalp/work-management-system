@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { FileItem } from "@/lib/actions/files"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileLayout } from "./file-layout"
 import { FileExplorer } from "./file-explorer"
 import { FileBreadcrumbs } from "./file-breadcrumbs"
@@ -14,8 +15,9 @@ interface FileClientPageProps {
 }
 
 export function FileClientPage({ items, currentPath }: FileClientPageProps) {
-  const [viewMode, setViewMode] = React.useState<"grid" | "list">("list")
+  const [viewMode, setViewMode] = useLocalStorage<"grid" | "list">("wms:files:viewMode", "list")
   const [showPreview, setShowPreview] = React.useState(true)
+  const [searchQuery, setSearchQuery] = React.useState("")
 
   return (
     <FileLayout
@@ -24,6 +26,8 @@ export function FileClientPage({ items, currentPath }: FileClientPageProps) {
       onViewModeChange={setViewMode}
       showPreview={showPreview}
       onTogglePreview={() => setShowPreview(!showPreview)}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
     >
       <FileDropZone currentPath={currentPath}>
         <div className="flex flex-1 flex-col">
@@ -38,6 +42,7 @@ export function FileClientPage({ items, currentPath }: FileClientPageProps) {
             viewMode={viewMode}
             showPreview={showPreview}
             onTogglePreview={() => setShowPreview(!showPreview)}
+            searchQuery={searchQuery}
           />
         </div>
       </FileDropZone>

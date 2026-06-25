@@ -1,70 +1,157 @@
 import { NextRequest, NextResponse } from "next/server"
-import fs from "fs/promises"
+import fs from "fs"
 import path from "path"
-
-const ROOT_DIR = path.resolve(process.cwd(), "data")
+import { getStoragePath } from "@/lib/storage-config"
+import crypto from "crypto"
 
 function getSafePath(relativePath: string): string | null {
-  const fullPath = path.resolve(ROOT_DIR, relativePath)
-  if (fullPath !== ROOT_DIR && !fullPath.startsWith(ROOT_DIR + path.sep)) {
+  const rootDir = getStoragePath()
+  const fullPath = path.resolve(rootDir, relativePath)
+  if (fullPath !== rootDir && !fullPath.startsWith(rootDir + path.sep)) {
     return null
   }
   return fullPath
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const relativePath = searchParams.get("path")
-
-  if (!relativePath || !relativePath.trim()) {
-    return new NextResponse("Path is required", { status: 400 })
-  }
-
-  const fullPath = getSafePath(relativePath)
-
-  if (!fullPath) {
-    return new NextResponse("Forbidden", { status: 403 })
-  }
-
-  try {
-    const stats = await fs.stat(fullPath)
-    if (!stats.isFile()) {
-      return new NextResponse("Path is not a file", { status: 400 })
-    }
-
-    const fileBuffer = await fs.readFile(fullPath)
-
-    // Determine content type
-    const ext = path.extname(fullPath).toLowerCase()
-    const contentType = getContentType(ext)
-
-    return new NextResponse(fileBuffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Length": stats.size.toString(),
-      },
-    })
-  } catch (error) {
-    console.error("File error:", error)
-    return new NextResponse("File not found", { status: 404 })
-  }
-}
-
-function getContentType(ext: string) {
+function getContentType(ext: string): string {
   const mimeTypes: Record<string, string> = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".svg": "image/svg+xml",
     ".gif": "image/gif",
+    ".webp": "image/webp",
     ".pdf": "application/pdf",
-    ".txt": "text/plain",
-    ".md": "text/markdown",
-    ".json": "application/json",
-    ".js": "application/javascript",
-    ".ts": "application/typescript",
-    ".css": "text/css",
-    ".html": "text/html",
+    ".txt": "text/plain; charset=utf-8",
+    ".md": "text/markdown; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".ts": "application/typescript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".html": "text/html; charset=utf-8",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+    ".aac": "audio/aac",
+    ".zip": "application/zip",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   }
-  return mimeTypes[ext] || "application/octet-stream"
+  return mimeTypes[ext.toLowerCase()] || "application/octet-stream"
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const relativePath = searchParams.get("path")
+
+  if (!relativePath?.trim()) {
+    return new NextResponse("Path is required", { status: 400 })
+  }
+
+  const fullPath = getSafePath(relativePath)
+  if (!fullPath) {
+    return new NextResponse("Forbidden", { status: 403 })
+  }
+
+  let stats: fs.Stats
+  try {
+    stats = fs.statSync(fullPath)
+    if (!stats.isFile()) {
+      return new NextResponse("Path is not a file", { status: 400 })
+    }
+  } catch {
+    return new NextResponse("File not found", { status: 404 })
+  }
+
+  const ext = path.extname(fullPath)
+  const contentType = getContentType(ext)
+  const fileSize = stats.size
+  const mtime = stats.mtime.toUTCString()
+  const etag = `"${crypto.createHash("md5").update(`${stats.mtimeMs}-${fileSize}`).digest("hex")}"`
+
+  // 304 Not Modified checks
+  const ifNoneMatch = request.headers.get("if-none-match")
+  const ifModifiedSince = request.headers.get("if-modified-since")
+  if (ifNoneMatch === etag) {
+    return new NextResponse(null, { status: 304 })
+  }
+  if (ifModifiedSince && new Date(ifModifiedSince) >= stats.mtime) {
+    return new NextResponse(null, { status: 304 })
+  }
+
+  const commonHeaders: Record<string, string> = {
+    "Content-Type": contentType,
+    "Accept-Ranges": "bytes",
+    "ETag": etag,
+    "Last-Modified": mtime,
+    "Cache-Control": "private, max-age=3600",
+  }
+
+  // Range request (video seek, resume download)
+  const rangeHeader = request.headers.get("range")
+  if (rangeHeader) {
+    const match = rangeHeader.match(/bytes=(\d*)-(\d*)/)
+    if (!match) {
+      return new NextResponse("Invalid Range", { status: 416 })
+    }
+    const start = match[1] ? parseInt(match[1]) : 0
+    const end = match[2] ? parseInt(match[2]) : fileSize - 1
+    const clampedEnd = Math.min(end, fileSize - 1)
+
+    if (start > clampedEnd || start >= fileSize) {
+      return new NextResponse(null, {
+        status: 416,
+        headers: { "Content-Range": `bytes */${fileSize}` },
+      })
+    }
+
+    const chunkSize = clampedEnd - start + 1
+    const nodeStream = fs.createReadStream(fullPath, { start, end: clampedEnd })
+    const webStream = new ReadableStream({
+      start(controller) {
+        nodeStream.on("data", (chunk) => controller.enqueue(chunk))
+        nodeStream.on("end", () => controller.close())
+        nodeStream.on("error", (err) => controller.error(err))
+      },
+      cancel() {
+        nodeStream.destroy()
+      },
+    })
+
+    return new NextResponse(webStream, {
+      status: 206,
+      headers: {
+        ...commonHeaders,
+        "Content-Range": `bytes ${start}-${clampedEnd}/${fileSize}`,
+        "Content-Length": chunkSize.toString(),
+      },
+    })
+  }
+
+  // Full file — stream it
+  const nodeStream = fs.createReadStream(fullPath)
+  const webStream = new ReadableStream({
+    start(controller) {
+      nodeStream.on("data", (chunk) => controller.enqueue(chunk))
+      nodeStream.on("end", () => controller.close())
+      nodeStream.on("error", (err) => controller.error(err))
+    },
+    cancel() {
+      nodeStream.destroy()
+    },
+  })
+
+  return new NextResponse(webStream, {
+    status: 200,
+    headers: {
+      ...commonHeaders,
+      "Content-Length": fileSize.toString(),
+    },
+  })
 }

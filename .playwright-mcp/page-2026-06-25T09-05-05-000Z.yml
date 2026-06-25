@@ -1,0 +1,96 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - button "Open Next.js Dev Tools" [ref=e10] [cursor=pointer]:
+    - img [ref=e11]
+  - alert [ref=e14]
+  - generic [ref=e15]:
+    - generic [ref=e18]:
+      - list [ref=e20]:
+        - listitem [ref=e21]:
+          - link "WorkOS" [ref=e22] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e24]
+            - generic [ref=e27]: WorkOS
+      - generic [ref=e28]:
+        - list [ref=e31]:
+          - listitem [ref=e32]:
+            - link "Analytics" [ref=e33] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e34]
+              - generic [ref=e39]: Analytics
+          - listitem [ref=e40]:
+            - link "Pipeline board view" [ref=e41] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e42]
+              - generic [ref=e43]: Pipeline board view
+          - listitem [ref=e44]:
+            - link "Tasks" [ref=e45] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e46]
+              - generic [ref=e49]: Tasks
+          - listitem [ref=e50]:
+            - link "Calendar" [ref=e51] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e52]
+              - generic [ref=e54]: Calendar
+          - listitem [ref=e55]:
+            - link "Files" [ref=e56] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e57]
+              - generic [ref=e59]: Files
+          - listitem [ref=e60]:
+            - link "Team" [ref=e61] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e62]
+              - generic [ref=e67]: Team
+        - list [ref=e70]:
+          - listitem [ref=e71]:
+            - link "Admin" [ref=e72] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=e73]
+              - generic [ref=e75]: Admin
+          - listitem [ref=e76]:
+            - link "Settings" [ref=e77] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e78]
+              - generic [ref=e81]: Settings
+      - list [ref=e83]:
+        - listitem [ref=e84]:
+          - button "A Admin admin@workos.com" [ref=e85]:
+            - generic [ref=e87]: A
+            - generic [ref=e88]:
+              - generic [ref=e89]: Admin
+              - generic [ref=e90]: admin@workos.com
+            - img [ref=e91]
+    - main [ref=e95]:
+      - generic [ref=e97]:
+        - generic [ref=e98]:
+          - button "Toggle Sidebar" [ref=e99]:
+            - img
+            - generic [ref=e100]: Toggle Sidebar
+          - generic [ref=e101]: Activity Log
+        - generic [ref=e103]:
+          - img
+          - textbox "Global search" [ref=e104] [cursor=pointer]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e105]:
+          - button [ref=e106]:
+            - img
+          - button "Create New" [ref=e107]:
+            - img
+            - generic [ref=e108]: Create New
+      - main [ref=e109]:
+        - link "Admin Panel" [ref=e111] [cursor=pointer]:
+          - /url: /admin
+          - img [ref=e112]
+          - text: Admin Panel
+        - generic [ref=e114]:
+          - img [ref=e116]
+          - generic [ref=e118]:
+            - heading "Activity Log" [level=1] [ref=e119]
+            - paragraph [ref=e120]: 0 events recorded.
+        - paragraph [ref=e123]: No activity yet.

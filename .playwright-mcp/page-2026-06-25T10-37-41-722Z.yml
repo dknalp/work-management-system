@@ -1,0 +1,116 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analytics" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analytics
+          - listitem [ref=e30]:
+            - link "Pipeline board view" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline board view
+          - listitem [ref=e34]:
+            - link "Tasks" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Tasks
+          - listitem [ref=e40]:
+            - link "Calendar" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Calendar
+          - listitem [ref=e45]:
+            - link "Files" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Files
+          - listitem [ref=e50]:
+            - link "Team" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Team
+        - list [ref=e60]:
+          - listitem [ref=e61]:
+            - link "Settings" [ref=e62] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e63]
+              - generic [ref=e66]: Settings
+      - list [ref=e68]:
+        - listitem [ref=e69]:
+          - button ". ..." [ref=e70]:
+            - generic [ref=e72]: .
+            - generic [ref=e74]: ...
+            - img [ref=e75]
+    - main [ref=e79]:
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - button "Toggle Sidebar" [ref=e83]:
+            - img
+            - generic [ref=e84]: Toggle Sidebar
+          - generic [ref=e85]: Settings
+        - generic [ref=e87]:
+          - img
+          - textbox "Global search" [ref=e88] [cursor=pointer]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e89]:
+          - button [ref=e90]:
+            - img
+          - button "Create New" [ref=e91]:
+            - img
+            - generic [ref=e92]: Create New
+      - main [ref=e93]:
+        - generic [ref=e94]:
+          - heading "Settings" [level=1] [ref=e95]
+          - paragraph [ref=e96]: Manage your workspace preferences.
+        - generic [ref=e97]:
+          - navigation [ref=e98]:
+            - button "Appearance" [ref=e99]:
+              - img [ref=e100]
+              - text: Appearance
+            - button "Notifications" [ref=e106]:
+              - img [ref=e107]
+              - text: Notifications
+            - button "Privacy & Security" [ref=e110]:
+              - img [ref=e111]
+              - text: Privacy & Security
+          - generic [ref=e114]:
+            - generic [ref=e115]:
+              - heading "Appearance" [level=2] [ref=e116]
+              - paragraph [ref=e117]: Customize how WorkOS looks on your device.
+            - generic [ref=e118]:
+              - generic [ref=e119]: Theme
+              - paragraph [ref=e120]: Select the color scheme for the interface.
+              - generic [ref=e121]:
+                - button "Warm" [ref=e122]:
+                  - generic [ref=e126]: Warm
+                - button "Slate" [ref=e127]:
+                  - generic [ref=e131]: Slate
+                - button "Dark" [ref=e132]:
+                  - generic [ref=e136]: Dark
+                - button "Forest" [ref=e137]:
+                  - generic [ref=e141]: Forest
+                - button "Midnight" [ref=e142]:
+                  - generic [ref=e146]: Midnight
+            - generic [ref=e147]:
+              - generic [ref=e148]: Language
+              - paragraph [ref=e149]: Choose your preferred display language.
+              - combobox [ref=e150]:
+                - img
+              - combobox [ref=e151]
+  - button "Open Next.js Dev Tools" [ref=e157] [cursor=pointer]:
+    - img [ref=e158]

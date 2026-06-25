@@ -1,46 +1,40 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-const PROTECTED_PREFIXES = [
-  "/dashboard",
-  "/tasks",
-  "/calendar",
-  "/files",
-  "/team",
-  "/settings",
-  "/profile",
-  "/admin",
-]
+const PUBLIC_PATHS = ["/", "/login", "/register", "/forgot-password", "/reset-password"]
+const AUTH_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"]
 
-const AUTH_ROUTES = ["/login", "/forgot-password", "/reset-password"]
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  const hasSession = request.cookies.get("has_session")?.value === "1"
+  const isAdmin = request.cookies.get("is_admin")?.value === "1"
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
-  const hasSession = req.cookies.has("has_session")
+  const isPublic = PUBLIC_PATHS.includes(pathname)
+  const isAuthPath = AUTH_PATHS.some((p) => pathname === p || pathname.startsWith(`/(auth)${p}`))
 
-  const isProtected = PROTECTED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  )
-  const isAuthRoute = AUTH_ROUTES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  )
-
-  if (isProtected && !hasSession) {
-    const url = req.nextUrl.clone()
-    url.pathname = "/login"
-    url.searchParams.set("from", pathname)
-    return NextResponse.redirect(url)
+  // Redirect logged-in users away from auth pages
+  if (hasSession && isAuthPath) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  if (isAuthRoute && hasSession) {
-    const url = req.nextUrl.clone()
-    url.pathname = "/dashboard"
-    url.searchParams.delete("from")
-    return NextResponse.redirect(url)
+  // Guard admin routes — redirect non-admins to dashboard
+  if (pathname.startsWith("/admin")) {
+    if (!hasSession || !isAdmin) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Guard all other protected routes
+  if (!isPublic && !isAuthPath && !hasSession) {
+    return NextResponse.redirect(new URL("/login", request.url))
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon\\.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/).*)",
+  ],
 }

@@ -6,7 +6,7 @@ import { formatDistanceToNow } from "date-fns"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Comment, Reply } from "@/components/tasks/task-types"
+import { Comment, Reply } from "@/types/task"
 import { useAuth } from "@/contexts/auth-context"
 
 interface CommentsModalProps {

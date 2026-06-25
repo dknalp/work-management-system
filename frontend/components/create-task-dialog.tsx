@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select"
 import { useTasks } from "@/contexts/task-context"
 import { useTeam } from "@/contexts/team-context"
-import { Task } from "@/components/tasks/task-types"
+import { Task } from "@/types/task"
 import { toast } from "sonner"
 
 interface CreateTaskDialogProps {

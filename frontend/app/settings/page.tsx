@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SiteHeader } from "@/components/layout/site-header"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
-import { MonitorIcon, SunIcon, MoonIcon, BellIcon, ShieldIcon, PaletteIcon } from "lucide-react"
+import { CheckIcon, BellIcon, ShieldIcon, PaletteIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const TABS = [
@@ -86,24 +86,39 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground">
                       Select the color scheme for the interface.
                     </p>
-                    <div className="mt-3 flex gap-3">
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                       {[
-                        { value: "light", label: "Light", icon: SunIcon },
-                        { value: "dark", label: "Dark", icon: MoonIcon },
-                        { value: "system", label: "System", icon: MonitorIcon },
-                      ].map(({ value, label, icon: Icon }) => (
+                        { name: "warm",     label: "Warm",     bg: "oklch(0.955 0.014 80)",  primary: "oklch(0.16 0.015 60)",  accent: "oklch(0.89 0.024 80)"  },
+                        { name: "slate",    label: "Slate",    bg: "oklch(0.970 0.004 240)", primary: "oklch(0.20 0.010 250)", accent: "oklch(0.91 0.007 240)" },
+                        { name: "dark",     label: "Dark",     bg: "oklch(0.130 0.018 220)", primary: "oklch(0.650 0.120 220)",accent: "oklch(0.230 0.020 220)"},
+                        { name: "forest",   label: "Forest",   bg: "oklch(0.120 0.018 150)", primary: "oklch(0.600 0.150 145)",accent: "oklch(0.220 0.022 148)"},
+                        { name: "midnight", label: "Midnight", bg: "oklch(0.110 0.022 270)", primary: "oklch(0.680 0.140 265)",accent: "oklch(0.210 0.025 268)"},
+                      ].map((t) => (
                         <button
-                          key={value}
-                          onClick={() => { setTheme(value); toast.success(`Theme set to ${label}`) }}
+                          key={t.name}
+                          onClick={() => { setTheme(t.name); toast.success(`Theme set to ${t.label}`) }}
                           className={cn(
-                            "flex flex-1 flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all",
-                            theme === value
-                              ? "border-primary bg-primary/5 text-primary"
-                              : "border-border text-muted-foreground hover:border-border/80 hover:bg-muted/40"
+                            "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
+                            theme === t.name
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-border/80 hover:bg-muted/40"
                           )}
                         >
-                          <Icon className="size-5" />
-                          <span className="text-xs font-medium">{label}</span>
+                          <div
+                            className="relative flex h-10 w-full items-center justify-center gap-1 rounded-md border border-black/10"
+                            style={{ backgroundColor: t.bg }}
+                          >
+                            <div className="size-3 rounded-full" style={{ backgroundColor: t.primary }} />
+                            <div className="size-2 rounded-full opacity-60" style={{ backgroundColor: t.accent }} />
+                            {theme === t.name && (
+                              <div className="absolute right-1 top-1">
+                                <CheckIcon className="size-3" style={{ color: t.primary }} />
+                              </div>
+                            )}
+                          </div>
+                          <span className={cn("text-xs font-medium", theme === t.name ? "text-primary" : "text-muted-foreground")}>
+                            {t.label}
+                          </span>
                         </button>
                       ))}
                     </div>

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
-import { SubTask } from "@/components/tasks/task-types"
+import { SubTask } from "@/types/task"
 
 interface SubtasksModalProps {
   open: boolean

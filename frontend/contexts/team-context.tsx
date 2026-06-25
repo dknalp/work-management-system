@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useCallback } from "react"
-import { useLocalStorage } from "@/lib/use-local-storage"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 
 export type TeamMember = {
   id: string

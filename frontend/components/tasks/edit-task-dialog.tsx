@@ -28,7 +28,7 @@ import {
   TaskPriority,
   TASK_STATUSES,
   TASK_PRIORITIES,
-} from "./task-types"
+} from "@/types/task"
 
 interface EditTaskDialogProps {
   task: Task | null

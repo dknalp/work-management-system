@@ -20,6 +20,7 @@ const routeLabels: Record<string, string> = {
   "/settings": "Settings",
   "/profile": "Profile",
   "/admin": "Admin Panel",
+  "/admin/activity": "Activity Log",
 }
 
 function getRouteLabel(pathname: string): string {

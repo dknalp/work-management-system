@@ -1,9 +1,17 @@
 "use client"
 
 import React, { useState, useMemo } from "react"
-import { DayPicker } from "react-day-picker"
-import "react-day-picker/dist/style.css"
-import { format, parseISO, isToday, isSameDay, startOfMonth, endOfMonth } from "date-fns"
+import {
+  format,
+  parseISO,
+  isToday,
+  isSameDay,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  addDays,
+  isSameMonth,
+} from "date-fns"
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,15 +20,16 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  CalendarDays,
 } from "lucide-react"
-import { AppSidebar } from "@/components/app-sidebar"
-import { SiteHeader } from "@/components/site-header"
+import { AppSidebar } from "@/components/layout/app-sidebar"
+import { SiteHeader } from "@/components/layout/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useTasks } from "@/contexts/task-context"
-import { Task, TaskPriority } from "@/components/tasks/task-types"
+import { Task, TaskPriority } from "@/types/task"
 import { toast } from "sonner"
 
 type CalendarTask = {
@@ -29,7 +38,6 @@ type CalendarTask = {
   date: string
   priority: "low" | "medium" | "high"
   completed: boolean
-  time?: string
 }
 
 const PRIORITY_COLOR: Record<string, string> = {
@@ -37,6 +45,13 @@ const PRIORITY_COLOR: Record<string, string> = {
   medium: "bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30",
   high: "bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-500/30",
   urgent: "bg-rose-500/20 text-rose-700 dark:text-rose-400 border-rose-500/30",
+}
+
+const CHIP_COLOR: Record<string, string> = {
+  low: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  medium: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  high: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
+  urgent: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
 }
 
 const DOT_COLOR: Record<string, string> = {
@@ -51,6 +66,25 @@ function taskToPriority(p: string): "low" | "medium" | "high" {
   return p as "low" | "medium" | "high"
 }
 
+function buildCalendarWeeks(year: number, month: number) {
+  const firstOfMonth = new Date(year, month, 1)
+  const gridStart = startOfWeek(firstOfMonth, { weekStartsOn: 0 })
+  const weeks: { date: Date; isCurrentMonth: boolean }[][] = []
+  let current = gridStart
+  while (weeks.length < 6) {
+    const week: { date: Date; isCurrentMonth: boolean }[] = []
+    for (let d = 0; d < 7; d++) {
+      week.push({ date: current, isCurrentMonth: isSameMonth(current, firstOfMonth) })
+      current = addDays(current, 1)
+    }
+    weeks.push(week)
+    if (weeks.length >= 4 && !isSameMonth(current, firstOfMonth)) break
+  }
+  return weeks
+}
+
+const DAY_HEADERS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+
 export default function CalendarPage() {
   const { tasks, addTask, updateTask, deleteTask } = useTasks()
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -60,7 +94,6 @@ export default function CalendarPage() {
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium")
   const [newTime, setNewTime] = useState("")
 
-  // Derive calendar tasks from TaskContext (only tasks with a dueDate)
   const calendarTasks: CalendarTask[] = useMemo(
     () =>
       tasks
@@ -75,16 +108,35 @@ export default function CalendarPage() {
     [tasks]
   )
 
-  const selectedDateStr = format(selectedDay, "yyyy-MM-dd")
+  const weeks = useMemo(
+    () => buildCalendarWeeks(currentMonth.getFullYear(), currentMonth.getMonth()),
+    [currentMonth]
+  )
 
+  const selectedDateStr = format(selectedDay, "yyyy-MM-dd")
   const tasksForSelectedDay = calendarTasks.filter((t) => t.date === selectedDateStr)
 
-  // Compute which dates have tasks (for dot indicators)
-  const datesWithTasks = useMemo(() => {
-    const set = new Set<string>()
-    calendarTasks.forEach((t) => set.add(t.date))
-    return set
-  }, [calendarTasks])
+  const monthTaskCount = useMemo(
+    () =>
+      calendarTasks.filter((t) => {
+        const d = parseISO(t.date)
+        return d >= startOfMonth(currentMonth) && d <= endOfMonth(currentMonth)
+      }).length,
+    [calendarTasks, currentMonth]
+  )
+
+  const monthDoneCount = useMemo(
+    () =>
+      calendarTasks.filter((t) => {
+        const d = parseISO(t.date)
+        return (
+          t.completed &&
+          d >= startOfMonth(currentMonth) &&
+          d <= endOfMonth(currentMonth)
+        )
+      }).length,
+    [calendarTasks, currentMonth]
+  )
 
   function handleAddTask() {
     if (!newTitle.trim()) return
@@ -135,105 +187,118 @@ export default function CalendarPage() {
       <SidebarInset>
         <SiteHeader />
         <main className="flex flex-1 overflow-hidden bg-background">
-          <div className="flex flex-1 flex-col lg:flex-row gap-0 overflow-hidden">
-            {/* Calendar panel */}
-            <div className="flex flex-col items-center p-6 lg:w-[400px] border-r border-border shrink-0">
-              {/* Month nav */}
-              <div className="flex w-full items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">
-                  {format(currentMonth, "MMMM yyyy")}
-                </h2>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={prevMonth}>
-                    <ChevronLeft size={16} />
+          <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
+
+            {/* ── Left: Calendar grid ─────────────────────────────── */}
+            <div className="flex flex-col lg:w-[52%] border-r border-border overflow-hidden">
+
+              {/* Month header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" onClick={prevMonth} className="h-7 w-7">
+                    <ChevronLeft size={15} />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={nextMonth}>
-                    <ChevronRight size={16} />
+                  <h2 className="text-sm font-semibold w-32 text-center tabular-nums">
+                    {format(currentMonth, "MMMM yyyy")}
+                  </h2>
+                  <Button variant="ghost" size="icon" onClick={nextMonth} className="h-7 w-7">
+                    <ChevronRight size={15} />
                   </Button>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>{monthTaskCount} tasks</span>
+                  {monthDoneCount > 0 && (
+                    <span className="text-emerald-600 font-medium">{monthDoneCount} done</span>
+                  )}
                 </div>
               </div>
 
-              <DayPicker
-                mode="single"
-                month={currentMonth}
-                selected={selectedDay}
-                onSelect={(d) => d && setSelectedDay(d)}
-                onMonthChange={setCurrentMonth}
-                showOutsideDays
-                className="w-full"
-                classNames={{
-                  months: "flex flex-col",
-                  month: "space-y-2",
-                  caption: "hidden",
-                  nav: "hidden",
-                  table: "w-full border-collapse",
-                  head_row: "flex",
-                  head_cell:
-                    "text-muted-foreground w-full text-center text-xs font-medium pb-1",
-                  row: "flex w-full",
-                  cell: "w-full text-center relative",
-                  day: cn(
-                    "h-9 w-full rounded-md text-sm hover:bg-accent transition-colors",
-                    "focus:outline-none focus:ring-1 focus:ring-ring"
-                  ),
-                  day_selected: "bg-primary text-primary-foreground hover:bg-primary",
-                  day_today: "font-bold text-primary",
-                  day_outside: "text-muted-foreground/50",
-                  day_disabled: "text-muted-foreground/30",
-                }}
-                modifiers={{
-                  hasTasks: Array.from(datesWithTasks).map((s) => new Date(s + "T12:00:00")),
-                }}
-                modifiersClassNames={{
-                  hasTasks: "has-tasks",
-                }}
-              />
+              {/* Day-of-week header row */}
+              <div className="grid grid-cols-7 border-b border-border shrink-0">
+                {DAY_HEADERS.map((d) => (
+                  <div
+                    key={d}
+                    className="py-2 text-center text-[11px] font-medium text-muted-foreground"
+                  >
+                    {d}
+                  </div>
+                ))}
+              </div>
 
-              {/* Quick stats */}
-              <div className="mt-4 w-full rounded-lg border border-border bg-muted/30 p-3 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  This month
-                </p>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total tasks</span>
-                  <span className="font-medium">
-                    {
-                      calendarTasks.filter((t) => {
-                        const d = parseISO(t.date)
-                        return (
-                          d >= startOfMonth(currentMonth) &&
-                          d <= endOfMonth(currentMonth)
-                        )
-                      }).length
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Completed</span>
-                  <span className="font-medium text-emerald-600">
-                    {
-                      calendarTasks.filter((t) => {
-                        const d = parseISO(t.date)
-                        return (
-                          t.completed &&
-                          d >= startOfMonth(currentMonth) &&
-                          d <= endOfMonth(currentMonth)
-                        )
-                      }).length
-                    }
-                  </span>
-                </div>
+              {/* Calendar cells */}
+              <div className="flex-1 overflow-y-auto">
+                {weeks.map((week, wi) => (
+                  <div key={wi} className="grid grid-cols-7 border-b border-border last:border-b-0">
+                    {week.map(({ date, isCurrentMonth }) => {
+                      const dayStr = format(date, "yyyy-MM-dd")
+                      const dayTasks = calendarTasks.filter((t) => t.date === dayStr)
+                      const isSelected = isSameDay(date, selectedDay)
+                      const isTodayDate = isToday(date)
+
+                      return (
+                        <button
+                          key={dayStr}
+                          onClick={() => setSelectedDay(date)}
+                          className={cn(
+                            "relative flex flex-col items-start px-1.5 pt-1.5 pb-2 text-left",
+                            "border-r border-border last:border-r-0",
+                            "min-h-[90px] transition-colors",
+                            "hover:bg-accent/50",
+                            isSelected && "bg-primary/[0.06]",
+                            !isCurrentMonth && "bg-muted/20"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-flex h-6 w-6 items-center justify-center rounded-full",
+                              "text-xs font-medium mb-1 shrink-0",
+                              !isCurrentMonth && "text-muted-foreground/50",
+                              isCurrentMonth && !isTodayDate && !isSelected && "text-foreground",
+                              isTodayDate && "bg-primary text-primary-foreground",
+                              isSelected && !isTodayDate && "ring-1 ring-primary text-primary"
+                            )}
+                          >
+                            {format(date, "d")}
+                          </span>
+
+                          {dayTasks.slice(0, 2).map((task) => (
+                            <span
+                              key={task.id}
+                              className={cn(
+                                "mb-0.5 w-full truncate rounded px-1.5 py-px text-[10px] leading-tight",
+                                CHIP_COLOR[task.priority],
+                                task.completed && "opacity-50 line-through"
+                              )}
+                            >
+                              {task.title}
+                            </span>
+                          ))}
+
+                          {dayTasks.length > 2 && (
+                            <span className="mt-0.5 text-[10px] text-muted-foreground px-1">
+                              +{dayTasks.length - 2} more
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Day detail panel */}
-            <div className="flex flex-1 flex-col overflow-hidden p-6">
-              <div className="mb-5 flex items-start justify-between">
+            {/* ── Right: Day detail ───────────────────────────────── */}
+            <div className="flex flex-1 flex-col overflow-hidden">
+
+              {/* Day header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
                 <div>
-                  <h2 className="text-xl font-semibold">
-                    {isToday(selectedDay) ? "Today" : format(selectedDay, "EEEE")}
+                  <h2 className="text-base font-semibold leading-tight">
+                    {isToday(selectedDay)
+                      ? "Today"
+                      : format(selectedDay, "EEEE")}
                   </h2>
-                  <p className="text-sm text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {format(selectedDay, "MMMM d, yyyy")}
                   </p>
                 </div>
@@ -242,80 +307,80 @@ export default function CalendarPage() {
                   onClick={() => setShowAddForm((v) => !v)}
                   variant={showAddForm ? "secondary" : "default"}
                 >
-                  <Plus size={15} className="mr-1" />
+                  <Plus size={14} className="mr-1" />
                   Add task
                 </Button>
               </div>
 
-              {/* Add task form */}
-              {showAddForm && (
-                <div className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
-                  <Input
-                    autoFocus
-                    placeholder="Task title…"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddTask()
-                      if (e.key === "Escape") setShowAddForm(false)
-                    }}
-                  />
-                  <div className="flex items-center gap-2">
+              <div className="flex flex-col flex-1 overflow-y-auto px-6 py-4 gap-3">
+                {/* Add task form */}
+                {showAddForm && (
+                  <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3 shrink-0">
                     <Input
-                      type="time"
-                      value={newTime}
-                      onChange={(e) => setNewTime(e.target.value)}
-                      className="h-8 w-28 text-sm"
+                      autoFocus
+                      placeholder="Task title…"
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddTask()
+                        if (e.key === "Escape") setShowAddForm(false)
+                      }}
                     />
-                    <div className="flex gap-1">
-                      {(["low", "medium", "high"] as const).map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => setNewPriority(p as TaskPriority)}
-                          className={cn(
-                            "rounded-full px-2.5 py-0.5 text-xs border capitalize transition-colors",
-                            PRIORITY_COLOR[p],
-                            newPriority === p ? "ring-1 ring-offset-1 ring-current" : "opacity-60"
-                          )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Input
+                        type="time"
+                        value={newTime}
+                        onChange={(e) => setNewTime(e.target.value)}
+                        className="h-8 w-28 text-sm"
+                      />
+                      <div className="flex gap-1">
+                        {(["low", "medium", "high"] as const).map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setNewPriority(p as TaskPriority)}
+                            className={cn(
+                              "rounded-full px-2.5 py-0.5 text-xs border capitalize transition-colors",
+                              PRIORITY_COLOR[p],
+                              newPriority === p
+                                ? "ring-1 ring-offset-1 ring-current"
+                                : "opacity-60"
+                            )}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="ml-auto flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowAddForm(false)}
                         >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="ml-auto flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setShowAddForm(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button size="sm" onClick={handleAddTask}>
-                        Add
-                      </Button>
+                          Cancel
+                        </Button>
+                        <Button size="sm" onClick={handleAddTask}>
+                          Add
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Task list */}
-              {tasksForSelectedDay.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-                  <div className="rounded-full bg-muted p-4">
-                    <Clock size={28} className="opacity-50" />
+                {/* Task list */}
+                {tasksForSelectedDay.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center flex-1 gap-3 text-muted-foreground py-16">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60">
+                      <CalendarDays size={22} className="opacity-40" />
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="text-sm font-medium text-foreground/60">No tasks this day</p>
+                      <p className="text-xs text-muted-foreground">
+                        Click &ldquo;Add task&rdquo; to schedule something here.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm">No tasks scheduled for this day.</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAddForm(true)}
-                  >
-                    <Plus size={14} className="mr-1" /> Schedule a task
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2 overflow-y-auto">
-                  {tasksForSelectedDay.map((task) => (
+                ) : (
+                  tasksForSelectedDay.map((task) => (
                     <div
                       key={task.id}
                       className={cn(
@@ -344,12 +409,6 @@ export default function CalendarPage() {
                           {task.title}
                         </span>
                         <div className="flex items-center gap-2">
-                          {task.time && (
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock size={11} />
-                              {task.time}
-                            </span>
-                          )}
                           <span
                             className={cn(
                               "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] border capitalize font-medium",
@@ -357,10 +416,7 @@ export default function CalendarPage() {
                             )}
                           >
                             <span
-                              className={cn(
-                                "h-1.5 w-1.5 rounded-full",
-                                DOT_COLOR[task.priority]
-                              )}
+                              className={cn("h-1.5 w-1.5 rounded-full", DOT_COLOR[task.priority])}
                             />
                             {task.priority}
                           </span>
@@ -373,10 +429,11 @@ export default function CalendarPage() {
                         <Trash2 size={15} />
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </div>
+
           </div>
         </main>
       </SidebarInset>
