@@ -8,6 +8,7 @@ import { TaskProvider } from "@/contexts/task-context"
 import { CommandPalette } from "@/components/command-palette"
 import { TeamProvider } from "@/contexts/team-context"
 import { cn } from "@/lib/utils"
+import { ChatWidgetWrapper } from "@/components/chat-widget-wrapper"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -42,7 +43,7 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <AuthProvider><TaskProvider><TeamProvider><CommandPalette />
-            <TooltipProvider>{children}</TooltipProvider>
+            <TooltipProvider>{children}<ChatWidgetWrapper /></TooltipProvider>
           </TeamProvider></TaskProvider></AuthProvider>
         </ThemeProvider>
       </body>

@@ -201,6 +201,134 @@ export async function listFilesRecursive(query: string): Promise<FileItem[]> {
   return results
 }
 
+// ─── Advanced Search ──────────────────────────────────────────────────────────
+
+export type SearchResult = FileItem & {
+  matchType: "name" | "content"
+  contentSnippet?: string
+}
+
+export type SearchOptions = {
+  query: string
+  scope: string       // relative path to search under, "" = entire storage
+  fileTypes: string[] // [] = all types, ["pdf","docx"] = specific extensions
+  includeContent: boolean
+  maxResults?: number
+}
+
+const CONCURRENCY = 10
+
+export async function searchFiles(opts: SearchOptions): Promise<SearchResult[]> {
+  await ensureRootDir()
+  const rootDir = getStoragePath()
+  const { query, scope, fileTypes, includeContent, maxResults = 100 } = opts
+  if (!query.trim()) return []
+
+  const scopeDir = scope
+    ? path.join(rootDir, path.normalize(scope).replace(/^(\.\.(\/|\\|$))+/, ""))
+    : rootDir
+
+  const results: SearchResult[] = []
+  let done = false
+
+  // Semaphore to cap concurrent I/O
+  let active = 0
+  const queue: (() => void)[] = []
+  function acquire(): Promise<void> {
+    return new Promise((resolve) => {
+      if (active < CONCURRENCY) { active++; resolve() }
+      else queue.push(() => { active++; resolve() })
+    })
+  }
+  function release() {
+    active--
+    const next = queue.shift()
+    if (next) next()
+  }
+
+  const { extractText, getSnippet } = await import("@/lib/file-content")
+
+  async function walk(dir: string): Promise<void> {
+    if (done) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let entries: any[]
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true, encoding: "utf8" })
+    } catch {
+      return
+    }
+
+    await Promise.all(
+      (entries as Array<{ name: unknown; isDirectory: () => boolean }>).map(async (entry) => {
+        if (done) return
+        const name = entry.name as string
+        if (name === ".trash") return
+        const entryPath = path.join(dir, name)
+        const isDir = entry.isDirectory()
+
+        if (!isDir) {
+          const ext = path.extname(name).toLowerCase().replace(/^\./, "")
+
+          // Type filter
+          if (fileTypes.length > 0 && !fileTypes.includes(ext)) {
+            if (isDir) await walk(entryPath)
+            return
+          }
+
+          const queryLower = query.toLowerCase()
+          const nameLower = name.toLowerCase()
+
+          let matchType: "name" | "content" | null = null
+          let contentSnippet: string | undefined
+
+          // Name match
+          if (nameLower.includes(queryLower)) {
+            matchType = "name"
+          }
+
+          // Content match (opt-in)
+          if (includeContent && matchType !== "name") {
+            await acquire()
+            try {
+              const text = await extractText(entryPath, ext)
+              if (text && text.toLowerCase().includes(queryLower)) {
+                matchType = "content"
+                contentSnippet = getSnippet(text, query)
+              }
+            } finally {
+              release()
+            }
+          }
+
+          if (matchType) {
+            await acquire()
+            try {
+              const stats = await fs.stat(entryPath)
+              results.push({
+                name,
+                path: path.relative(rootDir, entryPath),
+                isDirectory: false,
+                size: stats.size,
+                updatedAt: stats.mtime.toISOString(),
+                matchType,
+                contentSnippet,
+              })
+            } finally {
+              release()
+            }
+            if (results.length >= maxResults) done = true
+          }
+        } else {
+          await walk(entryPath)
+        }
+      })
+    )
+  }
+
+  await walk(scopeDir)
+  return results
+}
+
 export async function getStorageConfig() {
   const { getStorageConfig: _get } = await import("@/lib/storage-config")
   return _get()

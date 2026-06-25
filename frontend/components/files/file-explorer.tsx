@@ -57,12 +57,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FileItem, deleteItem, moveItem, renameItem } from "@/lib/actions/files"
+import { FileItem, SearchResult, deleteItem, moveItem, renameItem } from "@/lib/actions/files"
 import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileGrid } from "./file-grid"
 import { FilePreviewPanel } from "./file-preview-panel"
 import { SelectionLasso } from "./selection-lasso"
+import { SearchResultsView } from "./search-results-view"
 import { getFileIcon, formatSize } from "./file-utils"
 import { toast } from "sonner"
 
@@ -73,6 +74,9 @@ interface FileExplorerProps {
   showPreview: boolean
   onTogglePreview: () => void
   searchQuery: string
+  searchResults?: SearchResult[] | null
+  isSearching?: boolean
+  onClearSearch?: () => void
 }
 
 function downloadFile(path: string, name: string) {
@@ -90,6 +94,8 @@ export function FileExplorer({
   viewMode,
   showPreview,
   searchQuery,
+  searchResults,
+  isSearching,
 }: FileExplorerProps) {
   const router = useRouter()
   const containerRef = React.useRef<HTMLDivElement>(null)
@@ -373,7 +379,22 @@ export function FileExplorer({
         <SelectionLasso containerRef={containerRef} onSelectionChange={handleLassoChange} />
 
         <div className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto p-6">
-          {viewMode === "list" ? (
+          {isSearching && searchResults === null ? (
+            <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+              <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+              <p className="text-sm">Searching…</p>
+            </div>
+          ) : searchResults != null ? (
+            <SearchResultsView
+              results={searchResults}
+              query={searchQuery}
+              onOpen={handleItemDoubleClick}
+              onDownload={downloadFile}
+              onRename={handleRename}
+              onDelete={(path) => handleDeleteConfirm(path)}
+              onMoveTo={(paths) => handleMoveToOpen(paths)}
+            />
+          ) : viewMode === "list" ? (
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
               <Table>
                 <TableHeader className="bg-muted/30">

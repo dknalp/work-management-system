@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { FileItem } from "@/lib/actions/files"
+import { FileItem, SearchOptions, SearchResult, searchFiles } from "@/lib/actions/files"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileLayout } from "./file-layout"
 import { FileExplorer } from "./file-explorer"
@@ -18,6 +18,32 @@ export function FileClientPage({ items, currentPath }: FileClientPageProps) {
   const [viewMode, setViewMode] = useLocalStorage<"grid" | "list">("wms:files:viewMode", "list")
   const [showPreview, setShowPreview] = React.useState(true)
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [searchResults, setSearchResults] = React.useState<SearchResult[] | null>(null)
+  const [isSearching, setIsSearching] = React.useState(false)
+
+  const handleQueryChange = (q: string) => {
+    setSearchQuery(q)
+    if (!q.trim()) setSearchResults(null)
+  }
+
+  const doSearch = React.useCallback(async (opts: SearchOptions) => {
+    if (!opts.query.trim()) {
+      setSearchResults(null)
+      return
+    }
+    setIsSearching(true)
+    try {
+      const results = await searchFiles(opts)
+      setSearchResults(results)
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
+
+  const clearSearch = React.useCallback(() => {
+    setSearchResults(null)
+    setSearchQuery("")
+  }, [])
 
   return (
     <FileLayout
@@ -26,8 +52,11 @@ export function FileClientPage({ items, currentPath }: FileClientPageProps) {
       onViewModeChange={setViewMode}
       showPreview={showPreview}
       onTogglePreview={() => setShowPreview(!showPreview)}
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
+      onSearch={doSearch}
+      onQueryChange={handleQueryChange}
+      onClearSearch={clearSearch}
+      isSearching={isSearching}
+      hasSearchResults={searchResults !== null}
     >
       <FileDropZone currentPath={currentPath}>
         <div className="flex flex-1 flex-col">
@@ -43,6 +72,9 @@ export function FileClientPage({ items, currentPath }: FileClientPageProps) {
             showPreview={showPreview}
             onTogglePreview={() => setShowPreview(!showPreview)}
             searchQuery={searchQuery}
+            searchResults={searchResults}
+            isSearching={isSearching}
+            onClearSearch={clearSearch}
           />
         </div>
       </FileDropZone>
