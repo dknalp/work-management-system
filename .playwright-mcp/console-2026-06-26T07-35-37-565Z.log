@@ -700,3 +700,19 @@ https://nextjs.org/docs/messages/module-not-found @ http://localhost:3000/_next/
 [23516569ms] [LOG] [Fast Refresh] done in 202ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
 [23524345ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
 [23524359ms] [LOG] [Fast Refresh] done in 115ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23706494ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23706515ms] [LOG] [Fast Refresh] done in 89ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23743955ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23745182ms] [LOG] [Fast Refresh] done in 163ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23746151ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23746165ms] [LOG] [Fast Refresh] done in 114ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23746270ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23746288ms] [LOG] [Fast Refresh] done in 118ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23791312ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23791366ms] [LOG] [Fast Refresh] done in 161ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23793779ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23793806ms] [LOG] [Fast Refresh] done in 126ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23803015ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23803028ms] [LOG] [Fast Refresh] done in 113ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23804087ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297
+[23804095ms] [LOG] [Fast Refresh] done in 109ms @ http://localhost:3000/_next/static/chunks/5d2cf_next_dist_4ad02d79._.js:2297

@@ -2,8 +2,10 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
   FolderIcon,
   GripVerticalIcon,
   HardDriveIcon,
@@ -298,6 +300,7 @@ export function FileLayout({
   isSearching,
   hasSearchResults,
 }: FileLayoutProps) {
+  const router = useRouter()
   const [query, setQuery] = React.useState("")
   const [scope, setScope] = React.useState<"all" | "current">("all")
   const [selectedGroups, setSelectedGroups] = React.useState<Set<string>>(new Set())
@@ -373,6 +376,26 @@ export function FileLayout({
         {/* Toolbar */}
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background/50 px-6 backdrop-blur-md">
           <div className="flex flex-1 items-center gap-2">
+            {/* Back / Forward */}
+            <div className="flex items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground hover:text-foreground"
+                onClick={() => router.back()}
+              >
+                <ArrowLeftIcon className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground hover:text-foreground"
+                onClick={() => router.forward()}
+              >
+                <ArrowRightIcon className="size-3.5" />
+              </Button>
+            </div>
+
             {/* Search input */}
             <div className="relative w-72">
               <SearchIcon className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
