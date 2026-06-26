@@ -1,0 +1,205 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analytics" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analytics
+          - listitem [ref=e30]:
+            - link "Pipeline board view" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline board view
+          - listitem [ref=e34]:
+            - link "Tasks" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Tasks
+          - listitem [ref=e40]:
+            - link "Calendar" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Calendar
+          - listitem [ref=e45]:
+            - link "Files" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Files
+          - listitem [ref=e50]:
+            - link "Team" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Team
+        - list [ref=e60]:
+          - listitem [ref=e61]:
+            - link "Settings" [ref=e62] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e63]
+              - generic [ref=e66]: Settings
+      - list [ref=e68]:
+        - listitem [ref=e69]:
+          - button ". ..." [ref=e70]:
+            - generic [ref=e72]: .
+            - generic [ref=e74]: ...
+            - img [ref=e75]
+    - main [ref=e79]:
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - button "Toggle Sidebar" [ref=e83]:
+            - img
+            - generic [ref=e84]: Toggle Sidebar
+          - generic [ref=e85]: Dashboard
+        - generic [ref=e87]:
+          - img
+          - textbox "Global search" [ref=e88] [cursor=pointer]:
+            - /placeholder: Search anything...
+          - generic:
+            - generic: ⌘K
+        - generic [ref=e89]:
+          - button [ref=e90]:
+            - img
+          - button "Create New" [ref=e91]:
+            - img
+            - generic [ref=e92]: Create New
+      - main [ref=e93]:
+        - generic [ref=e94]:
+          - generic [ref=e95]:
+            - heading "Good morning, there 👋" [level=1] [ref=e96]
+            - paragraph [ref=e97]: Here's what's happening with your team today.
+          - generic [ref=e98]:
+            - generic [ref=e99]:
+              - img [ref=e101]
+              - generic [ref=e104]:
+                - paragraph [ref=e105]: "12"
+                - paragraph [ref=e106]: Total Tasks
+                - paragraph [ref=e107]: 25% complete
+            - generic [ref=e108]:
+              - img [ref=e110]
+              - generic [ref=e113]:
+                - paragraph [ref=e114]: "3"
+                - paragraph [ref=e115]: In Progress
+                - paragraph [ref=e116]: active right now
+            - generic [ref=e117]:
+              - img [ref=e119]
+              - generic [ref=e122]:
+                - paragraph [ref=e123]: "3"
+                - paragraph [ref=e124]: Completed
+                - paragraph [ref=e125]: of 12 total
+            - generic [ref=e126]:
+              - img [ref=e128]
+              - generic [ref=e130]:
+                - paragraph [ref=e131]: "9"
+                - paragraph [ref=e132]: Overdue
+                - paragraph [ref=e133]: past due date
+          - generic [ref=e134]:
+            - generic [ref=e136]:
+              - generic [ref=e137]: Task Activity
+              - generic [ref=e138]: Created vs completed — last 7 days
+            - generic [ref=e144]:
+              - generic [ref=e145]: Team Workload
+              - generic [ref=e146]: Task distribution by assignee
+          - generic [ref=e151]:
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - generic [ref=e154]: Upcoming Tasks
+                - link "View all" [ref=e155] [cursor=pointer]:
+                  - /url: /tasks
+                  - text: View all
+                  - img
+              - list [ref=e157]:
+                - listitem [ref=e158]:
+                  - generic [ref=e159]:
+                    - img [ref=e160]
+                    - generic [ref=e162]: Integrate Stripe webhook handling
+                  - generic [ref=e163]:
+                    - generic [ref=e164]: high
+                    - generic [ref=e165]: May 6
+                - listitem [ref=e166]:
+                  - generic [ref=e167]:
+                    - img [ref=e168]
+                    - generic [ref=e170]: Implement JWT refresh token mechanism
+                  - generic [ref=e171]:
+                    - generic [ref=e172]: high
+                    - generic [ref=e173]: May 8
+                - listitem [ref=e174]:
+                  - generic [ref=e175]:
+                    - img [ref=e176]
+                    - generic [ref=e178]: Redesign onboarding flow for new users
+                  - generic [ref=e179]:
+                    - generic [ref=e180]: high
+                    - generic [ref=e181]: May 10
+                - listitem [ref=e182]:
+                  - generic [ref=e183]:
+                    - img [ref=e184]
+                    - generic [ref=e186]: Migrate database to PostgreSQL 16
+                  - generic [ref=e187]:
+                    - generic [ref=e188]: high
+                    - generic [ref=e189]: May 12
+                - listitem [ref=e190]:
+                  - generic [ref=e191]:
+                    - img [ref=e192]
+                    - generic [ref=e194]: Write unit tests for payment module
+                  - generic [ref=e195]:
+                    - generic [ref=e196]: medium
+                    - generic [ref=e197]: May 15
+                - listitem [ref=e198]:
+                  - generic [ref=e199]:
+                    - img [ref=e200]
+                    - generic [ref=e202]: Optimize image loading with lazy load
+                  - generic [ref=e203]:
+                    - generic [ref=e204]: medium
+                    - generic [ref=e205]: May 18
+            - generic [ref=e206]:
+              - heading "Recent Activity" [level=3] [ref=e207]
+              - paragraph [ref=e208]: No activity yet. Start adding or updating tasks.
+  - generic [ref=e209]:
+    - generic:
+      - generic:
+        - generic:
+          - paragraph: Messages
+          - button "Close"
+        - generic:
+          - button "TG Team General 10:30 Hey! How's the project going?":
+            - generic: TG
+            - generic:
+              - generic:
+                - paragraph: Team General
+                - generic: 10:30
+              - paragraph: Hey! How's the project going?
+          - button "AJ Alice Johnson 09:15 Can you review my PR?":
+            - generic: AJ
+            - generic:
+              - generic:
+                - paragraph: Alice Johnson
+                - generic: 09:15
+              - paragraph: Can you review my PR?
+          - button "BS Bob Smith Yesterday Thanks!":
+            - generic: BS
+            - generic:
+              - generic:
+                - paragraph: Bob Smith
+                - generic: Yesterday
+              - paragraph: Thanks!
+          - button "CW Carol Williams Yesterday Meeting at 3pm":
+            - generic: CW
+            - generic:
+              - generic:
+                - paragraph: Carol Williams
+                - generic: Yesterday
+              - paragraph: Meeting at 3pm
+    - button "Open chat" [ref=e210]:
+      - img [ref=e212]
+  - button "Open Next.js Dev Tools" [ref=e219] [cursor=pointer]:
+    - img [ref=e220]

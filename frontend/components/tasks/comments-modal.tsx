@@ -105,7 +105,7 @@ export function CommentsModal({
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
           {comments.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No comments yet.
+              Henüz yorum yok.
             </p>
           ) : (
             comments.map((c) => (
@@ -125,7 +125,7 @@ export function CommentsModal({
                     onClick={() => setReplyingTo(c.id === replyingTo ? null : c.id)}
                     className="mt-1 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    Reply
+                    Yanıtla
                   </button>
                   {replyingTo === c.id && (
                     <div className="mt-2 flex gap-2">
@@ -133,11 +133,11 @@ export function CommentsModal({
                         value={replyInput}
                         onChange={(e) => setReplyInput(e.target.value)}
                         onKeyDown={handleReplyKeyDown}
-                        placeholder="Write a reply…"
+                        placeholder="Yanıt yaz…"
                         className="h-7 text-sm"
                       />
                       <Button size="sm" onClick={() => submitReply(c.id)} className="h-7">
-                        Reply
+                        Yanıtla
                       </Button>
                     </div>
                   )}
@@ -174,10 +174,10 @@ export function CommentsModal({
             value={commentInput}
             onChange={(e) => setCommentInput(e.target.value)}
             onKeyDown={handleCommentKeyDown}
-            placeholder="Add a comment…"
+            placeholder="Yorum ekle…"
             className="flex-1"
           />
-          <Button onClick={submitComment}>Add</Button>
+          <Button onClick={submitComment}>Ekle</Button>
         </div>
       </DialogContent>
     </Dialog>

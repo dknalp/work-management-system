@@ -23,9 +23,9 @@ import { useTasks } from "@/contexts/task-context"
 import { toast } from "sonner"
 
 const defaultColumns: Column[] = [
-  { id: "todo", title: "To-Do" },
-  { id: "in-progress", title: "In Progress" },
-  { id: "done", title: "Completed" },
+  { id: "todo", title: "Yapılacak" },
+  { id: "in-progress", title: "Devam Ediyor" },
+  { id: "done", title: "Tamamlandı" },
 ]
 
 interface KanbanBoardProps {
@@ -70,7 +70,7 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
         createdAt: new Date().toISOString().slice(0, 10),
       }
       addTask(newTask)
-      toast.success("Card added")
+      toast.success("Kart eklendi")
     },
     [addTask]
   )
@@ -78,7 +78,7 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   const updateCard = useCallback(
     (taskId: string, updates: Partial<Pick<Task, "title" | "priority" | "tags">>) => {
       updateTask(taskId, updates)
-      toast.success("Card updated")
+      toast.success("Kart güncellendi")
     },
     [updateTask]
   )
@@ -86,7 +86,7 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
   const deleteCard = useCallback(
     (taskId: string) => {
       deleteTask(taskId)
-      toast.success("Card deleted")
+      toast.success("Kart silindi")
     },
     [deleteTask]
   )
@@ -99,7 +99,7 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
       title: trimmed,
     }
     setColumns((prev) => [...prev, newCol])
-    toast.success(`Column "${trimmed}" added`)
+    toast.success(`"${trimmed}" sütunu eklendi`)
   }, [])
 
   React.useEffect(() => {

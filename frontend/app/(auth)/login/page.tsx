@@ -42,15 +42,15 @@ function LoginForm() {
           <BriefcaseIcon className="size-5" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">WorkOS</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Sign in to your account</p>
+          <h1 className="text-xl font-semibold tracking-tight">Tekrar hoş geldiniz</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Devam etmek için hesabınıza giriş yapın.</p>
         </div>
       </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">E-posta</Label>
           <Input
             id="email"
             type="email"
@@ -64,12 +64,12 @@ function LoginForm() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Şifre</Label>
             <Link
               href="/forgot-password"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              Forgot password?
+              Şifrenizi mi unuttunuz?
             </Link>
           </div>
           <div className="relative">
@@ -102,7 +102,7 @@ function LoginForm() {
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading && <LoaderIcon className="mr-2 size-4 animate-spin" />}
-          Sign in
+          Giriş yap
         </Button>
       </form>
     </div>

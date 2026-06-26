@@ -36,7 +36,7 @@ function TextPreview({ url }: { url: string }) {
       })
       .catch(() => {
         if (!cancelled) {
-          setContent("Failed to load preview.")
+          setContent("Önizleme yüklenemedi.")
           setLoading(false)
         }
       })
@@ -46,7 +46,7 @@ function TextPreview({ url }: { url: string }) {
   if (loading) {
     return (
       <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">
-        Loading…
+        Yükleniyor…
       </div>
     )
   }
@@ -71,9 +71,18 @@ function TextPreview({ url }: { url: string }) {
 export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
   if (!item) return null
 
-  const previewUrl = `/api/files/raw?path=${encodeURIComponent(item.path)}`
+  const isDrive = item.source === "drive" && !!item.driveFileId
+  const previewUrl = isDrive
+    ? `https://drive.google.com/file/d/${item.driveFileId}/preview`
+    : `/api/files/raw?path=${encodeURIComponent(item.path)}`
+  const imageUrl = isDrive
+    ? `https://drive.google.com/thumbnail?id=${item.driveFileId}&sz=w400`
+    : `/api/files/raw?path=${encodeURIComponent(item.path)}`
+  const downloadUrl = isDrive
+    ? `https://drive.google.com/uc?export=download&id=${item.driveFileId}`
+    : `/api/files/raw?path=${encodeURIComponent(item.path)}`
   const isImage = isImageFile(item.name)
-  const isText = isTextFile(item.name)
+  const isText = isTextFile(item.name) && !isDrive
   const isPDF = /\.pdf$/i.test(item.name)
 
   return (
@@ -81,7 +90,7 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
       <div className="flex items-center justify-between border-b border-border p-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <InfoIcon className="size-4 text-primary" />
-          Details
+          Detaylar
         </h3>
         <Button variant="ghost" size="icon" className="size-8" onClick={onClose}>
           <XIcon className="size-4" />
@@ -98,17 +107,18 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
         >
           {isImage ? (
             <img
-              src={previewUrl}
+              src={imageUrl}
               alt={item.name}
               className="max-h-full max-w-full object-contain drop-shadow-md"
             />
           ) : isText ? (
             <TextPreview url={previewUrl} />
-          ) : isPDF ? (
+          ) : isPDF || isDrive ? (
             <iframe
               src={previewUrl}
               className="h-64 w-full rounded-2xl border-0"
               title={item.name}
+              allow="autoplay"
             />
           ) : (
             <FileIcon className="size-16 text-muted-foreground/40" />
@@ -120,7 +130,7 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
           <div>
             <h4 className="mb-1 truncate text-sm font-bold">{item.name}</h4>
             <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-              {item.isDirectory ? "Folder" : item.name.split(".").pop() + " File"}
+              {item.isDirectory ? "Klasör" : item.name.split(".").pop() + " File"}
             </p>
           </div>
 
@@ -139,7 +149,7 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <CalendarIcon className="size-3.5" />
-                <span>Modified</span>
+                <span>Değiştirilme</span>
               </div>
               <span className="line-clamp-1 text-right font-medium">
                 {format(new Date(item.updatedAt), "MMM d, yyyy HH:mm")}
@@ -150,9 +160,9 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
 
         {!item.isDirectory && (
           <Button className="w-full gap-2 shadow-sm" asChild>
-            <a href={previewUrl} download={item.name}>
+            <a href={downloadUrl} download={item.name}>
               <DownloadIcon className="size-4" />
-              Download File
+              Dosyayı İndir
             </a>
           </Button>
         )}

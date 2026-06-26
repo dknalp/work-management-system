@@ -98,20 +98,20 @@ export function NavUser({
               <DropdownMenuItem asChild>
                 <Link href="/profile">
                   <CircleUserRoundIcon />
-                  Profile
+                  Profil
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings">
                   <Settings2Icon />
-                  Settings
+                  Ayarlar
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
               <LogOutIcon />
-              Log out
+              Çıkış Yap
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

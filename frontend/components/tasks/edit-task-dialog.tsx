@@ -68,8 +68,8 @@ export function EditTaskDialog({
 
   const validate = () => {
     const e: typeof errors = {}
-    if (!title.trim()) e.title = "Title is required"
-    if (!assignee.trim()) e.assignee = "Assignee is required"
+    if (!title.trim()) e.title = "Başlık zorunludur"
+    if (!assignee.trim()) e.assignee = "Sorumlu zorunludur"
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -100,9 +100,9 @@ export function EditTaskDialog({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>Edit Task</SheetTitle>
+          <SheetTitle>Görevi Düzenle</SheetTitle>
           <SheetDescription>
-            Update the task details below and save your changes.
+            Görev detaylarını aşağıdan güncelleyin ve değişikliklerinizi kaydedin.
           </SheetDescription>
         </SheetHeader>
 
@@ -110,7 +110,7 @@ export function EditTaskDialog({
           {/* ID (read-only) */}
           {task && (
             <div className="flex items-center gap-2 rounded-md border border-border/40 bg-muted/30 px-3 py-2 font-mono text-xs text-muted-foreground">
-              <span className="text-muted-foreground/60">Task ID:</span>
+              <span className="text-muted-foreground/60">Görev ID:</span>
               <span className="font-semibold text-foreground/70">
                 {task.id}
               </span>
@@ -123,7 +123,7 @@ export function EditTaskDialog({
               htmlFor="edit-title"
               className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
             >
-              Title <span className="text-rose-500">*</span>
+              Başlık <span className="text-rose-500">*</span>
             </Label>
             <Input
               id="edit-title"
@@ -147,7 +147,7 @@ export function EditTaskDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Status
+                Durum
               </Label>
               <Select
                 value={status}
@@ -170,7 +170,7 @@ export function EditTaskDialog({
 
             <div className="space-y-2">
               <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Priority
+                Öncelik
               </Label>
               <Select
                 value={priority}
@@ -198,7 +198,7 @@ export function EditTaskDialog({
               htmlFor="edit-assignee"
               className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
             >
-              Assignee <span className="text-rose-500">*</span>
+              Sorumlu <span className="text-rose-500">*</span>
             </Label>
             <Input
               id="edit-assignee"
@@ -221,7 +221,7 @@ export function EditTaskDialog({
           {/* Due Date */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-              Due Date
+              Son Tarih
             </Label>
             <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/30 px-3 py-2">
               <CalendarIcon className="size-3.5 shrink-0 text-muted-foreground" />
@@ -237,13 +237,13 @@ export function EditTaskDialog({
           {/* Tags */}
           <div className="space-y-2">
             <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-              Tags
+              Etiketler
             </Label>
             <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/30 px-3 py-2 transition-all focus-within:ring-1 focus-within:ring-primary/30">
               <TagIcon className="size-3.5 shrink-0 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Add tag and press Enter..."
+                placeholder="Etiket ekleyin ve Enter'a basın..."
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -284,11 +284,11 @@ export function EditTaskDialog({
             onClick={() => onOpenChange(false)}
             className="flex-1"
           >
-            Cancel
+            İptal
           </Button>
           <Button onClick={handleSave} className="flex-1 gap-2">
             <SaveIcon className="size-4" />
-            Save Changes
+            Değişiklikleri Kaydet
           </Button>
         </SheetFooter>
       </SheetContent>

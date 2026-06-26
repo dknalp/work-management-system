@@ -53,13 +53,13 @@ export function SubtasksModal({ open, onOpenChange, taskTitle, subTasks, onSubTa
           >
             <ArrowLeft size={18} />
           </button>
-          <DialogTitle className="text-base font-semibold">Sub-tasks</DialogTitle>
+          <DialogTitle className="text-base font-semibold">Alt Görevler</DialogTitle>
           <span className="ml-auto text-xs text-muted-foreground">{completedCount}/{subTasks.length}</span>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {subTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No sub-tasks yet.</p>
+            <p className="text-sm text-muted-foreground text-center py-8">Henüz alt görev yok.</p>
           ) : (
             <ul className="space-y-0.5">
               {subTasks.map(st => (
@@ -88,10 +88,10 @@ export function SubtasksModal({ open, onOpenChange, taskTitle, subTasks, onSubTa
             value={newSubTaskInput}
             onChange={e => setNewSubTaskInput(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Add sub-task…"
+            placeholder="Alt görev ekle…"
             className="flex-1"
           />
-          <Button onClick={addSubTask}>Add</Button>
+          <Button onClick={addSubTask}>Ekle</Button>
         </div>
       </DialogContent>
     </Dialog>

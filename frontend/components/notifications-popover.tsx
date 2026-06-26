@@ -49,7 +49,7 @@ export function NotificationsPopover() {
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Notifications</h3>
+            <h3 className="text-sm font-semibold">Bildirimler</h3>
             {mounted && unreadCount > 0 && (
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold">
                 {unreadCount}
@@ -64,7 +64,7 @@ export function NotificationsPopover() {
               onClick={markAllRead}
             >
               <CheckCheckIcon className="size-3" />
-              Mark all read
+              Tümünü okundu işaretle
             </Button>
           )}
         </div>
@@ -72,8 +72,8 @@ export function NotificationsPopover() {
         {activity.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
             <BellIcon className="size-8 opacity-20" />
-            <p className="text-sm">No notifications yet</p>
-            <p className="text-xs opacity-70">Activity from tasks will appear here.</p>
+            <p className="text-sm">Henüz bildirim yok</p>
+            <p className="text-xs opacity-70">Görevlerden gelen aktiviteler burada görünecek.</p>
           </div>
         ) : (
           <ScrollArea className="h-72">

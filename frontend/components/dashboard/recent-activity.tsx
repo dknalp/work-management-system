@@ -18,32 +18,32 @@ const ACTIVITY_META: Record<
   { label: (title: string, detail?: string) => string; icon: React.ElementType; color: string }
 > = {
   task_created: {
-    label: (t) => `Created "${t}"`,
+    label: (t) => `"${t}" oluşturuldu`,
     icon: PlusCircle,
     color: "text-blue-500",
   },
   task_completed: {
-    label: (t) => `Completed "${t}"`,
+    label: (t) => `"${t}" tamamlandı`,
     icon: CheckCircle2,
     color: "text-emerald-500",
   },
   task_reopened: {
-    label: (t) => `Reopened "${t}"`,
+    label: (t) => `"${t}" yeniden açıldı`,
     icon: RefreshCw,
     color: "text-amber-500",
   },
   task_status_changed: {
-    label: (t, d) => `Moved "${t}"${d ? ` (${d})` : ""}`,
+    label: (t, d) => `"${t}" taşındı${d ? ` (${d})` : ""}`,
     icon: ArrowRightLeft,
     color: "text-violet-500",
   },
   task_deleted: {
-    label: (t) => `Deleted "${t}"`,
+    label: (t) => `"${t}" silindi`,
     icon: Trash2,
     color: "text-rose-500",
   },
   task_updated: {
-    label: (t) => `Updated "${t}"`,
+    label: (t) => `"${t}" güncellendi`,
     icon: Pencil,
     color: "text-muted-foreground",
   },
@@ -57,9 +57,9 @@ export function RecentActivity() {
   if (visible.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
+        <h3 className="text-sm font-semibold mb-4">Son Etkinlik</h3>
         <p className="text-sm text-muted-foreground text-center py-6">
-          No activity yet. Start adding or updating tasks.
+          Henüz etkinlik yok. Görev eklemeye veya güncellemeye başlayın.
         </p>
       </div>
     )
@@ -67,7 +67,7 @@ export function RecentActivity() {
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
-      <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
+      <h3 className="text-sm font-semibold mb-4">Son Etkinlik</h3>
       <div className="flex flex-col divide-y divide-border">
         {visible.map((entry) => {
           const meta = ACTIVITY_META[entry.type]

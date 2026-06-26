@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/command-palette"
 import { TeamProvider } from "@/contexts/team-context"
 import { cn } from "@/lib/utils"
 import { ChatWidgetWrapper } from "@/components/chat-widget-wrapper"
+import { Toaster } from "@/components/ui/sonner"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -44,6 +45,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider><TaskProvider><TeamProvider><CommandPalette />
             <TooltipProvider>{children}<ChatWidgetWrapper /></TooltipProvider>
+            <Toaster />
           </TeamProvider></TaskProvider></AuthProvider>
         </ThemeProvider>
       </body>

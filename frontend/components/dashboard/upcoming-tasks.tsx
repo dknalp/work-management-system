@@ -28,8 +28,8 @@ export function UpcomingTasks() {
         const isOverdue = t.dueDate < todayStr
         const parsed = parseISO(t.dueDate)
         let dueDateLabel = format(parsed, "MMM d")
-        if (isToday(parsed)) dueDateLabel = "Today"
-        else if (isTomorrow(parsed)) dueDateLabel = "Tomorrow"
+        if (isToday(parsed)) dueDateLabel = "Bugün"
+        else if (isTomorrow(parsed)) dueDateLabel = "Yarın"
         return { ...t, isOverdue, dueDateLabel }
       })
   }, [tasks])
@@ -43,7 +43,7 @@ export function UpcomingTasks() {
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-base font-semibold">Upcoming Tasks</CardTitle>
+        <CardTitle className="text-base font-semibold">Yaklaşan Görevler</CardTitle>
         <Button
           variant="ghost"
           size="sm"
@@ -51,7 +51,7 @@ export function UpcomingTasks() {
           asChild
         >
           <Link href="/tasks">
-            View all
+            Tümünü gör
             <ArrowRightIcon className="size-3" />
           </Link>
         </Button>
@@ -63,7 +63,7 @@ export function UpcomingTasks() {
             <div className="flex size-16 items-center justify-center rounded-2xl border border-dashed border-border bg-muted/40">
               <ClipboardListIcon className="size-7 text-muted-foreground/60" />
             </div>
-            <p className="text-sm font-medium text-foreground">No upcoming tasks</p>
+            <p className="text-sm font-medium text-foreground">Yaklaşan görev yok</p>
           </div>
         ) : (
           <ul className="space-y-2">

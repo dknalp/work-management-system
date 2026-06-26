@@ -20,7 +20,7 @@ export default function TasksPage() {
 
   const handleAdd = (task: Task) => {
     addTask(task)
-    toast.success("Task created", { description: task.title })
+    toast.success("Görev oluşturuldu", { description: task.title })
   }
 
   return (
@@ -38,8 +38,8 @@ export default function TasksPage() {
         <main className="flex flex-1 flex-col overflow-auto bg-background">
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
             <div className="mb-6">
-              <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
-              {mounted && <p className="text-sm text-muted-foreground mt-1">{tasks.length} task{tasks.length !== 1 ? "s" : ""}</p>}
+              <h1 className="text-2xl font-semibold tracking-tight">Görevler</h1>
+              {mounted && <p className="text-sm text-muted-foreground mt-1">{tasks.length} görev</p>}
             </div>
             <div className="mb-6">
               <QuickAddTask onAdd={handleAdd} />

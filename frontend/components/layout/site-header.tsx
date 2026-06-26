@@ -11,22 +11,22 @@ import { NotificationsPopover } from "@/components/notifications-popover"
 import { CreateTaskDialog } from "@/components/create-task-dialog"
 
 const routeLabels: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/dashboard/board": "Pipeline Board",
-  "/tasks": "Tasks",
-  "/calendar": "Calendar",
-  "/files": "Files",
-  "/team": "Team",
-  "/settings": "Settings",
-  "/profile": "Profile",
-  "/admin": "Admin Panel",
-  "/admin/activity": "Activity Log",
+  "/dashboard": "Analitik",
+  "/dashboard/board": "Pipeline Panosu",
+  "/tasks": "Görevler",
+  "/calendar": "Takvim",
+  "/files": "Dosyalar",
+  "/team": "Ekip",
+  "/settings": "Ayarlar",
+  "/profile": "Profil",
+  "/admin": "Yönetici Paneli",
+  "/admin/activity": "Etkinlik Günlüğü",
 }
 
 function getRouteLabel(pathname: string): string {
   if (routeLabels[pathname]) return routeLabels[pathname]
-  if (pathname.startsWith("/files/")) return "Files"
-  return "Dashboard"
+  if (pathname.startsWith("/files/")) return "Dosyalar"
+  return "Analitik"
 }
 
 export function SiteHeader() {
@@ -54,7 +54,7 @@ export function SiteHeader() {
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="h-9 w-full cursor-pointer rounded-lg border-border bg-muted/50 pr-16 pl-9 text-sm placeholder:text-muted-foreground focus-visible:bg-background focus-visible:ring-1"
-              placeholder="Search anything..."
+              placeholder="Ara..."
               aria-label="Global search"
               readOnly
               onClick={() => {
@@ -84,7 +84,7 @@ export function SiteHeader() {
           {/* Create New button */}
           <Button size="sm" className="gap-2 font-medium" onClick={() => setCreateOpen(true)}>
             <PlusIcon className="size-4" />
-            <span className="hidden sm:inline">Create New</span>
+            <span className="hidden sm:inline">Yeni Oluştur</span>
           </Button>
         </div>
       </div>

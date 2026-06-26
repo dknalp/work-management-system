@@ -59,19 +59,19 @@ const statusConfig: Record<
   { label: string; color: string; dot: string }
 > = {
   active: {
-    label: "Active",
+    label: "Aktif",
     color:
       "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     dot: "bg-emerald-500",
   },
   away: {
-    label: "Away",
+    label: "Uzakta",
     color:
       "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
     dot: "bg-amber-500",
   },
   offline: {
-    label: "Offline",
+    label: "Çevrimdışı",
     color: "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/20",
     dot: "bg-zinc-400",
   },
@@ -121,7 +121,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
           className="-ml-3 h-8 gap-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Member
+          Üye
           <ArrowUpDownIcon className="size-3" />
         </Button>
       ),
@@ -155,7 +155,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
     },
     {
       accessorKey: "email",
-      header: "Email",
+      header: "E-posta",
       cell: ({ row }) => (
         <span className="text-sm text-muted-foreground">
           {row.getValue("email")}
@@ -171,7 +171,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
           className="-ml-3 h-8 gap-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Department
+          Departman
           <ArrowUpDownIcon className="size-3" />
         </Button>
       ),
@@ -192,7 +192,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
     },
     {
       accessorKey: "status",
-      header: "Status",
+      header: "Durum",
       cell: ({ row }) => {
         const status = row.getValue("status") as TeamMember["status"]
         const cfg = statusConfig[status]
@@ -216,7 +216,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
           className="-ml-3 h-8 gap-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Joined
+          Katılım
           <ArrowUpDownIcon className="size-3" />
         </Button>
       ),
@@ -242,7 +242,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onClick={() => onEdit(member)}>
                   <Pencil className="mr-2 size-3.5" />
-                  Edit Member
+                  Üyeyi Düzenle
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
@@ -250,7 +250,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
                   }}
                 >
                   <Mail className="mr-2 size-3.5" />
-                  Send Email
+                  E-posta Gönder
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -258,7 +258,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 size-3.5" />
-                  Remove Member
+                  Üyeyi Kaldır
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -345,7 +345,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
                   colSpan={columns.length}
                   className="h-24 text-center text-sm text-muted-foreground"
                 >
-                  No team members found.
+                  Ekip üyesi bulunamadı.
                 </TableCell>
               </TableRow>
             )}
@@ -357,8 +357,8 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
       <div className="flex items-center justify-between px-1 text-sm text-muted-foreground">
         <p>
           {totalRows === 0
-            ? "No results"
-            : `Showing ${from}–${to} of ${totalRows} member${totalRows !== 1 ? "s" : ""}`}
+            ? "Sonuç yok"
+            : `${totalRows} üyeden ${from}–${to} gösteriliyor`}
         </p>
         <div className="flex items-center gap-1">
           <Button

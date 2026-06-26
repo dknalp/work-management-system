@@ -6,6 +6,7 @@ import {
   FolderIcon,
   MoreVerticalIcon,
   PencilIcon,
+  PinIcon,
   Trash2Icon,
   ExternalLinkIcon,
   ChevronUpIcon,
@@ -14,6 +15,9 @@ import {
   DownloadIcon,
   MoveIcon,
   XIcon,
+  CopyIcon,
+  ScissorsIcon,
+  ClipboardPasteIcon,
 } from "lucide-react"
 import { format } from "date-fns"
 import {
@@ -57,7 +61,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FileItem, SearchResult, deleteItem, moveItem, renameItem } from "@/lib/actions/files"
+import { FileItem, SearchResult, moveToTrash, moveItem, renameItem, copyItem } from "@/lib/actions/files"
 import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileGrid } from "./file-grid"
@@ -65,6 +69,7 @@ import { FilePreviewPanel } from "./file-preview-panel"
 import { SelectionLasso } from "./selection-lasso"
 import { SearchResultsView } from "./search-results-view"
 import { getFileIcon, formatSize } from "./file-utils"
+import { usePinnedFolders } from "@/hooks/use-pinned-folders"
 import { toast } from "sonner"
 
 interface FileExplorerProps {
@@ -79,10 +84,30 @@ interface FileExplorerProps {
   onClearSearch?: () => void
 }
 
-function downloadFile(path: string, name: string) {
+type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
+
+function getFileOpenUrl(item: FileItem): string {
+  if (item.source === "drive" && item.driveFileId) {
+    return `https://drive.google.com/file/d/${item.driveFileId}/view`
+  }
+  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
+}
+
+function getFileDownloadUrl(item: FileItem): string {
+  if (item.source === "drive" && item.driveFileId) {
+    return `https://drive.google.com/uc?export=download&id=${item.driveFileId}`
+  }
+  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
+}
+
+function downloadFile(item: FileItem) {
+  if (item.source === "drive" && item.driveFileId) {
+    window.open(getFileDownloadUrl(item), "_blank")
+    return
+  }
   const a = document.createElement("a")
-  a.href = `/api/files/raw?path=${encodeURIComponent(path)}`
-  a.download = name
+  a.href = getFileDownloadUrl(item)
+  a.download = item.name
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -99,8 +124,12 @@ export function FileExplorer({
 }: FileExplorerProps) {
   const router = useRouter()
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const { pin, isPinned } = usePinnedFolders()
   const [selectedPaths, setSelectedPaths] = React.useState<Set<string>>(new Set())
   const [activeItem, setActiveItem] = React.useState<FileItem | null>(null)
+
+  // Clipboard state (in-app copy/cut)
+  const [clipboard, setClipboard] = React.useState<Clipboard>(null)
 
   // Rename modal
   const [renameOpen, setRenameOpen] = React.useState(false)
@@ -127,7 +156,7 @@ export function FileExplorer({
     if (item.isDirectory) {
       router.push(`/files/${item.path}`)
     } else {
-      window.open(`/api/files/raw?path=${item.path}`, "_blank")
+      window.open(getFileOpenUrl(item), "_blank")
     }
   }
 
@@ -155,15 +184,47 @@ export function FileExplorer({
   }
 
   const doDelete = async () => {
-    const results = await Promise.all(deletePaths.map((p) => deleteItem(p)))
-    const successCount = results.filter((r) => r.success).length
-    if (successCount > 0) {
-      toast.success(`${successCount} item(s) deleted`)
-      router.refresh()
-    }
     setDeleteOpen(false)
-    setSelectedPaths(new Set())
-    setActiveItem(null)
+    const results = await Promise.all(deletePaths.map((p) => moveToTrash(p)))
+    const succeeded = results.filter((r) => r.success)
+    const failCount = results.length - succeeded.length
+
+    if (succeeded.length > 0) {
+      router.refresh()
+      setSelectedPaths(new Set())
+      setActiveItem(null)
+
+      toast.success(
+        succeeded.length === 1
+          ? `"${succeeded[0].originalName}" çöp kutusuna taşındı`
+          : `${succeeded.length} öğe çöp kutusuna taşındı`,
+        {
+          duration: 6000,
+          action: {
+            label: "Geri Al",
+            onClick: async () => {
+              const undoResults = await Promise.all(
+                succeeded.map((r) =>
+                  r.success
+                    ? import("@/lib/actions/files").then(({ restoreFromTrash }) =>
+                        restoreFromTrash(r.trashName, r.originalName)
+                      )
+                    : Promise.resolve({ success: false })
+                )
+              )
+              const undone = undoResults.filter((r) => r.success).length
+              if (undone > 0) {
+                toast.success(`${undone} öğe geri yüklendi`)
+                router.refresh()
+              }
+            },
+          },
+        }
+      )
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount} öğe taşınamadı`)
+    }
   }
 
   const handleMoveToOpen = (paths: string[]) => {
@@ -190,7 +251,7 @@ export function FileExplorer({
   const handleBulkDownload = () => {
     items
       .filter((i) => selectedPaths.has(i.path) && !i.isDirectory)
-      .forEach((item) => downloadFile(item.path, item.name))
+      .forEach((item) => downloadFile(item))
   }
 
   const handleSort = (key: "name" | "size" | "updatedAt") => {
@@ -201,6 +262,46 @@ export function FileExplorer({
       setSortDir("asc")
     }
   }
+
+  // Clipboard operations
+  const handleCopy = React.useCallback((paths: string[]) => {
+    setClipboard({ paths, mode: "copy" })
+    toast.success(
+      paths.length === 1 ? "1 öğe kopyalandı" : `${paths.length} öğe kopyalandı`,
+      { description: "Yapıştırmak için Ctrl+V" }
+    )
+  }, [])
+
+  const handleCut = React.useCallback((paths: string[]) => {
+    setClipboard({ paths, mode: "cut" })
+    toast.success(
+      paths.length === 1 ? "1 öğe kesildi" : `${paths.length} öğe kesildi`,
+      { description: "Yapıştırmak için Ctrl+V" }
+    )
+  }, [])
+
+  const handlePaste = React.useCallback(async () => {
+    if (!clipboard) return
+    const results = await Promise.all(
+      clipboard.paths.map((p) =>
+        clipboard.mode === "copy"
+          ? copyItem(p, currentPath)
+          : moveItem(p, currentPath)
+      )
+    )
+    const ok = results.filter((r) => r.success).length
+    if (ok > 0) {
+      toast.success(
+        clipboard.mode === "copy"
+          ? `${ok} öğe yapıştırıldı`
+          : `${ok} öğe taşındı`
+      )
+      if (clipboard.mode === "cut") setClipboard(null)
+      router.refresh()
+    } else {
+      toast.error("Yapıştırma başarısız")
+    }
+  }, [clipboard, currentPath, router])
 
   const handleLassoChange = React.useCallback(
     (rect: { top: number; left: number; width: number; height: number } | null) => {
@@ -307,9 +408,22 @@ export function FileExplorer({
         setSelectedPaths(new Set(items.map((i) => i.path)))
         if (items.length > 0) setActiveItem(items[0])
       }
+      if ((e.key === "c" || e.key === "C") && (e.ctrlKey || e.metaKey) && selectedPaths.size > 0) {
+        e.preventDefault()
+        handleCopy(Array.from(selectedPaths))
+      }
+      if ((e.key === "x" || e.key === "X") && (e.ctrlKey || e.metaKey) && selectedPaths.size > 0) {
+        e.preventDefault()
+        handleCut(Array.from(selectedPaths))
+      }
+      if ((e.key === "v" || e.key === "V") && (e.ctrlKey || e.metaKey) && clipboard) {
+        e.preventDefault()
+        handlePaste()
+      }
       if (e.key === "Escape") {
         setSelectedPaths(new Set())
         setActiveItem(null)
+        if (clipboard) setClipboard(null)
       }
       if (e.key === "Enter" && activeItem) {
         handleItemDoubleClick(activeItem)
@@ -318,7 +432,7 @@ export function FileExplorer({
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [selectedPaths, activeItem, items, renameOpen, deleteOpen])
+  }, [selectedPaths, activeItem, items, renameOpen, deleteOpen, clipboard, handleCopy, handleCut, handlePaste])
 
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
     if (item.name === "..") {
@@ -366,6 +480,9 @@ export function FileExplorer({
     (i) => i.isDirectory && i.name !== ".." && !moveSourcePaths.includes(i.path)
   )
 
+  const isCutItem = (path: string) =>
+    clipboard?.mode === "cut" && clipboard.paths.includes(path)
+
   return (
     <>
       <div
@@ -389,7 +506,7 @@ export function FileExplorer({
               results={searchResults}
               query={searchQuery}
               onOpen={handleItemDoubleClick}
-              onDownload={downloadFile}
+              onDownload={(item) => downloadFile(item)}
               onRename={handleRename}
               onDelete={(path) => handleDeleteConfirm(path)}
               onMoveTo={(paths) => handleMoveToOpen(paths)}
@@ -403,19 +520,19 @@ export function FileExplorer({
                       className="w-[400px] cursor-pointer px-6 text-[10px] font-bold tracking-wider uppercase select-none"
                       onClick={() => handleSort("name")}
                     >
-                      Name {sortIcon("name")}
+                      Ad {sortIcon("name")}
                     </TableHead>
                     <TableHead
                       className="cursor-pointer text-[10px] font-bold tracking-wider uppercase select-none"
                       onClick={() => handleSort("size")}
                     >
-                      Size {sortIcon("size")}
+                      Boyut {sortIcon("size")}
                     </TableHead>
                     <TableHead
                       className="cursor-pointer text-[10px] font-bold tracking-wider uppercase select-none"
                       onClick={() => handleSort("updatedAt")}
                     >
-                      Modified {sortIcon("updatedAt")}
+                      Değiştirilme {sortIcon("updatedAt")}
                     </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -429,7 +546,7 @@ export function FileExplorer({
                       >
                         <div className="flex flex-col items-center gap-2">
                           <FolderIcon className="size-12 opacity-10" />
-                          <p>No files found in this directory.</p>
+                          <p>Bu dizinde dosya bulunamadı.</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -437,6 +554,7 @@ export function FileExplorer({
                   {displayItems.map((item) => {
                     const isSelected = selectedPaths.has(item.path)
                     const isParentDir = item.name === ".."
+                    const isCut = !isParentDir && isCutItem(item.path)
 
                     const tableRow = (
                       <TableRow
@@ -467,7 +585,8 @@ export function FileExplorer({
                             ? "bg-primary/5 hover:bg-primary/10"
                             : "hover:bg-muted/30",
                           "data-[drop-target=true]:bg-primary/20",
-                          isParentDir && "text-muted-foreground/60"
+                          isParentDir && "text-muted-foreground/60",
+                          isCut && "opacity-40"
                         )}
                         onClick={(e) => {
                           e.stopPropagation()
@@ -514,35 +633,56 @@ export function FileExplorer({
                                   className="gap-2"
                                   onClick={() => handleItemDoubleClick(item)}
                                 >
-                                  <ExternalLinkIcon className="size-3.5" /> Open
+                                  <ExternalLinkIcon className="size-3.5" /> Aç
                                 </DropdownMenuItem>
                                 {!item.isDirectory && (
                                   <DropdownMenuItem
                                     className="gap-2"
-                                    onClick={() => downloadFile(item.path, item.name)}
+                                    onClick={() => downloadFile(item)}
                                   >
-                                    <DownloadIcon className="size-3.5" /> Download
+                                    <DownloadIcon className="size-3.5" /> İndir
+                                  </DropdownMenuItem>
+                                )}
+                                {item.isDirectory && !isPinned(item.path) && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => pin({ name: item.name, path: item.path })}
+                                  >
+                                    <PinIcon className="size-3.5" /> Sabitle
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="gap-2"
+                                  onClick={() => handleCopy([item.path])}
+                                >
+                                  <CopyIcon className="size-3.5" /> Kopyala
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="gap-2"
+                                  onClick={() => handleCut([item.path])}
+                                >
+                                  <ScissorsIcon className="size-3.5" /> Kes
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="gap-2"
                                   onClick={() => handleRename(item)}
                                 >
-                                  <PencilIcon className="size-3.5" /> Rename
+                                  <PencilIcon className="size-3.5" /> Yeniden Adlandır
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="gap-2"
                                   onClick={() => handleMoveToOpen([item.path])}
                                 >
-                                  <MoveIcon className="size-3.5" /> Move to
+                                  <MoveIcon className="size-3.5" /> Taşı
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="gap-2 text-destructive focus:text-destructive"
                                   onClick={() => handleDeleteConfirm(item.path)}
                                 >
-                                  <Trash2Icon className="size-3.5" /> Delete
+                                  <Trash2Icon className="size-3.5" /> Sil
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -561,35 +701,56 @@ export function FileExplorer({
                             className="gap-2"
                             onClick={() => handleItemDoubleClick(item)}
                           >
-                            <ExternalLinkIcon className="size-4" /> Open
+                            <ExternalLinkIcon className="size-4" /> Aç
                           </ContextMenuItem>
                           {!item.isDirectory && (
                             <ContextMenuItem
                               className="gap-2"
-                              onClick={() => downloadFile(item.path, item.name)}
+                              onClick={() => downloadFile(item)}
                             >
-                              <DownloadIcon className="size-4" /> Download
+                              <DownloadIcon className="size-4" /> İndir
+                            </ContextMenuItem>
+                          )}
+                          {item.isDirectory && !isPinned(item.path) && (
+                            <ContextMenuItem
+                              className="gap-2"
+                              onClick={() => pin({ name: item.name, path: item.path })}
+                            >
+                              <PinIcon className="size-4" /> Sabitle
                             </ContextMenuItem>
                           )}
                           <ContextMenuSeparator />
                           <ContextMenuItem
                             className="gap-2"
+                            onClick={() => handleCopy([item.path])}
+                          >
+                            <CopyIcon className="size-4" /> Kopyala
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            className="gap-2"
+                            onClick={() => handleCut([item.path])}
+                          >
+                            <ScissorsIcon className="size-4" /> Kes
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            className="gap-2"
                             onClick={() => handleRename(item)}
                           >
-                            <PencilIcon className="size-4" /> Rename
+                            <PencilIcon className="size-4" /> Yeniden Adlandır
                           </ContextMenuItem>
                           <ContextMenuItem
                             className="gap-2"
                             onClick={() => handleMoveToOpen([item.path])}
                           >
-                            <MoveIcon className="size-4" /> Move to
+                            <MoveIcon className="size-4" /> Taşı
                           </ContextMenuItem>
                           <ContextMenuSeparator />
                           <ContextMenuItem
                             className="gap-2 text-destructive focus:text-destructive"
                             onClick={() => handleDeleteConfirm(item.path)}
                           >
-                            <Trash2Icon className="size-4" /> Delete
+                            <Trash2Icon className="size-4" /> Sil
                           </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
@@ -608,6 +769,9 @@ export function FileExplorer({
               onRename={handleRename}
               onDelete={(path) => handleDeleteConfirm(path)}
               onMoveTo={(paths) => handleMoveToOpen(paths)}
+              clipboard={clipboard}
+              onCopy={handleCopy}
+              onCut={handleCut}
             />
           )}
         </div>
@@ -620,7 +784,7 @@ export function FileExplorer({
         {selectedPaths.size >= 2 && (
           <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
             <span className="mr-2 text-sm font-semibold tabular-nums">
-              {selectedPaths.size} selected
+              {selectedPaths.size} seçili
             </span>
             <Button
               size="sm"
@@ -628,7 +792,23 @@ export function FileExplorer({
               className="h-7 gap-1.5 text-xs"
               onClick={handleBulkDownload}
             >
-              <DownloadIcon className="size-3.5" /> Download
+              <DownloadIcon className="size-3.5" /> İndir
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => handleCopy(Array.from(selectedPaths))}
+            >
+              <CopyIcon className="size-3.5" /> Kopyala
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => handleCut(Array.from(selectedPaths))}
+            >
+              <ScissorsIcon className="size-3.5" /> Kes
             </Button>
             <Button
               size="sm"
@@ -636,7 +816,7 @@ export function FileExplorer({
               className="h-7 gap-1.5 text-xs"
               onClick={() => handleMoveToOpen(Array.from(selectedPaths))}
             >
-              <MoveIcon className="size-3.5" /> Move
+              <MoveIcon className="size-3.5" /> Taşı
             </Button>
             <Button
               size="sm"
@@ -644,7 +824,7 @@ export function FileExplorer({
               className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => handleDeleteConfirm(Array.from(selectedPaths))}
             >
-              <Trash2Icon className="size-3.5" /> Delete
+              <Trash2Icon className="size-3.5" /> Sil
             </Button>
             <Button
               size="sm"
@@ -659,13 +839,40 @@ export function FileExplorer({
             </Button>
           </div>
         )}
+
+        {/* Paste hint bar — shown when clipboard is active and no bulk selection */}
+        {clipboard && selectedPaths.size < 2 && (
+          <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-primary/30 bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
+            <ClipboardPasteIcon className="size-3.5 text-primary" />
+            <span className="text-sm text-muted-foreground">
+              {clipboard.paths.length === 1 ? "1 öğe" : `${clipboard.paths.length} öğe`}
+              {clipboard.mode === "cut" ? " kesildi" : " kopyalandı"}
+            </span>
+            <Button
+              size="sm"
+              variant="default"
+              className="ml-1 h-7 gap-1.5 text-xs"
+              onClick={handlePaste}
+            >
+              <ClipboardPasteIcon className="size-3.5" /> Yapıştır
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="size-7 p-0 text-muted-foreground"
+              onClick={() => setClipboard(null)}
+            >
+              <XIcon className="size-3.5" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Rename Dialog */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename</DialogTitle>
+            <DialogTitle>Yeniden Adlandır</DialogTitle>
           </DialogHeader>
           <Input
             value={renameValue}
@@ -679,10 +886,10 @@ export function FileExplorer({
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameOpen(false)}>
-              Cancel
+              İptal
             </Button>
             <Button onClick={doRename} disabled={!renameValue.trim()}>
-              Rename
+              Yeniden Adlandır
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -693,17 +900,17 @@ export function FileExplorer({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {deletePaths.length === 1 ? "this item" : `${deletePaths.length} items`}?
+              {deletePaths.length === 1 ? "Bu öğe çöp kutusuna taşınsın mı?" : `${deletePaths.length} öğe çöp kutusuna taşınsın mı?`}
             </AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            <AlertDialogDescription>Öğeler 7 gün sonra otomatik olarak kalıcı şekilde silinir.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
             <AlertDialogAction
               onClick={doDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete
+              Çöp Kutusuna Taşı
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -713,15 +920,15 @@ export function FileExplorer({
       <Dialog open={moveToOpen} onOpenChange={setMoveToOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Move to</DialogTitle>
+            <DialogTitle>Taşı</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Choose a destination folder in the current directory:
+              Mevcut dizinde bir hedef klasör seçin:
             </p>
             {folderChoices.length === 0 ? (
               <p className="rounded-lg bg-muted/30 px-3 py-6 text-center text-xs text-muted-foreground">
-                No folders available here. Type a path below.
+                Burada klasör yok. Aşağıya bir yol yazın.
               </p>
             ) : (
               <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
@@ -742,7 +949,7 @@ export function FileExplorer({
               </div>
             )}
             <Input
-              placeholder="Or type a path (e.g. Documents/Projects)"
+              placeholder="Veya bir yol yazın (örn. Belgeler/Projeler)"
               value={moveToTarget}
               onChange={(e) => setMoveToTarget(e.target.value)}
               className="text-xs"
@@ -750,10 +957,10 @@ export function FileExplorer({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoveToOpen(false)}>
-              Cancel
+              İptal
             </Button>
             <Button onClick={doMoveTo} disabled={!moveToTarget.trim()}>
-              Move
+              Taşı
             </Button>
           </DialogFooter>
         </DialogContent>

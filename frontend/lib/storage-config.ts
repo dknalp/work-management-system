@@ -5,30 +5,37 @@ const CONFIG_FILE = path.join(process.cwd(), "config", "storage.json")
 // Default: proje kökü altında data/ (frontend/../data)
 const DEFAULT_PATH = path.resolve(process.cwd(), "../data")
 
+// In-memory cache to avoid reading disk on every Server Action call
+let cachedPath: string | null = null
+
 export function getStoragePath(): string {
   if (process.env.FILE_STORAGE_PATH) {
     return path.isAbsolute(process.env.FILE_STORAGE_PATH)
       ? process.env.FILE_STORAGE_PATH
       : path.resolve(process.cwd(), process.env.FILE_STORAGE_PATH)
   }
+  if (cachedPath !== null) return cachedPath
   try {
     const raw = fs.readFileSync(CONFIG_FILE, "utf-8")
     const cfg = JSON.parse(raw)
     if (cfg.storagePath && typeof cfg.storagePath === "string") {
-      return path.isAbsolute(cfg.storagePath)
+      cachedPath = path.isAbsolute(cfg.storagePath)
         ? cfg.storagePath
         : path.resolve(process.cwd(), cfg.storagePath)
+      return cachedPath!
     }
   } catch {
     // config file doesn't exist yet — use default
   }
-  return DEFAULT_PATH
+  cachedPath = DEFAULT_PATH
+  return cachedPath!
 }
 
 export async function setStoragePath(newPath: string): Promise<void> {
   const resolved = path.isAbsolute(newPath) ? newPath : path.resolve(process.cwd(), newPath)
   await fs.promises.mkdir(path.dirname(CONFIG_FILE), { recursive: true })
   await fs.promises.writeFile(CONFIG_FILE, JSON.stringify({ storagePath: resolved }, null, 2))
+  cachedPath = resolved
 }
 
 export async function getStorageConfig(): Promise<{

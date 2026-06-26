@@ -83,7 +83,7 @@ function buildCalendarWeeks(year: number, month: number) {
   return weeks
 }
 
-const DAY_HEADERS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+const DAY_HEADERS = ["Pz", "Pt", "Sa", "Ça", "Pe", "Cu", "Ct"]
 
 export default function CalendarPage() {
   const { tasks, addTask, updateTask, deleteTask } = useTasks()
@@ -151,7 +151,7 @@ export default function CalendarPage() {
       createdAt: new Date().toISOString().slice(0, 10),
     }
     addTask(newTask)
-    toast.success("Task added to calendar")
+    toast.success("Görev takvime eklendi")
     setNewTitle("")
     setNewPriority("medium")
     setNewTime("")
@@ -166,7 +166,7 @@ export default function CalendarPage() {
 
   function handleDelete(taskId: string) {
     deleteTask(taskId)
-    toast.success("Task deleted")
+    toast.success("Görev silindi")
   }
 
   const prevMonth = () =>
@@ -206,9 +206,9 @@ export default function CalendarPage() {
                   </Button>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>{monthTaskCount} tasks</span>
+                  <span>{monthTaskCount} görev</span>
                   {monthDoneCount > 0 && (
-                    <span className="text-emerald-600 font-medium">{monthDoneCount} done</span>
+                    <span className="text-emerald-600 font-medium">{monthDoneCount} tamamlandı</span>
                   )}
                 </div>
               </div>
@@ -276,7 +276,7 @@ export default function CalendarPage() {
 
                           {dayTasks.length > 2 && (
                             <span className="mt-0.5 text-[10px] text-muted-foreground px-1">
-                              +{dayTasks.length - 2} more
+                              +{dayTasks.length - 2} daha
                             </span>
                           )}
                         </button>
@@ -295,7 +295,7 @@ export default function CalendarPage() {
                 <div>
                   <h2 className="text-base font-semibold leading-tight">
                     {isToday(selectedDay)
-                      ? "Today"
+                      ? "Bugün"
                       : format(selectedDay, "EEEE")}
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -308,7 +308,7 @@ export default function CalendarPage() {
                   variant={showAddForm ? "secondary" : "default"}
                 >
                   <Plus size={14} className="mr-1" />
-                  Add task
+                  Görev Ekle
                 </Button>
               </div>
 
@@ -318,7 +318,7 @@ export default function CalendarPage() {
                   <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3 shrink-0">
                     <Input
                       autoFocus
-                      placeholder="Task title…"
+                      placeholder="Görev başlığı…"
                       value={newTitle}
                       onChange={(e) => setNewTitle(e.target.value)}
                       onKeyDown={(e) => {
@@ -356,10 +356,10 @@ export default function CalendarPage() {
                           variant="ghost"
                           onClick={() => setShowAddForm(false)}
                         >
-                          Cancel
+                          İptal
                         </Button>
                         <Button size="sm" onClick={handleAddTask}>
-                          Add
+                          Ekle
                         </Button>
                       </div>
                     </div>
@@ -373,9 +373,9 @@ export default function CalendarPage() {
                       <CalendarDays size={22} className="opacity-40" />
                     </div>
                     <div className="text-center space-y-1">
-                      <p className="text-sm font-medium text-foreground/60">No tasks this day</p>
+                      <p className="text-sm font-medium text-foreground/60">Bu gün görev yok</p>
                       <p className="text-xs text-muted-foreground">
-                        Click &ldquo;Add task&rdquo; to schedule something here.
+                        &ldquo;Görev Ekle&rdquo;ye tıklayarak buraya bir şey planlayın.
                       </p>
                     </div>
                   </div>

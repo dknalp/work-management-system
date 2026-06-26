@@ -20,15 +20,15 @@ import {
 
 const chartConfig = {
   todo: {
-    label: "To-Do",
+    label: "Yapılacak",
     color: "var(--chart-4)",
   },
   inProgress: {
-    label: "In Progress",
+    label: "Devam Ediyor",
     color: "var(--chart-2)",
   },
   done: {
-    label: "Done",
+    label: "Tamamlandı",
     color: "var(--chart-1)",
   },
 }
@@ -60,13 +60,13 @@ export function TeamWorkloadChart() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Team Workload</CardTitle>
-        <CardDescription>Task distribution by assignee</CardDescription>
+        <CardTitle className="text-base font-semibold">Ekip İş Yükü</CardTitle>
+        <CardDescription>Sorumluya göre görev dağılımı</CardDescription>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
           <div className="flex h-[200px] items-center justify-center">
-            <p className="text-sm text-muted-foreground">No task data yet</p>
+            <p className="text-sm text-muted-foreground">Henüz görev verisi yok</p>
           </div>
         ) : (
           <ChartContainer config={chartConfig} className="h-[200px] w-full">

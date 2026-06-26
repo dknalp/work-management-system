@@ -36,7 +36,7 @@ export function TaskToolbar({
       <div className="relative flex-1">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search tasks..."
+          placeholder="Görev ara..."
           value={globalFilter}
           onChange={(e) => onGlobalFilterChange(e.target.value)}
           className="h-9 pl-9"
@@ -52,7 +52,7 @@ export function TaskToolbar({
           onClick={onDeleteSelected}
         >
           <Trash2Icon className="size-3.5" />
-          Delete {selectedCount}
+          {selectedCount} Sil
         </Button>
       )}
 
@@ -61,7 +61,7 @@ export function TaskToolbar({
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-1.5">
             <SlidersHorizontalIcon className="size-3.5" />
-            Columns
+            Sütunlar
             {table.getAllColumns().filter((c) => !c.getIsVisible()).length > 0 && (
               <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
                 {table.getAllColumns().filter((c) => !c.getIsVisible()).length}
@@ -71,7 +71,7 @@ export function TaskToolbar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuLabel className="text-xs text-muted-foreground">
-            Toggle columns
+            Sütunları değiştir
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {table

@@ -28,7 +28,7 @@ interface SearchResultsViewProps {
   results: SearchResult[]
   query: string
   onOpen: (item: SearchResult) => void
-  onDownload: (path: string, name: string) => void
+  onDownload: (item: SearchResult) => void
   onRename: (item: SearchResult) => void
   onDelete: (path: string) => void
   onMoveTo: (paths: string[]) => void
@@ -77,8 +77,8 @@ export function SearchResultsView({
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
         <SearchXIcon className="size-10 opacity-20" />
-        <p className="text-sm font-medium">No results for &quot;{query}&quot;</p>
-        <p className="text-xs opacity-60">Try a different query or enable content search in filters</p>
+        <p className="text-sm font-medium">&quot;{query}&quot; için sonuç bulunamadı</p>
+        <p className="text-xs opacity-60">Farklı bir arama terimi deneyin veya filtrelerde içerik aramasını etkinleştirin</p>
       </div>
     )
   }
@@ -86,8 +86,7 @@ export function SearchResultsView({
   return (
     <div className="flex flex-col gap-1">
       <p className="mb-2 px-1 text-xs text-muted-foreground">
-        {results.length} result{results.length !== 1 ? "s" : ""} for{" "}
-        <span className="font-medium text-foreground">&quot;{query}&quot;</span>
+        &quot;{query}&quot; için {results.length} sonuç
       </p>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -121,7 +120,7 @@ export function SearchResultsView({
                         : "border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
                     )}
                   >
-                    {item.matchType === "content" ? "Content" : "Name"}
+                    {item.matchType === "content" ? "İçerik" : "Ad"}
                   </Badge>
                 </div>
 
@@ -141,7 +140,7 @@ export function SearchResultsView({
                     }}
                   >
                     <FolderOpenIcon className="size-3" />
-                    {folderPath || "Root"}
+                    {folderPath || "Kök"}
                   </button>
                   <span>·</span>
                   <span>{formatSize(item.size)}</span>
@@ -162,7 +161,7 @@ export function SearchResultsView({
                 {!item.isDirectory && (
                   <ContextMenuItem
                     className="gap-2"
-                    onClick={() => onDownload(item.path, item.name)}
+                    onClick={() => onDownload(item)}
                   >
                     <DownloadIcon className="size-4" /> Download
                   </ContextMenuItem>
@@ -172,14 +171,14 @@ export function SearchResultsView({
                   <PencilIcon className="size-4" /> Rename
                 </ContextMenuItem>
                 <ContextMenuItem className="gap-2" onClick={() => onMoveTo([item.path])}>
-                  <MoveIcon className="size-4" /> Move to
+                  <MoveIcon className="size-4" /> Taşı
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   className="gap-2 text-destructive focus:text-destructive"
                   onClick={() => onDelete(item.path)}
                 >
-                  <Trash2Icon className="size-4" /> Delete
+                  <Trash2Icon className="size-4" /> Çöp Kutusuna Taşı
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>

@@ -21,9 +21,9 @@ import { CheckIcon, BellIcon, ShieldIcon, PaletteIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const TABS = [
-  { id: "appearance", label: "Appearance", icon: PaletteIcon },
-  { id: "notifications", label: "Notifications", icon: BellIcon },
-  { id: "privacy", label: "Privacy & Security", icon: ShieldIcon },
+  { id: "appearance", label: "Görünüm", icon: PaletteIcon },
+  { id: "notifications", label: "Bildirimler", icon: BellIcon },
+  { id: "privacy", label: "Gizlilik ve Güvenlik", icon: ShieldIcon },
 ]
 
 export default function SettingsPage() {
@@ -41,9 +41,9 @@ export default function SettingsPage() {
         <SiteHeader />
         <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Ayarlar</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Manage your workspace preferences.
+              Çalışma alanı tercihlerinizi yönetin.
             </p>
           </div>
 
@@ -75,24 +75,24 @@ export default function SettingsPage() {
               {activeTab === "appearance" && (
                 <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
                   <div>
-                    <h2 className="text-base font-semibold">Appearance</h2>
+                    <h2 className="text-base font-semibold">Görünüm</h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Customize how WorkOS looks on your device.
+                      WorkOS'un cihazınızda nasıl göründüğünü özelleştirin.
                     </p>
                   </div>
                   <Separator />
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Theme</Label>
+                    <Label className="text-sm font-medium">Tema</Label>
                     <p className="text-xs text-muted-foreground">
-                      Select the color scheme for the interface.
+                      Arayüz için renk şemasını seçin.
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                       {[
-                        { name: "warm",     label: "Warm",     bg: "oklch(0.955 0.014 80)",  primary: "oklch(0.16 0.015 60)",  accent: "oklch(0.89 0.024 80)"  },
-                        { name: "slate",    label: "Slate",    bg: "oklch(0.970 0.004 240)", primary: "oklch(0.20 0.010 250)", accent: "oklch(0.91 0.007 240)" },
-                        { name: "dark",     label: "Dark",     bg: "oklch(0.130 0.018 220)", primary: "oklch(0.650 0.120 220)",accent: "oklch(0.230 0.020 220)"},
-                        { name: "forest",   label: "Forest",   bg: "oklch(0.120 0.018 150)", primary: "oklch(0.600 0.150 145)",accent: "oklch(0.220 0.022 148)"},
-                        { name: "midnight", label: "Midnight", bg: "oklch(0.110 0.022 270)", primary: "oklch(0.680 0.140 265)",accent: "oklch(0.210 0.025 268)"},
+                        { name: "warm",     label: "Sıcak",      bg: "oklch(0.955 0.014 80)",  primary: "oklch(0.16 0.015 60)",  accent: "oklch(0.89 0.024 80)"  },
+                        { name: "slate",    label: "Gri",        bg: "oklch(0.970 0.004 240)", primary: "oklch(0.20 0.010 250)", accent: "oklch(0.91 0.007 240)" },
+                        { name: "dark",     label: "Koyu",       bg: "oklch(0.130 0.018 220)", primary: "oklch(0.650 0.120 220)",accent: "oklch(0.230 0.020 220)"},
+                        { name: "forest",   label: "Orman",      bg: "oklch(0.120 0.018 150)", primary: "oklch(0.600 0.150 145)",accent: "oklch(0.220 0.022 148)"},
+                        { name: "midnight", label: "Gece Yarısı",bg: "oklch(0.110 0.022 270)", primary: "oklch(0.680 0.140 265)",accent: "oklch(0.210 0.025 268)"},
                       ].map((t) => (
                         <button
                           key={t.name}
@@ -127,9 +127,9 @@ export default function SettingsPage() {
                   <Separator />
 
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Language</Label>
+                    <Label className="text-sm font-medium">Dil</Label>
                     <p className="text-xs text-muted-foreground">
-                      Choose your preferred display language.
+                      Tercih ettiğiniz görüntüleme dilini seçin.
                     </p>
                     <Select defaultValue="en">
                       <SelectTrigger className="mt-2 w-48">
@@ -149,16 +149,16 @@ export default function SettingsPage() {
               {activeTab === "notifications" && (
                 <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
                   <div>
-                    <h2 className="text-base font-semibold">Notifications</h2>
+                    <h2 className="text-base font-semibold">Bildirimler</h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Control which notifications you receive.
+                      Hangi bildirimleri alacağınızı kontrol edin.
                     </p>
                   </div>
                   <Separator />
                   {[
-                    { label: "Email notifications", description: "Receive activity updates via email", value: emailNotifs, onChange: setEmailNotifs },
-                    { label: "Task reminders", description: "Get reminded about upcoming due dates", value: taskReminders, onChange: setTaskReminders },
-                    { label: "Team updates", description: "Be notified when team members are added or removed", value: teamUpdates, onChange: setTeamUpdates },
+                    { label: "E-posta bildirimleri", description: "Etkinlik güncellemelerini e-posta ile alın", value: emailNotifs, onChange: setEmailNotifs },
+                    { label: "Görev hatırlatıcıları", description: "Yaklaşan son tarihler için hatırlatıcı alın", value: taskReminders, onChange: setTaskReminders },
+                    { label: "Ekip güncellemeleri", description: "Ekip üyeleri eklendiğinde veya kaldırıldığında bildirim alın", value: teamUpdates, onChange: setTeamUpdates },
                   ].map(({ label, description, value, onChange }) => (
                     <div key={label} className="flex items-center justify-between">
                       <div>
@@ -189,22 +189,22 @@ export default function SettingsPage() {
               {activeTab === "privacy" && (
                 <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
                   <div>
-                    <h2 className="text-base font-semibold">Privacy & Security</h2>
+                    <h2 className="text-base font-semibold">Gizlilik ve Güvenlik</h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Manage your account security settings.
+                      Hesap güvenlik ayarlarınızı yönetin.
                     </p>
                   </div>
                   <Separator />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Account</p>
-                    <p className="text-xs text-muted-foreground">Signed in as <span className="font-medium text-foreground">{user?.email}</span></p>
+                    <p className="text-sm font-medium">Hesap</p>
+                    <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">{user?.email}</span> olarak oturum açıldı</p>
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" onClick={() => toast.info("Password change coming soon")}>
-                      Change password
+                    <Button variant="outline" size="sm" onClick={() => toast.info("Şifre değiştirme yakında geliyor")}>
+                      Şifre değiştir
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={() => toast.info("Account deletion coming soon")}>
-                      Delete account
+                    <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={() => toast.info("Hesap silme yakında geliyor")}>
+                      Hesabı sil
                     </Button>
                   </div>
                 </div>

@@ -56,28 +56,28 @@ export default function RegisterPage() {
           <BriefcaseIcon className="size-5" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Create account</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Join WorkOS today</p>
+          <h1 className="text-xl font-semibold tracking-tight">Hesap oluştur</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Başlamak için aşağıdaki bilgileri doldurun.</p>
         </div>
       </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Full name</Label>
+          <Label htmlFor="name">Ad Soyad</Label>
           <Input
             id="name"
             type="text"
             autoComplete="name"
             required
-            placeholder="Alex Johnson"
+            placeholder="Adınız Soyadınız"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">E-posta</Label>
           <Input
             id="email"
             type="email"
@@ -90,7 +90,7 @@ export default function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">Şifre</Label>
           <div className="relative">
             <Input
               id="password"
@@ -122,14 +122,14 @@ export default function RegisterPage() {
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading && <LoaderIcon className="mr-2 size-4 animate-spin" />}
-          Create account
+          Hesap Oluştur
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
+        Zaten hesabınız var mı?{" "}
         <Link href="/login" className="font-medium text-foreground hover:underline">
-          Sign in
+          Giriş yap
         </Link>
       </p>
     </div>

@@ -136,10 +136,10 @@ export function FileDropZone({ children, currentPath }: FileDropZoneProps) {
               <UploadIcon className="size-8 animate-bounce text-primary" />
             </div>
             <h3 className="text-xl font-bold tracking-tight text-primary">
-              Drop files to upload
+              Yüklemek için dosyaları bırakın
             </h3>
             <p className="text-sm font-medium text-primary/70">
-              to {currentPath || "root"}
+              {currentPath || "kök"} konumuna
             </p>
           </div>
         )}
@@ -151,17 +151,17 @@ export function FileDropZone({ children, currentPath }: FileDropZoneProps) {
             <AlertDialogTitle>
               {conflictFiles.length === 1
                 ? `"${conflictFiles[0]?.name}" already exists`
-                : `${conflictFiles.length} files already exist`}
+                : `${conflictFiles.length} dosya zaten mevcut`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {conflictFiles.length === 1
-                ? "Do you want to replace the existing file?"
-                : `Do you want to replace all ${conflictFiles.length} existing files?`}
+                ? "Mevcut dosyanın üzerine yazmak ister misiniz?"
+                : `Mevcut ${conflictFiles.length} dosyanın üzerine yazmak ister misiniz?`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConflictFiles([])}>Keep original</AlertDialogCancel>
-            <AlertDialogAction onClick={handleOverwriteConfirm}>Replace</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setConflictFiles([])}>Orijinali koru</AlertDialogCancel>
+            <AlertDialogAction onClick={handleOverwriteConfirm}>Üzerine yaz</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

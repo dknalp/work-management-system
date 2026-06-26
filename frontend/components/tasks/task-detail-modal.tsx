@@ -221,7 +221,7 @@ export function TaskDetailModal({
                         className="shrink-0"
                       >
                         <Pencil size={14} className="mr-1" />
-                        Edit
+                        Düzenle
                       </Button>
                     </>
                   )}
@@ -232,7 +232,7 @@ export function TaskDetailModal({
                 <>
                   <div className="flex gap-3">
                     <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-1">Status</p>
+                      <p className="text-xs text-muted-foreground mb-1">Durum</p>
                       <Select
                         value={draft.status}
                         onValueChange={(v) =>
@@ -252,7 +252,7 @@ export function TaskDetailModal({
                       </Select>
                     </div>
                     <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-1">Priority</p>
+                      <p className="text-xs text-muted-foreground mb-1">Öncelik</p>
                       <Select
                         value={draft.priority}
                         onValueChange={(v) =>
@@ -275,7 +275,7 @@ export function TaskDetailModal({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Assignee</p>
+                      <p className="text-xs text-muted-foreground mb-1">Sorumlu</p>
                       <Input
                         value={draft.assignee ?? ""}
                         onChange={(e) =>
@@ -285,7 +285,7 @@ export function TaskDetailModal({
                       />
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Due date</p>
+                      <p className="text-xs text-muted-foreground mb-1">Son tarih</p>
                       <Input
                         type="date"
                         value={draft.dueDate ?? ""}
@@ -298,7 +298,7 @@ export function TaskDetailModal({
                   </div>
 
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Description</p>
+                    <p className="text-xs text-muted-foreground mb-1">Açıklama</p>
                     <Textarea
                       rows={3}
                       value={draft.description ?? ""}
@@ -310,7 +310,7 @@ export function TaskDetailModal({
                   </div>
 
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Tags</p>
+                    <p className="text-xs text-muted-foreground mb-1">Etiketler</p>
                     {(draft.tags ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-2">
                         {(draft.tags ?? []).map((tag) => (
@@ -335,7 +335,7 @@ export function TaskDetailModal({
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
-                        placeholder="Add tag…"
+                        placeholder="Etiket ekle…"
                         className="h-8 text-sm"
                       />
                       <Button
@@ -345,7 +345,7 @@ export function TaskDetailModal({
                         disabled={!tagInput.trim()}
                         className="h-8 shrink-0"
                       >
-                        Add
+                        Ekle
                       </Button>
                     </div>
                   </div>
@@ -368,9 +368,9 @@ export function TaskDetailModal({
                   </div>
 
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                    <span className="text-muted-foreground">Assignee</span>
+                    <span className="text-muted-foreground">Sorumlu</span>
                     <span className="text-foreground">{task.assignee}</span>
-                    <span className="text-muted-foreground">Due date</span>
+                    <span className="text-muted-foreground">Son tarih</span>
                     <span className="text-foreground">{task.dueDate}</span>
                   </div>
 
@@ -386,7 +386,7 @@ export function TaskDetailModal({
 
                   <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">
-                      Description
+                      Açıklama
                     </p>
                     {task.description ? (
                       <p className="text-sm text-foreground whitespace-pre-wrap">
@@ -397,7 +397,7 @@ export function TaskDetailModal({
                         onClick={handleStartEdit}
                         className="text-sm text-muted-foreground/60 hover:text-muted-foreground italic"
                       >
-                        Add description...
+                        Açıklama ekle...
                       </button>
                     )}
                   </div>
@@ -408,7 +408,7 @@ export function TaskDetailModal({
 
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2">
-                  Sub-tasks
+                  Alt görevler
                   {task.subTasks && task.subTasks.length > 0 && (
                     <span className="ml-1 text-xs font-normal">
                       ({task.subTasks.filter((s) => s.completed).length}/
@@ -454,7 +454,7 @@ export function TaskDetailModal({
                     onClick={() => setShowAllSubTasks(true)}
                     className="mt-1 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    Show all ({task.subTasks!.length}) sub-tasks →
+                    Tümünü göster ({task.subTasks!.length}) alt görev →
                   </button>
                 )}
 
@@ -463,7 +463,7 @@ export function TaskDetailModal({
                     value={newSubTaskTitle}
                     onChange={(e) => setNewSubTaskTitle(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAddSubTask()}
-                    placeholder="New sub-task…"
+                    placeholder="Yeni alt görev…"
                     className="h-8 text-sm"
                   />
                   <Button
@@ -482,7 +482,7 @@ export function TaskDetailModal({
 
               <div>
                 <p className="mb-2 text-sm font-medium text-muted-foreground">
-                  Comments{(task?.comments ?? []).length > 0 && ` (${(task?.comments ?? []).length})`}
+                  Yorumlar{(task?.comments ?? []).length > 0 && ` (${(task?.comments ?? []).length})`}
                 </p>
 
                 {(task?.comments ?? []).length > 0 && (
@@ -514,7 +514,7 @@ export function TaskDetailModal({
                                 }
                                 className="text-xs text-muted-foreground hover:text-foreground mt-1"
                               >
-                                Reply
+                                Yanıtla
                               </button>
 
                               {replyingTo === comment.id && (
@@ -528,7 +528,7 @@ export function TaskDetailModal({
                                         submitReply(comment.id)
                                       }
                                     }}
-                                    placeholder="Write a reply…"
+                                    placeholder="Yanıt yaz…"
                                     className="h-7 text-sm flex-1"
                                   />
                                   <Button
@@ -536,7 +536,7 @@ export function TaskDetailModal({
                                     className="h-7 shrink-0"
                                     onClick={() => submitReply(comment.id)}
                                   >
-                                    Reply
+                                    Yanıtla
                                   </Button>
                                 </div>
                               )}
@@ -582,7 +582,7 @@ export function TaskDetailModal({
                     onClick={() => setShowAllComments(true)}
                     className="mb-2 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    Show all ({(task?.comments ?? []).length}) comments →
+                    Tümünü göster ({(task?.comments ?? []).length}) yorum →
                   </button>
                 )}
 
@@ -596,19 +596,19 @@ export function TaskDetailModal({
                         submitComment()
                       }
                     }}
-                    placeholder="Add a comment…"
+                    placeholder="Yorum ekle…"
                     className="flex-1"
                   />
-                  <Button onClick={submitComment}>Add</Button>
+                  <Button onClick={submitComment}>Ekle</Button>
                 </div>
               </div>
 
               {isEditing && (
                 <div className="flex justify-end gap-2 pt-3 border-t border-border mt-2">
                   <Button variant="ghost" onClick={handleCancel}>
-                    Cancel
+                    İptal
                   </Button>
-                  <Button onClick={handleSave}>Save changes</Button>
+                  <Button onClick={handleSave}>Değişiklikleri kaydet</Button>
                 </div>
               )}
             </>

@@ -39,24 +39,23 @@ export function DeleteMemberDialog({
           <AlertDialogDescription>
             {memberName ? (
               <>
-                Are you sure you want to remove{" "}
                 <span className="font-semibold text-foreground">
                   {memberName}
                 </span>{" "}
-                from the team? This action cannot be undone.
+                kişisini ekipten kaldırmak istediğinize emin misiniz? Bu işlem geri alınamaz.
               </>
             ) : (
-              "Are you sure you want to remove this member? This action cannot be undone."
+              "Bu üyeyi ekipten kaldırmak istediğinize emin misiniz? Bu işlem geri alınamaz."
             )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>İptal</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
           >
-            Remove Member
+            Üyeyi Kaldır
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

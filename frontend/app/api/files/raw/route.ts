@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import fs from "fs"
 import path from "path"
 import { getStoragePath } from "@/lib/storage-config"
+import { isAuthenticated } from "@/lib/server-auth"
 import crypto from "crypto"
+
+// Extensions that must be forced to download to prevent XSS / script execution
+const FORCE_DOWNLOAD_EXTS = new Set([
+  ".html", ".htm", ".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx",
+  ".php", ".sh", ".bash", ".zsh", ".py", ".rb", ".pl", ".lua",
+  ".svg", ".xml", ".xhtml",
+])
 
 function getSafePath(relativePath: string): string | null {
   const rootDir = getStoragePath()
@@ -18,17 +26,12 @@ function getContentType(ext: string): string {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
-    ".svg": "image/svg+xml",
     ".gif": "image/gif",
     ".webp": "image/webp",
     ".pdf": "application/pdf",
     ".txt": "text/plain; charset=utf-8",
-    ".md": "text/markdown; charset=utf-8",
-    ".json": "application/json; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-    ".ts": "application/typescript; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".html": "text/html; charset=utf-8",
+    ".md": "text/plain; charset=utf-8",
+    ".json": "text/plain; charset=utf-8",
     ".mp4": "video/mp4",
     ".mov": "video/quicktime",
     ".avi": "video/x-msvideo",
@@ -47,6 +50,10 @@ function getContentType(ext: string): string {
 }
 
 export async function GET(request: NextRequest) {
+  if (!(await isAuthenticated())) {
+    return new NextResponse("Unauthorized", { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const relativePath = searchParams.get("path")
 
@@ -85,12 +92,18 @@ export async function GET(request: NextRequest) {
     return new NextResponse(null, { status: 304 })
   }
 
+  const fileName = path.basename(fullPath)
+  const forceDownload = FORCE_DOWNLOAD_EXTS.has(ext.toLowerCase())
   const commonHeaders: Record<string, string> = {
-    "Content-Type": contentType,
+    "Content-Type": forceDownload ? "application/octet-stream" : contentType,
+    "Content-Disposition": forceDownload
+      ? `attachment; filename="${encodeURIComponent(fileName)}"`
+      : `inline; filename="${encodeURIComponent(fileName)}"`,
     "Accept-Ranges": "bytes",
     "ETag": etag,
     "Last-Modified": mtime,
     "Cache-Control": "private, max-age=3600",
+    "X-Content-Type-Options": "nosniff",
   }
 
   // Range request (video seek, resume download)

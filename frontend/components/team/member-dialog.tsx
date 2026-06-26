@@ -46,18 +46,18 @@ const ROLES = [
 ]
 
 const DEPARTMENTS = [
-  "Engineering",
-  "Product",
-  "Design",
-  "Analytics",
-  "Marketing",
-  "Human Resources",
+  "Mühendislik",
+  "Ürün",
+  "Tasarım",
+  "Analitik",
+  "Pazarlama",
+  "İnsan Kaynakları",
 ]
 
 const STATUSES: { value: TeamMember["status"]; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "away", label: "Away" },
-  { value: "offline", label: "Offline" },
+  { value: "active", label: "Aktif" },
+  { value: "away", label: "Uzakta" },
+  { value: "offline", label: "Çevrimdışı" },
 ]
 
 const emptyForm: Partial<TeamMember> = {
@@ -104,12 +104,12 @@ export function MemberDialog({
 
   const validate = (): boolean => {
     const next: Record<string, string> = {}
-    if (!form.name?.trim()) next.name = "Name is required."
-    if (!form.email?.trim()) next.email = "Email is required."
+    if (!form.name?.trim()) next.name = "Ad zorunludur."
+    if (!form.email?.trim()) next.email = "E-posta zorunludur."
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      next.email = "Enter a valid email."
-    if (!form.role) next.role = "Role is required."
-    if (!form.department) next.department = "Department is required."
+      next.email = "Geçerli bir e-posta girin."
+    if (!form.role) next.role = "Rol zorunludur."
+    if (!form.department) next.department = "Departman zorunludur."
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -137,11 +137,11 @@ export function MemberDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Member" : "Add Member"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Üyeyi Düzenle" : "Üye Ekle"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Update the team member's information below."
-              : "Fill in the details to invite a new team member."}
+              ? "Ekip üyesinin bilgilerini aşağıdan güncelleyin."
+              : "Yeni ekip üyesi eklemek için bilgileri doldurun."}
           </DialogDescription>
         </DialogHeader>
 
@@ -149,13 +149,13 @@ export function MemberDialog({
           {/* Name */}
           <div className="space-y-1.5">
             <Label htmlFor="name">
-              Full Name <span className="text-destructive">*</span>
+              Ad Soyad <span className="text-destructive">*</span>
             </Label>
             <Input
               id="name"
               value={form.name ?? ""}
               onChange={(e) => set("name", e.target.value)}
-              placeholder="Jane Doe"
+              placeholder="Ayşe Yılmaz"
               className={
                 errors.name
                   ? "border-destructive focus-visible:ring-destructive/20"
@@ -170,14 +170,14 @@ export function MemberDialog({
           {/* Email */}
           <div className="space-y-1.5">
             <Label htmlFor="email">
-              Email <span className="text-destructive">*</span>
+              E-posta <span className="text-destructive">*</span>
             </Label>
             <Input
               id="email"
               type="email"
               value={form.email ?? ""}
               onChange={(e) => set("email", e.target.value)}
-              placeholder="jane@worksync.io"
+              placeholder="ayse@worksync.io"
               className={
                 errors.email
                   ? "border-destructive focus-visible:ring-destructive/20"
@@ -191,7 +191,7 @@ export function MemberDialog({
 
           {/* Phone */}
           <div className="space-y-1.5">
-            <Label htmlFor="phone">Phone</Label>
+            <Label htmlFor="phone">Telefon</Label>
             <Input
               id="phone"
               value={form.phone ?? ""}
@@ -204,7 +204,7 @@ export function MemberDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="role">
-                Role <span className="text-destructive">*</span>
+                Rol <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={form.role ?? ""}
@@ -214,7 +214,7 @@ export function MemberDialog({
                   id="role"
                   className={errors.role ? "border-destructive" : ""}
                 >
-                  <SelectValue placeholder="Select role" />
+                  <SelectValue placeholder="Rol seçin" />
                 </SelectTrigger>
                 <SelectContent>
                   {ROLES.map((r) => (
@@ -231,7 +231,7 @@ export function MemberDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="department">
-                Department <span className="text-destructive">*</span>
+                Departman <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={form.department ?? ""}
@@ -241,7 +241,7 @@ export function MemberDialog({
                   id="department"
                   className={errors.department ? "border-destructive" : ""}
                 >
-                  <SelectValue placeholder="Select dept." />
+                  <SelectValue placeholder="Departman seçin" />
                 </SelectTrigger>
                 <SelectContent>
                   {DEPARTMENTS.map((d) => (
@@ -259,13 +259,13 @@ export function MemberDialog({
 
           {/* Status */}
           <div className="space-y-1.5">
-            <Label htmlFor="status">Status</Label>
+            <Label htmlFor="status">Durum</Label>
             <Select
               value={form.status ?? "active"}
               onValueChange={(v) => set("status", v as TeamMember["status"])}
             >
               <SelectTrigger id="status">
-                <SelectValue placeholder="Select status" />
+                <SelectValue placeholder="Durum seçin" />
               </SelectTrigger>
               <SelectContent>
                 {STATUSES.map((s) => (
@@ -283,10 +283,10 @@ export function MemberDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              İptal
             </Button>
             <Button type="submit">
-              {isEdit ? "Save Changes" : "Add Member"}
+              {isEdit ? "Değişiklikleri Kaydet" : "Üye Ekle"}
             </Button>
           </DialogFooter>
         </form>

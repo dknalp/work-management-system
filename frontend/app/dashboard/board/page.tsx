@@ -59,25 +59,25 @@ export default function BoardPage() {
           <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
             <div className="space-y-0.5">
               <h2 className="text-xl font-bold tracking-tight">
-                Pipeline board view
+                Pipeline Panosu
               </h2>
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                Manage your team&apos;s workflow and track progress.
+                Ekibinizin iş akışını yönetin ve ilerlemeyi takip edin.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="h-8 gap-2">
                 <Share2Icon className="size-3.5" />
-                Share
+                Paylaş
               </Button>
               <Button variant="outline" size="sm" className="h-8 gap-2">
                 <Settings2Icon className="size-3.5" />
-                Customize
+                Özelleştir
               </Button>
               <div className="mx-1 h-4 w-px bg-border" />
               <Button size="sm" className="h-8 gap-2" onClick={openAddColumn}>
                 <PlusIcon className="size-3.5" />
-                Add Column
+                Sütun Ekle
               </Button>
             </div>
           </div>
@@ -93,7 +93,7 @@ export default function BoardPage() {
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">
-              Add Column
+              Sütun Ekle
             </DialogTitle>
           </DialogHeader>
 
@@ -102,7 +102,7 @@ export default function BoardPage() {
               htmlFor="column-title"
               className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
             >
-              Column name
+              Sütun adı
             </Label>
             <input
               id="column-title"
@@ -110,7 +110,7 @@ export default function BoardPage() {
               value={columnTitle}
               onChange={(e) => setColumnTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="e.g. Review, Blocked, QA…"
+              placeholder="örn. İnceleme, Engellendi, QA…"
               autoFocus
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
             />
@@ -122,14 +122,14 @@ export default function BoardPage() {
               size="sm"
               onClick={() => setAddColumnOpen(false)}
             >
-              Cancel
+              İptal
             </Button>
             <Button
               size="sm"
               onClick={confirmAddColumn}
               disabled={!columnTitle.trim()}
             >
-              Add Column
+              Sütun Ekle
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -199,7 +199,7 @@ export function KanbanCard({
         <ContextMenuContent className="w-40">
           <ContextMenuItem className="gap-2" onSelect={openDetail}>
             <PencilIcon className="size-3.5" />
-            Edit Task
+            Görevi Düzenle
           </ContextMenuItem>
           <ContextMenuItem
             variant="destructive"
@@ -207,7 +207,7 @@ export function KanbanCard({
             onSelect={() => onDelete?.(task.id)}
           >
             <Trash2Icon className="size-3.5" />
-            Delete Task
+            Görevi Sil
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -216,7 +216,7 @@ export function KanbanCard({
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">
-              Task Detail
+              Görev Detayı
             </DialogTitle>
           </DialogHeader>
 
@@ -226,7 +226,7 @@ export function KanbanCard({
                 htmlFor="card-title"
                 className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
               >
-                Title
+                Başlık
               </Label>
               <Textarea
                 id="card-title"
@@ -239,7 +239,7 @@ export function KanbanCard({
 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Priority
+                Öncelik
               </Label>
               <div className="flex gap-2">
                 {(["low", "medium", "high"] as const).map((p) => (
@@ -266,9 +266,9 @@ export function KanbanCard({
                 htmlFor="card-tags"
                 className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
               >
-                Tags{" "}
+                Etiketler{" "}
                 <span className="font-normal normal-case">
-                  (comma separated)
+                  (virgülle ayırın)
                 </span>
               </Label>
               <input
@@ -276,7 +276,7 @@ export function KanbanCard({
                 type="text"
                 value={editTagsInput}
                 onChange={(e) => setEditTagsInput(e.target.value)}
-                placeholder="Design, API, Review"
+                placeholder="Tasarım, API, İnceleme"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
               />
             </div>
@@ -290,7 +290,7 @@ export function KanbanCard({
               onClick={handleDelete}
             >
               <Trash2Icon className="size-3.5" />
-              Delete
+              Sil
             </Button>
             <div className="flex gap-2">
               <Button
@@ -298,14 +298,14 @@ export function KanbanCard({
                 size="sm"
                 onClick={() => setDetailOpen(false)}
               >
-                Cancel
+                İptal
               </Button>
               <Button
                 size="sm"
                 onClick={handleSave}
                 disabled={!editTitle.trim()}
               >
-                Save changes
+                Değişiklikleri kaydet
               </Button>
             </div>
           </DialogFooter>

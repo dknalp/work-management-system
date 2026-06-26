@@ -36,21 +36,21 @@ export type { TeamMember }
 type ViewMode = "grid" | "table"
 
 const DEPARTMENTS = [
-  "All",
-  "Engineering",
-  "Infrastructure",
-  "Product",
-  "Design",
-  "Analytics",
-  "Marketing",
-  "Human Resources",
-  "Operations",
+  "Tümü",
+  "Mühendislik",
+  "Altyapı",
+  "Ürün",
+  "Tasarım",
+  "Analitik",
+  "Pazarlama",
+  "İnsan Kaynakları",
+  "Operasyon",
 ]
 
 export default function TeamPage() {
   const { members, addMember, updateMember, deleteMember } = useTeam()
   const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("All")
+  const [departmentFilter, setDepartmentFilter] = useState("Tümü")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -70,7 +70,7 @@ export default function TeamPage() {
         m.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.role.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesDept =
-        departmentFilter === "All" || m.department === departmentFilter
+        departmentFilter === "Tümü" || m.department === departmentFilter
       return matchesSearch && matchesDept
     })
   }, [members, searchQuery, departmentFilter])
@@ -84,13 +84,13 @@ export default function TeamPage() {
     const isEdit = members.some((m) => m.id === member.id)
     if (isEdit) {
       updateMember(member.id, member)
-      toast.success("Member updated", {
-        description: `${member.name}'s profile has been updated.`,
+      toast.success("Üye güncellendi", {
+        description: `${member.name} güncellendi.`,
       })
     } else {
       addMember(member)
-      toast.success("Member added", {
-        description: `${member.name} has been added to the team.`,
+      toast.success("Üye eklendi", {
+        description: `${member.name} ekibe eklendi.`,
       })
     }
   }
@@ -104,17 +104,17 @@ export default function TeamPage() {
     const member = members.find((m) => m.id === deletingMemberId)
     deleteMember(deletingMemberId)
     setDeletingMemberId(null)
-    toast.success("Member removed", {
+    toast.success("Üye kaldırıldı", {
       description: member
-        ? `${member.name} has been removed from the team.`
-        : "Member removed.",
+        ? `${member.name} ekipten çıkarıldı.`
+        : "Üye kaldırıldı.",
     })
   }
 
   const statCards = [
     {
       key: "total",
-      label: "Total Members",
+      label: "Toplam Üye",
       value: stats.total,
       icon: UsersIcon,
       color: "text-violet-500",
@@ -122,7 +122,7 @@ export default function TeamPage() {
     },
     {
       key: "active",
-      label: "Active Now",
+      label: "Şu An Aktif",
       value: stats.active,
       icon: UserCheckIcon,
       color: "text-emerald-500",
@@ -130,7 +130,7 @@ export default function TeamPage() {
     },
     {
       key: "departments",
-      label: "Departments",
+      label: "Departmanlar",
       value: stats.departments,
       icon: BuildingIcon,
       color: "text-blue-500",
@@ -153,7 +153,7 @@ export default function TeamPage() {
         <main className="flex flex-1 flex-col overflow-auto bg-background/50">
           <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 md:px-8">
             <div className="flex flex-col gap-1">
-              <h1 className="text-2xl font-bold tracking-tight">Team</h1>
+              <h1 className="text-2xl font-bold tracking-tight">Ekip</h1>
             </div>
 
             {/* Stat Cards */}
@@ -192,7 +192,7 @@ export default function TeamPage() {
                 <div className="group relative w-full sm:w-64">
                   <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
                   <Input
-                    placeholder="Search members..."
+                    placeholder="Üye ara..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="h-9 rounded-lg border-border/40 bg-background/40 pl-9 text-sm focus-visible:ring-primary/20"
@@ -201,7 +201,7 @@ export default function TeamPage() {
 
                 <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                   <SelectTrigger className="h-9 w-[160px] rounded-lg border-border/40 bg-background/40 text-sm">
-                    <SelectValue placeholder="Department" />
+                    <SelectValue placeholder="Departman" />
                   </SelectTrigger>
                   <SelectContent>
                     {DEPARTMENTS.map((dept) => (
@@ -243,9 +243,9 @@ export default function TeamPage() {
                   </Button>
                 </div>
 
-                {(searchQuery || departmentFilter !== "All") && (
+                {(searchQuery || departmentFilter !== "Tümü") && (
                   <Badge variant="secondary" className="h-7 px-2.5 text-xs font-medium">
-                    {filteredMembers.length} result{filteredMembers.length !== 1 ? "s" : ""}
+                    {filteredMembers.length} sonuç
                   </Badge>
                 )}
               </div>
@@ -255,9 +255,9 @@ export default function TeamPage() {
             {filteredMembers.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/20 bg-muted/5 py-24">
                 <UsersIcon className="mb-3 size-10 text-muted-foreground/40" />
-                <p className="text-sm font-medium text-muted-foreground">No members found</p>
+                <p className="text-sm font-medium text-muted-foreground">Üye bulunamadı</p>
                 <p className="mt-1 text-xs text-muted-foreground/70">
-                  Try adjusting your search or filter.
+                  Arama veya filtrenizi ayarlamayı deneyin.
                 </p>
               </div>
             ) : viewMode === "table" ? (

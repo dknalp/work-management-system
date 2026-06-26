@@ -43,21 +43,21 @@ const statusConfig: Record<
   { label: string; color: string; dot: string; ring: string }
 > = {
   active: {
-    label: "Active",
+    label: "Aktif",
     color:
       "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
     dot: "bg-emerald-500",
     ring: "ring-emerald-500",
   },
   away: {
-    label: "Away",
+    label: "Uzakta",
     color:
       "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
     dot: "bg-amber-500",
     ring: "ring-amber-500",
   },
   offline: {
-    label: "Offline",
+    label: "Çevrimdışı",
     color: "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/20",
     dot: "bg-zinc-400",
     ring: "ring-zinc-400",
@@ -107,13 +107,13 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
                 <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={() => onEdit(member)}>
                     <Pencil className="mr-2 size-3.5" />
-                    Edit Member
+                    Üyeyi Düzenle
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => window.open(`mailto:${member.email}`)}
                   >
                     <Mail className="mr-2 size-3.5" />
-                    Send Email
+                    E-posta Gönder
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -121,7 +121,7 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 size-3.5" />
-                    Remove Member
+                    Üyeyi Kaldır
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

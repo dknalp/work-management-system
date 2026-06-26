@@ -42,7 +42,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
       createdAt: new Date().toISOString(),
     }
     addTask(task)
-    toast.success("Task created", { description: task.title })
+    toast.success("Görev oluşturuldu", { description: task.title })
     setTitle("")
     setAssignee("")
     setPriority("medium")
@@ -58,7 +58,7 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
         </DialogHeader>
         <div className="space-y-3 py-2">
           <Input
-            placeholder="Task title *"
+            placeholder="Görev başlığı *"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
@@ -67,17 +67,17 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
           <div className="grid grid-cols-2 gap-3">
             <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
               <SelectTrigger>
-                <SelectValue placeholder="Priority" />
+                <SelectValue placeholder="Öncelik" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="low">Düşük</SelectItem>
+                <SelectItem value="medium">Orta</SelectItem>
+                <SelectItem value="high">Yüksek</SelectItem>
               </SelectContent>
             </Select>
             <Select value={assignee} onValueChange={setAssignee}>
               <SelectTrigger>
-                <SelectValue placeholder="Assignee" />
+                <SelectValue placeholder="Sorumlu" />
               </SelectTrigger>
               <SelectContent>
                 {members.map((m) => (
@@ -96,10 +96,10 @@ export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) 
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            İptal
           </Button>
           <Button onClick={handleSubmit} disabled={!title.trim()}>
-            Create task
+            Görev oluştur
           </Button>
         </div>
       </DialogContent>

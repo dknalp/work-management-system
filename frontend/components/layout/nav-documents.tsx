@@ -37,7 +37,7 @@ export function NavDocuments({
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Documents</SidebarGroupLabel>
+      <SidebarGroupLabel>Belgeler</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <SidebarMenuItem key={item.name}>
@@ -54,7 +54,7 @@ export function NavDocuments({
                   className="rounded-sm data-[state=open]:bg-accent"
                 >
                   <MoreHorizontalIcon />
-                  <span className="sr-only">More</span>
+                  <span className="sr-only">Daha Fazla</span>
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -64,16 +64,16 @@ export function NavDocuments({
               >
                 <DropdownMenuItem>
                   <FolderIcon />
-                  <span>Open</span>
+                  <span>Aç</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <ShareIcon />
-                  <span>Share</span>
+                  <span>Paylaş</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive">
                   <Trash2Icon />
-                  <span>Delete</span>
+                  <span>Sil</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -82,7 +82,7 @@ export function NavDocuments({
         <SidebarMenuItem>
           <SidebarMenuButton className="text-sidebar-foreground/70">
             <MoreHorizontalIcon className="text-sidebar-foreground/70" />
-            <span>More</span>
+            <span>Daha Fazla</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

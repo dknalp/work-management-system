@@ -4,6 +4,7 @@ import fs from "fs/promises"
 import path from "path"
 import { revalidatePath } from "next/cache"
 import { getStoragePath } from "@/lib/storage-config"
+import { requireAuth } from "@/lib/server-auth"
 
 async function ensureRootDir() {
   try {
@@ -13,10 +14,23 @@ async function ensureRootDir() {
   }
 }
 
-function getSafePath(relativePath: string) {
+function getSafePath(relativePath: string): string {
   const rootDir = getStoragePath()
-  const safePath = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, "")
-  return path.join(rootDir, safePath)
+  const fullPath = path.resolve(rootDir, relativePath)
+  // Prevent path traversal — fall back to root if outside storage root
+  if (fullPath !== rootDir && !fullPath.startsWith(rootDir + path.sep)) {
+    return rootDir
+  }
+  return fullPath
+}
+
+// Strip path separators and null bytes from a bare file/folder name
+function sanitizeName(name: string): string {
+  return name
+    .replace(/[\x00/\\]/g, "")   // remove null bytes and path separators
+    .replace(/\.{2,}/g, ".")      // collapse .. sequences
+    .trim()
+    .slice(0, 255)                // limit to max filename length
 }
 
 export type FileItem = {
@@ -26,9 +40,12 @@ export type FileItem = {
   size: number
   updatedAt: string
   childCount?: number
+  source?: "disk" | "drive"
+  driveFileId?: string
 }
 
 export async function listFiles(relativePath: string = ""): Promise<FileItem[]> {
+  await requireAuth()
   await ensureRootDir()
   const rootDir = getStoragePath()
   const fullPath = getSafePath(relativePath)
@@ -37,7 +54,7 @@ export async function listFiles(relativePath: string = ""): Promise<FileItem[]> 
     const entries = await fs.readdir(fullPath, { withFileTypes: true })
     const items = await Promise.all(
       entries
-        .filter((e) => e.name !== ".trash") // hide trash folder
+        .filter((e) => e.name !== ".trash")
         .map(async (entry) => {
           const entryPath = path.join(fullPath, entry.name)
           const stats = await fs.stat(entryPath)
@@ -46,8 +63,9 @@ export async function listFiles(relativePath: string = ""): Promise<FileItem[]> 
           let childCount: number | undefined
           if (entry.isDirectory()) {
             try {
-              const children = await fs.readdir(entryPath)
-              childCount = children.filter((c) => c !== ".trash").length
+              // Use withFileTypes to avoid a second stat per entry
+              const children = await fs.readdir(entryPath, { withFileTypes: true })
+              childCount = children.filter((c) => c.name !== ".trash").length
             } catch {
               childCount = 0
             }
@@ -76,6 +94,7 @@ export async function listFiles(relativePath: string = ""): Promise<FileItem[]> 
 }
 
 export async function deleteItem(relativePath: string) {
+  await requireAuth()
   const fullPath = getSafePath(relativePath)
   try {
     await fs.rm(fullPath, { recursive: true, force: true })
@@ -88,6 +107,7 @@ export async function deleteItem(relativePath: string) {
 }
 
 export async function moveToTrash(relativePath: string) {
+  await requireAuth()
   const rootDir = getStoragePath()
   const trashDir = path.join(rootDir, ".trash")
   const fullPath = getSafePath(relativePath)
@@ -95,20 +115,24 @@ export async function moveToTrash(relativePath: string) {
 
   try {
     await fs.mkdir(trashDir, { recursive: true })
-    const dest = path.join(trashDir, `${Date.now()}_${fileName}`)
+    const trashName = `${Date.now()}_${fileName}`
+    const dest = path.join(trashDir, trashName)
     await fs.rename(fullPath, dest)
     revalidatePath("/files", "layout")
-    return { success: true }
+    return { success: true as const, trashName, originalName: fileName }
   } catch (error) {
     console.error("Error moving to trash:", error)
-    return { success: false, error: "Failed to move to trash" }
+    return { success: false as const, error: "Failed to move to trash" }
   }
 }
 
 export async function renameItem(oldPath: string, newName: string) {
+  await requireAuth()
+  const safe = sanitizeName(newName)
+  if (!safe) return { success: false, error: "Invalid name" }
   const oldFullPath = getSafePath(oldPath)
   const dir = path.dirname(oldFullPath)
-  const newFullPath = path.join(dir, newName)
+  const newFullPath = path.join(dir, safe)
 
   try {
     await fs.rename(oldFullPath, newFullPath)
@@ -121,7 +145,10 @@ export async function renameItem(oldPath: string, newName: string) {
 }
 
 export async function createFolder(parentPath: string, name: string) {
-  const fullPath = path.join(getSafePath(parentPath), name)
+  await requireAuth()
+  const safe = sanitizeName(name)
+  if (!safe) return { success: false, error: "Invalid folder name" }
+  const fullPath = path.join(getSafePath(parentPath), safe)
   try {
     await fs.mkdir(fullPath, { recursive: true })
     revalidatePath("/files", "layout")
@@ -133,6 +160,7 @@ export async function createFolder(parentPath: string, name: string) {
 }
 
 export async function moveItem(sourcePath: string, targetDirPath: string) {
+  await requireAuth()
   const safeSourcePath = getSafePath(sourcePath)
   const fileName = path.basename(sourcePath)
   const safeTargetDirPath = getSafePath(targetDirPath)
@@ -150,10 +178,17 @@ export async function moveItem(sourcePath: string, targetDirPath: string) {
 }
 
 export async function copyItem(sourcePath: string, targetDirPath: string) {
+  await requireAuth()
   const safeSourcePath = getSafePath(sourcePath)
   const fileName = path.basename(sourcePath)
   const safeTargetDirPath = getSafePath(targetDirPath)
-  const destinationPath = path.join(safeTargetDirPath, fileName)
+  let destinationPath = path.join(safeTargetDirPath, fileName)
+
+  if (safeSourcePath === destinationPath) {
+    const ext = path.extname(fileName)
+    const base = path.basename(fileName, ext)
+    destinationPath = path.join(safeTargetDirPath, `${base} (kopya)${ext}`)
+  }
 
   try {
     await fs.access(safeSourcePath)
@@ -167,6 +202,7 @@ export async function copyItem(sourcePath: string, targetDirPath: string) {
 }
 
 export async function listFilesRecursive(query: string): Promise<FileItem[]> {
+  await requireAuth()
   await ensureRootDir()
   const rootDir = getStoragePath()
   const results: FileItem[] = []
@@ -219,6 +255,7 @@ export type SearchOptions = {
 const CONCURRENCY = 10
 
 export async function searchFiles(opts: SearchOptions): Promise<SearchResult[]> {
+  await requireAuth()
   await ensureRootDir()
   const rootDir = getStoragePath()
   const { query, scope, fileTypes, includeContent, maxResults = 100 } = opts
@@ -329,6 +366,127 @@ export async function searchFiles(opts: SearchOptions): Promise<SearchResult[]> 
   return results
 }
 
+export type TrashItem = {
+  trashName: string   // timestamped name on disk
+  originalName: string
+  isDirectory: boolean
+  size: number
+  deletedAt: string
+  expiresAt: string
+}
+
+const TRASH_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+async function purgeExpiredTrash(trashDir: string) {
+  const cutoff = Date.now() - TRASH_TTL_MS
+  try {
+    const entries = await fs.readdir(trashDir, { withFileTypes: true })
+    await Promise.all(
+      entries.map(async (entry) => {
+        const underscoreIdx = entry.name.indexOf("_")
+        const ts = underscoreIdx >= 0 ? parseInt(entry.name.slice(0, underscoreIdx)) : NaN
+        if (!isNaN(ts) && ts < cutoff) {
+          await fs.rm(path.join(trashDir, entry.name), { recursive: true, force: true })
+        }
+      })
+    )
+  } catch {
+    // best-effort
+  }
+}
+
+export async function listTrash(): Promise<TrashItem[]> {
+  await requireAuth()
+  const trashDir = path.join(getStoragePath(), ".trash")
+  try {
+    await fs.access(trashDir)
+  } catch {
+    return []
+  }
+  // Lazy cleanup — remove items older than 7 days on every listing
+  await purgeExpiredTrash(trashDir)
+  try {
+    const entries = await fs.readdir(trashDir, { withFileTypes: true })
+    const items = await Promise.all(
+      entries.map(async (entry) => {
+        const stats = await fs.stat(path.join(trashDir, entry.name))
+        const underscoreIdx = entry.name.indexOf("_")
+        const originalName = underscoreIdx >= 0 ? entry.name.slice(underscoreIdx + 1) : entry.name
+        const ts = underscoreIdx >= 0 ? parseInt(entry.name.slice(0, underscoreIdx)) : stats.mtimeMs
+        const expiresAt = new Date(ts + TRASH_TTL_MS).toISOString()
+        return {
+          trashName: entry.name,
+          originalName,
+          isDirectory: entry.isDirectory(),
+          size: stats.size,
+          deletedAt: new Date(ts).toISOString(),
+          expiresAt,
+        }
+      })
+    )
+    return items.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt))
+  } catch (error) {
+    console.error("Error listing trash:", error)
+    return []
+  }
+}
+
+export async function restoreFromTrash(trashName: string, restorePath: string) {
+  await requireAuth()
+  const rootDir = getStoragePath()
+  const trashDir = path.join(rootDir, ".trash")
+  // Only allow plain names — no path separators
+  const safeName = path.basename(trashName)
+  const trashFullPath = path.join(trashDir, safeName)
+  const destFullPath = getSafePath(restorePath)
+
+  // Verify trashFullPath is actually inside trashDir
+  if (!trashFullPath.startsWith(trashDir + path.sep) && trashFullPath !== trashDir) {
+    return { success: false, error: "Invalid trash name" }
+  }
+
+  try {
+    await fs.access(trashFullPath)
+    await fs.mkdir(path.dirname(destFullPath), { recursive: true })
+    await fs.rename(trashFullPath, destFullPath)
+    revalidatePath("/files", "layout")
+    return { success: true }
+  } catch (error) {
+    console.error("Error restoring from trash:", error)
+    return { success: false, error: "Failed to restore item" }
+  }
+}
+
+export async function deleteFromTrash(trashName: string) {
+  await requireAuth()
+  const trashDir = path.join(getStoragePath(), ".trash")
+  const safeName = path.basename(trashName)
+  const fullPath = path.join(trashDir, safeName)
+  if (!fullPath.startsWith(trashDir + path.sep)) {
+    return { success: false, error: "Invalid trash name" }
+  }
+  try {
+    await fs.rm(fullPath, { recursive: true, force: true })
+    return { success: true }
+  } catch (error) {
+    console.error("Error deleting from trash:", error)
+    return { success: false, error: "Failed to delete permanently" }
+  }
+}
+
+export async function emptyTrash() {
+  await requireAuth()
+  const trashDir = path.join(getStoragePath(), ".trash")
+  try {
+    await fs.rm(trashDir, { recursive: true, force: true })
+    await fs.mkdir(trashDir, { recursive: true })
+    return { success: true }
+  } catch (error) {
+    console.error("Error emptying trash:", error)
+    return { success: false, error: "Failed to empty trash" }
+  }
+}
+
 export async function getStorageConfig() {
   const { getStorageConfig: _get } = await import("@/lib/storage-config")
   return _get()
@@ -336,6 +494,7 @@ export async function getStorageConfig() {
 
 export async function updateStoragePath(newPath: string) {
   "use server"
+  await requireAuth()
   try {
     // Validate: must be an absolute path pointing to an existing or creatable directory
     const resolved = path.isAbsolute(newPath) ? newPath : path.resolve(process.cwd(), newPath)

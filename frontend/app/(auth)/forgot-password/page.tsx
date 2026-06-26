@@ -43,9 +43,9 @@ export default function ForgotPasswordPage() {
           <BriefcaseIcon className="size-5" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Reset password</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Şifrenizi mi unuttunuz?</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Enter your email and we&apos;ll send a reset link
+            E-posta adresinizi girin, şifrenizi sıfırlamak için size bir bağlantı göndereceğiz.
           </p>
         </div>
       </div>
@@ -63,14 +63,14 @@ export default function ForgotPasswordPage() {
           </div>
           <Link href="/login">
             <Button variant="outline" className="w-full">
-              Back to login
+              Girişe dön
             </Button>
           </Link>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">E-posta</Label>
             <Input
               id="email"
               type="email"
@@ -90,13 +90,13 @@ export default function ForgotPasswordPage() {
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <LoaderIcon className="mr-2 size-4 animate-spin" />}
-            Send reset link
+            Sıfırlama Bağlantısı Gönder
           </Button>
 
           <Link href="/login">
             <Button variant="ghost" className="w-full gap-2 text-muted-foreground">
               <ArrowLeftIcon className="size-4" />
-              Back to login
+              Girişe dön
             </Button>
           </Link>
         </form>

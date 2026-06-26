@@ -21,11 +21,11 @@ import {
 
 const chartConfig = {
   created: {
-    label: "Created",
+    label: "Oluşturulan",
     color: "var(--chart-2)",
   },
   completed: {
-    label: "Completed",
+    label: "Tamamlanan",
     color: "var(--chart-1)",
   },
 }
@@ -54,8 +54,8 @@ export function TaskOverviewChart() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Task Activity</CardTitle>
-        <CardDescription>Created vs completed — last 7 days</CardDescription>
+        <CardTitle className="text-base font-semibold">Görev Aktivitesi</CardTitle>
+        <CardDescription>Oluşturulan - tamamlanan — son 7 gün</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[200px] w-full">

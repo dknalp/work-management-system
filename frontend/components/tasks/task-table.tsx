@@ -69,8 +69,8 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
   const handleDelete = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))
     onDelete?.(id)
-    toast.success("Task deleted", {
-      description: `Task ${id} has been removed.`,
+    toast.success("Görev silindi", {
+      description: `Görev ${id} kaldırıldı.`,
     })
   }, [onDelete])
 
@@ -79,9 +79,7 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
     setTasks((prev) => prev.filter((t) => !selectedIds.includes(t.id)))
     onDeleteMany?.(selectedIds)
     setRowSelection({})
-    toast.success(
-      `${selectedIds.length} task${selectedIds.length > 1 ? "s" : ""} deleted`
-    )
+    toast.success(`${selectedIds.length} görev silindi`)
   }, [rowSelection, onDeleteMany])
 
   const handleStatusChange = useCallback(
@@ -204,9 +202,9 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
                 >
                   <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <InboxIcon className="size-10 opacity-20" />
-                    <p className="text-sm font-medium">No tasks found</p>
+                    <p className="text-sm font-medium">Görev bulunamadı</p>
                     <p className="text-xs opacity-70">
-                      Try adjusting your filters or add a new task.
+                      Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin.
                     </p>
                   </div>
                 </TableCell>
@@ -220,9 +218,9 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
           {table.getFilteredSelectedRowModel().rows.length > 0 && (
-            <span>{table.getFilteredSelectedRowModel().rows.length} of </span>
+            <span>{table.getFilteredSelectedRowModel().rows.length} / </span>
           )}
-          <span>{table.getFilteredRowModel().rows.length} row(s)</span>
+          <span>{table.getFilteredRowModel().rows.length} satır</span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -231,7 +229,7 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
               htmlFor="rows-per-page"
               className="text-sm whitespace-nowrap text-muted-foreground"
             >
-              Rows per page
+              Sayfa başına satır
             </Label>
             <Select
               value={`${table.getState().pagination.pageSize}`}
@@ -257,8 +255,7 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
           </div>
 
           <div className="text-sm font-medium whitespace-nowrap">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {Math.max(1, table.getPageCount())}
+            Sayfa {table.getState().pagination.pageIndex + 1} / {Math.max(1, table.getPageCount())}
           </div>
 
           <div className="flex items-center gap-1">

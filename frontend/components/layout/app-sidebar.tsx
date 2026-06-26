@@ -30,32 +30,32 @@ import { useAuth } from "@/contexts/auth-context"
 
 const navMain = [
     {
-    title: "Analytics",
+    title: "Analitik",
     url: "/dashboard",
     icon: <LayoutDashboardIcon />,
   },
   {
-    title: "Pipeline board view",
+    title: "Pipeline Panosu",
     url: "/dashboard/board",
     icon: <KanbanIcon />,
   },
   {
-    title: "Tasks",
+    title: "Görevler",
     url: "/tasks",
     icon: <CheckSquareIcon />,
   },
   {
-    title: "Calendar",
+    title: "Takvim",
     url: "/calendar",
     icon: <CalendarIcon />,
   },
   {
-    title: "Files",
+    title: "Dosyalar",
     url: "/files",
     icon: <FolderIcon />,
   },
   {
-    title: "Team",
+    title: "Ekip",
     url: "/team",
     icon: <UsersIcon />,
   },
@@ -63,7 +63,7 @@ const navMain = [
 
 const navSecondary = [
   {
-    title: "Settings",
+    title: "Ayarlar",
     url: "/settings",
     icon: <Settings2Icon />,
   },
@@ -81,7 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }))
 
   const adminItem = user?.is_admin
-    ? [{ title: "Admin", url: "/admin", icon: <ShieldIcon />, isActive: pathname === "/admin" || pathname.startsWith("/admin/") }]
+    ? [{ title: "Yönetici", url: "/admin", icon: <ShieldIcon />, isActive: pathname === "/admin" || pathname.startsWith("/admin/") }]
     : []
 
   const navSecondaryWithActive = [

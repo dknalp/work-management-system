@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useCallback } from "react"
 import { Task, MOCK_TASKS } from "@/types/task"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useAuth, type User } from "@/contexts/auth-context"
 
 export type ActivityType =
   | "task_created"
@@ -19,6 +20,8 @@ export type ActivityEntry = {
   taskTitle: string
   detail?: string
   timestamp: string // ISO
+  userId?: string | null
+  userName?: string | null
 }
 
 interface TaskContextValue {
@@ -35,6 +38,7 @@ const TaskContext = createContext<TaskContextValue | null>(null)
 function makeActivity(
   type: ActivityType,
   task: Pick<Task, "id" | "title">,
+  user: User | null,
   detail?: string
 ): ActivityEntry {
   return {
@@ -44,10 +48,13 @@ function makeActivity(
     taskTitle: task.title,
     detail,
     timestamp: new Date().toISOString(),
+    userId: user?.id ?? null,
+    userName: user?.name ?? null,
   }
 }
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
   const [tasks, setTasks] = useLocalStorage<Task[]>("wms:tasks", MOCK_TASKS)
   const [activity, setActivity] = useLocalStorage<ActivityEntry[]>("wms:activity", [])
 
@@ -58,9 +65,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const addTask = useCallback(
     (task: Task) => {
       setTasks((prev) => [task, ...prev])
-      pushActivity(makeActivity("task_created", task))
+      pushActivity(makeActivity("task_created", task, user))
     },
-    [pushActivity]
+    [pushActivity, user]
   )
 
   const updateTask = useCallback(
@@ -71,33 +78,33 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           const next = { ...t, ...updates }
           if (updates.status !== undefined && updates.status !== t.status) {
             if (updates.status === "done") {
-              pushActivity(makeActivity("task_completed", next))
+              pushActivity(makeActivity("task_completed", next, user))
             } else if (t.status === "done") {
-              pushActivity(makeActivity("task_reopened", next))
+              pushActivity(makeActivity("task_reopened", next, user))
             } else {
               pushActivity(
-                makeActivity("task_status_changed", next, `${t.status} → ${updates.status}`)
+                makeActivity("task_status_changed", next, user, `${t.status} → ${updates.status}`)
               )
             }
           } else if (Object.keys(updates).length > 0) {
-            pushActivity(makeActivity("task_updated", next))
+            pushActivity(makeActivity("task_updated", next, user))
           }
           return next
         })
       )
     },
-    [pushActivity]
+    [pushActivity, user]
   )
 
   const deleteTask = useCallback(
     (id: string) => {
       setTasks((prev) => {
         const task = prev.find((t) => t.id === id)
-        if (task) pushActivity(makeActivity("task_deleted", task))
+        if (task) pushActivity(makeActivity("task_deleted", task, user))
         return prev.filter((t) => t.id !== id)
       })
     },
-    [pushActivity]
+    [pushActivity, user]
   )
 
   const deleteTasks = useCallback(
@@ -105,12 +112,12 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       setTasks((prev) => {
         const toDelete = prev.filter((t) => ids.includes(t.id))
         toDelete.forEach((task) =>
-          pushActivity(makeActivity("task_deleted", task))
+          pushActivity(makeActivity("task_deleted", task, user))
         )
         return prev.filter((t) => !ids.includes(t.id))
       })
     },
-    [pushActivity]
+    [pushActivity, user]
   )
 
   return (

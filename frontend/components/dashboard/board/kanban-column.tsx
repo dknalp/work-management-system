@@ -134,7 +134,7 @@ export function KanbanColumn({
           {tasks.length === 0 && !isAddingCard && (
             <div className="flex flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed border-border/50 py-12 opacity-50">
               <p className="text-xs text-muted-foreground italic">
-                No tasks here
+                Burada görev yok
               </p>
             </div>
           )}
@@ -148,7 +148,7 @@ export function KanbanColumn({
               value={newCardTitle}
               onChange={(e) => setNewCardTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Card title… (Enter to save, Esc to cancel)"
+              placeholder="Kart başlığı… (Kaydetmek için Enter, iptal için Esc)"
               rows={2}
               className={cn(
                 "w-full resize-none rounded-md bg-transparent text-sm text-foreground placeholder:text-muted-foreground",
@@ -162,7 +162,7 @@ export function KanbanColumn({
                 onClick={commitAddCard}
                 disabled={!newCardTitle.trim()}
               >
-                Add card
+                Kart ekle
               </Button>
               <Button
                 variant="ghost"
@@ -185,7 +185,7 @@ export function KanbanColumn({
           onClick={startAddingCard}
         >
           <PlusIcon className="size-3.5" />
-          Add Card
+          Kart Ekle
         </Button>
       )}
     </div>

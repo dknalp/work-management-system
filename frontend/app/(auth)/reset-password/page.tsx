@@ -62,7 +62,7 @@ function ResetPasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="password">New password</Label>
+        <Label htmlFor="password">Yeni Şifre</Label>
         <div className="relative">
           <Input
             id="password"
@@ -86,7 +86,7 @@ function ResetPasswordForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="confirm">Confirm password</Label>
+        <Label htmlFor="confirm">Şifreyi Onayla</Label>
         <Input
           id="confirm"
           type={showPassword ? "text" : "password"}
@@ -105,7 +105,7 @@ function ResetPasswordForm() {
 
       <Button type="submit" className="w-full" disabled={loading}>
         {loading && <LoaderIcon className="mr-2 size-4 animate-spin" />}
-        Set new password
+        Şifreyi Sıfırla
       </Button>
     </form>
   )
@@ -119,8 +119,8 @@ export default function ResetPasswordPage() {
           <BriefcaseIcon className="size-5" />
         </div>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Set new password</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Choose a strong password</p>
+          <h1 className="text-xl font-semibold tracking-tight">Şifrenizi sıfırlayın</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Aşağıya yeni şifrenizi girin.</p>
         </div>
       </div>
       <Suspense>

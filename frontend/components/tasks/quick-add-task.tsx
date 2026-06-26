@@ -114,12 +114,12 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
           onChange={(e) => setTitle(e.target.value)}
           onFocus={() => setIsExpanded(true)}
           onKeyDown={handleKeyDown}
-          placeholder="What needs to be done?"
+          placeholder="Ne yapılması gerekiyor?"
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
         {title.trim() && (
           <Button size="sm" onClick={handleSubmit}>
-            Add task
+            Görev ekle
           </Button>
         )}
       </div>
@@ -157,7 +157,7 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
             </Select>
             <div className="relative">
               <Input
-                placeholder="Assignee"
+                placeholder="Sorumlu"
                 value={assignee}
                 onChange={(e) => {
                   setAssignee(e.target.value);
@@ -232,14 +232,14 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
                   }
                 }
               }}
-              placeholder="Add sub-task… (Enter for each)"
+              placeholder="Alt görev ekle… (Her biri için Enter)"
               className="h-7 w-full rounded border border-border bg-transparent px-2 text-sm placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add description…"
+            placeholder="Açıklama ekle…"
             rows={2}
             className="mt-2 resize-none text-sm"
             onKeyDown={(e) => {

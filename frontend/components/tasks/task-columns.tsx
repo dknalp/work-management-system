@@ -48,18 +48,18 @@ const statusConfig: Record<
   { label: string; className: string; icon: React.ReactNode }
 > = {
   todo: {
-    label: "Todo",
+    label: "Yapılacak",
     className: "border-border text-muted-foreground bg-muted/40",
     icon: <CircleIcon className="size-3" />,
   },
   "in-progress": {
-    label: "In Progress",
+    label: "Devam Ediyor",
     className:
       "border-blue-500/30 text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/40",
     icon: <CircleDotIcon className="size-3" />,
   },
   done: {
-    label: "Done",
+    label: "Tamamlandı",
     className:
       "border-emerald-500/30 text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40",
     icon: <CheckIcon className="size-3" />,
@@ -71,19 +71,19 @@ const priorityConfig: Record<
   { label: string; className: string; dot: string }
 > = {
   low: {
-    label: "Low",
+    label: "Düşük",
     className:
       "border-slate-400/30 text-slate-500 bg-slate-50 dark:text-slate-400 dark:bg-slate-900/40",
     dot: "bg-slate-400",
   },
   medium: {
-    label: "Medium",
+    label: "Orta",
     className:
       "border-amber-500/30 text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/40",
     dot: "bg-amber-500",
   },
   high: {
-    label: "High",
+    label: "Yüksek",
     className:
       "border-rose-500/30 text-rose-700 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/40",
     dot: "bg-rose-500",
@@ -104,7 +104,7 @@ export function createColumns(
             (table.getIsSomePageRowsSelected() && "indeterminate")
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select All"
+          aria-label="Tümünü Seç"
           className="translate-y-px"
         />
       ),
@@ -112,7 +112,7 @@ export function createColumns(
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label="Satırı seç"
           className="translate-y-px"
         />
       ),
@@ -122,7 +122,7 @@ export function createColumns(
     },
     {
       accessorKey: "id",
-      header: ({ column }) => <SortableHeader column={column} label="ID" />,
+      header: ({ column }) => <SortableHeader column={column} label="Kimlik" />,
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground">
           {row.original.id}
@@ -132,7 +132,7 @@ export function createColumns(
     },
     {
       accessorKey: "title",
-      header: ({ column }) => <SortableHeader column={column} label="Title" />,
+      header: ({ column }) => <SortableHeader column={column} label="Başlık" />,
       cell: ({ row }) => (
         <span className="line-clamp-2 max-w-[440px] text-sm leading-snug font-medium">
           {row.original.title}
@@ -142,7 +142,7 @@ export function createColumns(
     },
     {
       accessorKey: "status",
-      header: ({ column }) => <SortableHeader column={column} label="Status" />,
+      header: ({ column }) => <SortableHeader column={column} label="Durum" />,
       cell: ({ row }) => {
         const status = row.original.status
         const cfg = statusConfig[status]
@@ -192,7 +192,7 @@ export function createColumns(
     {
       accessorKey: "priority",
       header: ({ column }) => (
-        <SortableHeader column={column} label="Priority" />
+        <SortableHeader column={column} label="Öncelik" />
       ),
       cell: ({ row }) => {
         const cfg = priorityConfig[row.original.priority]
@@ -222,7 +222,7 @@ export function createColumns(
     {
       accessorKey: "assignee",
       header: ({ column }) => (
-        <SortableHeader column={column} label="Assignee" />
+        <SortableHeader column={column} label="Sorumlu" />
       ),
       cell: ({ row }) => {
         const name = row.original.assignee
@@ -245,7 +245,7 @@ export function createColumns(
     {
       accessorKey: "dueDate",
       header: ({ column }) => (
-        <SortableHeader column={column} label="Deadline" />
+        <SortableHeader column={column} label="Son Tarih" />
       ),
       cell: ({ row }) => {
         const date = new Date(row.original.dueDate)
@@ -266,7 +266,7 @@ export function createColumns(
     {
       accessorKey: "createdAt",
       header: ({ column }) => (
-        <SortableHeader column={column} label="Created At" />
+        <SortableHeader column={column} label="Oluşturulma" />
       ),
       cell: ({ row }) => {
         const date = new Date(row.original.createdAt)
@@ -279,7 +279,7 @@ export function createColumns(
     },
     {
       accessorKey: "tags",
-      header: "Tags",
+      header: "Etiketler",
       cell: ({ row }) => {
         const tags = row.original.tags
         const visible = tags.slice(0, 2)
@@ -317,7 +317,7 @@ export function createColumns(
           size="icon"
           className="size-8 text-muted-foreground hover:text-destructive"
           onClick={() => onDelete(row.original.id)}
-          aria-label="Delete task"
+          aria-label="Görevi sil"
         >
           <Trash2Icon className="size-4" />
         </Button>
