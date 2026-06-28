@@ -25,8 +25,12 @@ export function proxy(req: NextRequest) {
   )
 
   const isAdminRoute = pathname === "/admin" || pathname.startsWith("/admin/")
+  const isTeamRoute = pathname === "/team" || pathname.startsWith("/team/")
   const isAdminCookie = req.cookies.get("is_admin")?.value === "1"
-  if (isAdminRoute && hasSession && !isAdminCookie) {
+  const userRole = req.cookies.get("user_role")?.value
+  const isAdminRole = isAdminCookie || userRole === "admin"
+
+  if ((isAdminRoute || isTeamRoute) && hasSession && !isAdminRole) {
     return NextResponse.redirect(new URL("/dashboard", req.url))
   }
 

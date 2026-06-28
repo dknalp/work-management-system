@@ -1,0 +1,476 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analitik" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analitik
+          - listitem [ref=e30]:
+            - link "Pipeline Panosu" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline Panosu
+          - listitem [ref=e34]:
+            - link "Görevler" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Görevler
+          - listitem [ref=e40]:
+            - link "Takvim" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Takvim
+          - listitem [ref=e45]:
+            - link "Dosyalar" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Dosyalar
+          - listitem [ref=e50]:
+            - link "Ekip" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Ekip
+        - list [ref=e60]:
+          - listitem [ref=e170]:
+            - link "Yönetici" [ref=e171] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=e172]
+              - generic [ref=e174]: Yönetici
+          - listitem [ref=e61]:
+            - link "Ayarlar" [ref=e62] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e63]
+              - generic [ref=e66]: Ayarlar
+      - list [ref=e68]:
+        - listitem [ref=e69]:
+          - button "A Admin admin@workos.com" [ref=e175]:
+            - generic [ref=e72]: A
+            - generic [ref=e73]:
+              - generic [ref=e74]: Admin
+              - generic [ref=e176]: admin@workos.com
+            - img [ref=e75]
+    - main [ref=e79]:
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - button "Toggle Sidebar" [ref=e83]:
+            - img
+            - generic [ref=e84]: Toggle Sidebar
+          - generic [ref=e85]: Görevler
+        - generic [ref=e86]:
+          - button "2" [ref=e177]:
+            - img
+            - generic [ref=e178]: "2"
+          - button "Yeni Oluştur" [ref=e88]:
+            - img
+            - generic [ref=e89]: Yeni Oluştur
+      - main [ref=e90]:
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - heading "Görevler" [level=1] [ref=e93]
+            - paragraph [ref=e179]: 14 görev
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - img [ref=e97]
+              - textbox "Ne yapılması gerekiyor?" [active] [ref=e98]
+            - generic:
+              - generic:
+                - generic [ref=e99]:
+                  - combobox [ref=e100]:
+                    - generic: Todo
+                    - img
+                  - combobox [ref=e102]:
+                    - generic: Medium
+                    - img
+                  - textbox "Sorumlu" [ref=e105]
+                  - textbox [ref=e106]
+                - textbox "Alt görev ekle… (Her biri için Enter)" [ref=e108]
+                - textbox "Açıklama ekle…" [ref=e109]
+          - generic [ref=e110]:
+            - generic [ref=e111]:
+              - generic [ref=e112]:
+                - img
+                - textbox "Görev ara..." [ref=e113]
+              - button "Sütunlar" [ref=e114]:
+                - img
+                - text: Sütunlar
+            - table [ref=e117]:
+              - rowgroup [ref=e118]:
+                - row "Tümünü Seç Kimlik Başlık Durum Öncelik Sorumlu Son Tarih Oluşturulma Etiketler" [ref=e119]:
+                  - columnheader "Tümünü Seç" [ref=e120]:
+                    - checkbox "Tümünü Seç" [ref=e180]
+                  - columnheader "Kimlik" [ref=e122]:
+                    - button "Kimlik" [ref=e181]:
+                      - text: Kimlik
+                      - img
+                  - columnheader "Başlık" [ref=e124]:
+                    - button "Başlık" [ref=e182]:
+                      - text: Başlık
+                      - img
+                  - columnheader "Durum" [ref=e126]:
+                    - button "Durum" [ref=e183]:
+                      - text: Durum
+                      - img
+                  - columnheader "Öncelik" [ref=e128]:
+                    - button "Öncelik" [ref=e184]:
+                      - text: Öncelik
+                      - img
+                  - columnheader "Sorumlu" [ref=e130]:
+                    - button "Sorumlu" [ref=e185]:
+                      - text: Sorumlu
+                      - img
+                  - columnheader "Son Tarih" [ref=e132]:
+                    - button "Son Tarih" [ref=e186]:
+                      - text: Son Tarih
+                      - img
+                  - columnheader "Oluşturulma" [ref=e134]:
+                    - button "Oluşturulma" [ref=e187]:
+                      - text: Oluşturulma
+                      - img
+                  - columnheader "Etiketler" [ref=e136]
+                  - columnheader [ref=e137]
+              - rowgroup [ref=e138]:
+                - row "Satırı seç 007440ff-9612-49c3-be51-ad33adfba73f Test DB Persistence Task Orta — Jun 28, 2026 Görevi sil" [ref=e188] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e189]:
+                    - checkbox "Satırı seç" [ref=e190]
+                  - cell "007440ff-9612-49c3-be51-ad33adfba73f" [ref=e191]
+                  - cell "Test DB Persistence Task" [ref=e192]:
+                    - generic [ref=e193]: Test DB Persistence Task
+                  - cell [ref=e194]:
+                    - combobox [ref=e195]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Yapılacak
+                      - img
+                  - cell "Orta" [ref=e196]:
+                    - generic [ref=e197]: Orta
+                  - cell [ref=e199]
+                  - cell "—" [ref=e202]
+                  - cell "Jun 28, 2026" [ref=e203]
+                  - cell [ref=e204]
+                  - cell "Görevi sil" [ref=e205]:
+                    - button "Görevi sil" [ref=e206]:
+                      - img
+                - row "Satırı seç b443d0c9-ff51-4764-966a-7b9f9b9edfeb Test DB Persistence Task Orta — Jun 28, 2026 Görevi sil" [ref=e207] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e208]:
+                    - checkbox "Satırı seç" [ref=e209]
+                  - cell "b443d0c9-ff51-4764-966a-7b9f9b9edfeb" [ref=e210]
+                  - cell "Test DB Persistence Task" [ref=e211]:
+                    - generic [ref=e212]: Test DB Persistence Task
+                  - cell [ref=e213]:
+                    - combobox [ref=e214]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Yapılacak
+                      - img
+                  - cell "Orta" [ref=e215]:
+                    - generic [ref=e216]: Orta
+                  - cell [ref=e218]
+                  - cell "—" [ref=e221]
+                  - cell "Jun 28, 2026" [ref=e222]
+                  - cell [ref=e223]
+                  - cell "Görevi sil" [ref=e224]:
+                    - button "Görevi sil" [ref=e225]:
+                      - img
+                - row "Satırı seç TASK-012 Implement real-time notifications via WebSocket Yüksek PN Priya Nair Aug 1, 2026 Apr 27, 2026 backend realtime Görevi sil" [ref=e226] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e227]:
+                    - checkbox "Satırı seç" [ref=e228]
+                  - cell "TASK-012" [ref=e229]
+                  - cell "Implement real-time notifications via WebSocket" [ref=e230]:
+                    - generic [ref=e231]: Implement real-time notifications via WebSocket
+                  - cell [ref=e232]:
+                    - combobox [ref=e233]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Yapılacak
+                      - img
+                  - cell "Yüksek" [ref=e234]:
+                    - generic [ref=e235]: Yüksek
+                  - cell "PN Priya Nair" [ref=e237]:
+                    - generic [ref=e238]:
+                      - generic [ref=e239]: PN
+                      - generic [ref=e240]: Priya Nair
+                  - cell "Aug 1, 2026" [ref=e241]
+                  - cell "Apr 27, 2026" [ref=e242]
+                  - cell "backend realtime" [ref=e243]:
+                    - generic [ref=e244]:
+                      - generic [ref=e245]: backend
+                      - generic [ref=e246]: realtime
+                  - cell "Görevi sil" [ref=e247]:
+                    - button "Görevi sil" [ref=e248]:
+                      - img
+                - row "Satırı seç TASK-011 Document REST API endpoints with OpenAPI Düşük SC Sarah Chen Apr 29, 2026 Apr 16, 2026 documentation backend Görevi sil" [ref=e249] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e250]:
+                    - checkbox "Satırı seç" [ref=e251]
+                  - cell "TASK-011" [ref=e252]
+                  - cell "Document REST API endpoints with OpenAPI" [ref=e253]:
+                    - generic [ref=e254]: Document REST API endpoints with OpenAPI
+                  - cell [ref=e255]:
+                    - combobox [ref=e256]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Tamamlandı
+                      - img
+                  - cell "Düşük" [ref=e257]:
+                    - generic [ref=e258]: Düşük
+                  - cell "SC Sarah Chen" [ref=e260]:
+                    - generic [ref=e261]:
+                      - generic [ref=e262]: SC
+                      - generic [ref=e263]: Sarah Chen
+                  - cell "Apr 29, 2026" [ref=e264]
+                  - cell "Apr 16, 2026" [ref=e265]
+                  - cell "documentation backend" [ref=e266]:
+                    - generic [ref=e267]:
+                      - generic [ref=e268]: documentation
+                      - generic [ref=e269]: backend
+                  - cell "Görevi sil" [ref=e270]:
+                    - button "Görevi sil" [ref=e271]:
+                      - img
+                - row "Satırı seç TASK-010 Audit and fix accessibility issues Orta MW Marcus Webb Jul 30, 2026 Apr 26, 2026 a11y frontend Görevi sil" [ref=e272] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e273]:
+                    - checkbox "Satırı seç" [ref=e274]
+                  - cell "TASK-010" [ref=e275]
+                  - cell "Audit and fix accessibility issues" [ref=e276]:
+                    - generic [ref=e277]: Audit and fix accessibility issues
+                  - cell [ref=e278]:
+                    - combobox [ref=e279]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Yapılacak
+                      - img
+                  - cell "Orta" [ref=e280]:
+                    - generic [ref=e281]: Orta
+                  - cell "MW Marcus Webb" [ref=e283]:
+                    - generic [ref=e284]:
+                      - generic [ref=e285]: MW
+                      - generic [ref=e286]: Marcus Webb
+                  - cell "Jul 30, 2026" [ref=e287]
+                  - cell "Apr 26, 2026" [ref=e288]
+                  - cell "a11y frontend" [ref=e289]:
+                    - generic [ref=e290]:
+                      - generic [ref=e291]: a11y
+                      - generic [ref=e292]: frontend
+                  - cell "Görevi sil" [ref=e293]:
+                    - button "Görevi sil" [ref=e294]:
+                      - img
+                - row "Satırı seç TASK-009 Integrate Stripe webhook handling Yüksek AJ Alex Johnson Jul 8, 2026 Apr 25, 2026 backend payments Görevi sil" [ref=e295] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e296]:
+                    - checkbox "Satırı seç" [ref=e297]
+                  - cell "TASK-009" [ref=e298]
+                  - cell "Integrate Stripe webhook handling" [ref=e299]:
+                    - generic [ref=e300]: Integrate Stripe webhook handling
+                  - cell [ref=e301]:
+                    - combobox [ref=e302]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Devam Ediyor
+                      - img
+                  - cell "Yüksek" [ref=e303]:
+                    - generic [ref=e304]: Yüksek
+                  - cell "AJ Alex Johnson" [ref=e306]:
+                    - generic [ref=e307]:
+                      - generic [ref=e308]: AJ
+                      - generic [ref=e309]: Alex Johnson
+                  - cell "Jul 8, 2026" [ref=e310]
+                  - cell "Apr 25, 2026" [ref=e311]
+                  - cell "backend payments" [ref=e312]:
+                    - generic [ref=e313]:
+                      - generic [ref=e314]: backend
+                      - generic [ref=e315]: payments
+                  - cell "Görevi sil" [ref=e316]:
+                    - button "Görevi sil" [ref=e317]:
+                      - img
+                - row "Satırı seç TASK-008 Optimize image loading with lazy load Orta PN Priya Nair Jul 22, 2026 Apr 24, 2026 performance frontend Görevi sil" [ref=e318] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e319]:
+                    - checkbox "Satırı seç" [ref=e320]
+                  - cell "TASK-008" [ref=e321]
+                  - cell "Optimize image loading with lazy load" [ref=e322]:
+                    - generic [ref=e323]: Optimize image loading with lazy load
+                  - cell [ref=e324]:
+                    - combobox [ref=e325]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Yapılacak
+                      - img
+                  - cell "Orta" [ref=e326]:
+                    - generic [ref=e327]: Orta
+                  - cell "PN Priya Nair" [ref=e329]:
+                    - generic [ref=e330]:
+                      - generic [ref=e331]: PN
+                      - generic [ref=e332]: Priya Nair
+                  - cell "Jul 22, 2026" [ref=e333]
+                  - cell "Apr 24, 2026" [ref=e334]
+                  - cell "performance frontend" [ref=e335]:
+                    - generic [ref=e336]:
+                      - generic [ref=e337]: performance
+                      - generic [ref=e338]: frontend
+                  - cell "Görevi sil" [ref=e339]:
+                    - button "Görevi sil" [ref=e340]:
+                      - img
+                - row "Satırı seç TASK-007 Add dark mode support to dashboard Düşük SC Sarah Chen Jul 25, 2026 Apr 23, 2026 ui design Görevi sil" [ref=e341] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e342]:
+                    - checkbox "Satırı seç" [ref=e343]
+                  - cell "TASK-007" [ref=e344]
+                  - cell "Add dark mode support to dashboard" [ref=e345]:
+                    - generic [ref=e346]: Add dark mode support to dashboard
+                  - cell [ref=e347]:
+                    - combobox [ref=e348]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Yapılacak
+                      - img
+                  - cell "Düşük" [ref=e349]:
+                    - generic [ref=e350]: Düşük
+                  - cell "SC Sarah Chen" [ref=e352]:
+                    - generic [ref=e353]:
+                      - generic [ref=e354]: SC
+                      - generic [ref=e355]: Sarah Chen
+                  - cell "Jul 25, 2026" [ref=e356]
+                  - cell "Apr 23, 2026" [ref=e357]
+                  - cell "ui design" [ref=e358]:
+                    - generic [ref=e359]:
+                      - generic [ref=e360]: ui
+                      - generic [ref=e361]: design
+                  - cell "Görevi sil" [ref=e362]:
+                    - button "Görevi sil" [ref=e363]:
+                      - img
+                - row "Satırı seç TASK-006 Set up CI/CD pipeline with GitHub Actions Yüksek MW Marcus Webb Apr 28, 2026 Apr 14, 2026 devops ci-cd Görevi sil" [ref=e364] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e365]:
+                    - checkbox "Satırı seç" [ref=e366]
+                  - cell "TASK-006" [ref=e367]
+                  - cell "Set up CI/CD pipeline with GitHub Actions" [ref=e368]:
+                    - generic [ref=e369]: Set up CI/CD pipeline with GitHub Actions
+                  - cell [ref=e370]:
+                    - combobox [ref=e371]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Tamamlandı
+                      - img
+                  - cell "Yüksek" [ref=e372]:
+                    - generic [ref=e373]: Yüksek
+                  - cell "MW Marcus Webb" [ref=e375]:
+                    - generic [ref=e376]:
+                      - generic [ref=e377]: MW
+                      - generic [ref=e378]: Marcus Webb
+                  - cell "Apr 28, 2026" [ref=e379]
+                  - cell "Apr 14, 2026" [ref=e380]
+                  - cell "devops ci-cd" [ref=e381]:
+                    - generic [ref=e382]:
+                      - generic [ref=e383]: devops
+                      - generic [ref=e384]: ci-cd
+                  - cell "Görevi sil" [ref=e385]:
+                    - button "Görevi sil" [ref=e386]:
+                      - img
+                - row "Satırı seç TASK-005 Create reusable date-picker component Orta AJ Alex Johnson Apr 30, 2026 Apr 15, 2026 ui frontend Görevi sil" [ref=e387] [cursor=pointer]:
+                  - cell "Satırı seç" [ref=e388]:
+                    - checkbox "Satırı seç" [ref=e389]
+                  - cell "TASK-005" [ref=e390]
+                  - cell "Create reusable date-picker component" [ref=e391]:
+                    - generic [ref=e392]: Create reusable date-picker component
+                  - cell [ref=e393]:
+                    - combobox [ref=e394]:
+                      - generic:
+                        - generic:
+                          - img
+                          - text: Tamamlandı
+                      - img
+                  - cell "Orta" [ref=e395]:
+                    - generic [ref=e396]: Orta
+                  - cell "AJ Alex Johnson" [ref=e398]:
+                    - generic [ref=e399]:
+                      - generic [ref=e400]: AJ
+                      - generic [ref=e401]: Alex Johnson
+                  - cell "Apr 30, 2026" [ref=e402]
+                  - cell "Apr 15, 2026" [ref=e403]
+                  - cell "ui frontend" [ref=e404]:
+                    - generic [ref=e405]:
+                      - generic [ref=e406]: ui
+                      - generic [ref=e407]: frontend
+                  - cell "Görevi sil" [ref=e408]:
+                    - button "Görevi sil" [ref=e409]:
+                      - img
+            - generic [ref=e147]:
+              - generic [ref=e149]: 14 satır
+              - generic [ref=e150]:
+                - generic [ref=e151]:
+                  - generic [ref=e152]: Sayfa başına satır
+                  - combobox "Sayfa başına satır" [ref=e153]:
+                    - generic: "10"
+                    - img
+                - generic [ref=e155]: Sayfa 1 / 2
+                - generic [ref=e156]:
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+                  - button [ref=e410]:
+                    - img
+                  - button [ref=e411]:
+                    - img
+  - generic [ref=e157]:
+    - button "Sohbeti aç" [ref=e158]:
+      - img [ref=e159]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e412]:
+        - img [ref=e414]
+        - generic [ref=e417]:
+          - generic [ref=e418]: Görev oluşturuldu
+          - generic [ref=e419]: Test DB Persistence Task
+  - button "Open Next.js Dev Tools" [ref=e166] [cursor=pointer]:
+    - img [ref=e167]
+  - alert [ref=e420]

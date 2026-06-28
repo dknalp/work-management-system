@@ -1,0 +1,198 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analitik" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analitik
+          - listitem [ref=e30]:
+            - link "Pipeline Panosu" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline Panosu
+          - listitem [ref=e34]:
+            - link "Görevler" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Görevler
+          - listitem [ref=e40]:
+            - link "Takvim" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Takvim
+          - listitem [ref=e45]:
+            - link "Dosyalar" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Dosyalar
+          - listitem [ref=e50]:
+            - link "Ekip" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Ekip
+        - list [ref=e60]:
+          - listitem [ref=e61]:
+            - link "Ayarlar" [ref=e62] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e63]
+              - generic [ref=e66]: Ayarlar
+      - list [ref=e68]:
+        - listitem [ref=e69]:
+          - button ". ..." [ref=e70]:
+            - generic [ref=e72]: .
+            - generic [ref=e74]: ...
+            - img [ref=e75]
+    - main [ref=e79]:
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - button "Toggle Sidebar" [ref=e83]:
+            - img
+            - generic [ref=e84]: Toggle Sidebar
+          - generic [ref=e85]: Görevler
+        - generic [ref=e86]:
+          - button [ref=e87]:
+            - img
+          - button "Yeni Oluştur" [ref=e88]:
+            - img
+            - generic [ref=e89]: Yeni Oluştur
+      - main [ref=e90]:
+        - generic [ref=e91]:
+          - heading "Görevler" [level=1] [ref=e93]
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - img [ref=e97]
+              - textbox "Ne yapılması gerekiyor?" [ref=e98]
+            - generic:
+              - generic:
+                - generic [ref=e99]:
+                  - combobox [ref=e100]:
+                    - img
+                  - combobox [ref=e101]
+                  - combobox [ref=e102]:
+                    - img
+                  - combobox [ref=e103]
+                  - textbox "Sorumlu" [ref=e105]
+                  - textbox [ref=e106]
+                - textbox "Alt görev ekle… (Her biri için Enter)" [ref=e108]
+                - textbox "Açıklama ekle…" [ref=e109]
+          - generic [ref=e110]:
+            - generic [ref=e111]:
+              - generic [ref=e112]:
+                - img
+                - textbox "Görev ara..." [ref=e113]
+              - button "Sütunlar" [ref=e114]:
+                - img
+                - text: Sütunlar
+            - table [ref=e117]:
+              - rowgroup [ref=e118]:
+                - row "Tümünü Seç Kimlik Başlık Durum Öncelik Sorumlu Son Tarih Oluşturulma Etiketler" [ref=e119]:
+                  - columnheader "Tümünü Seç" [ref=e120]:
+                    - checkbox "Tümünü Seç" [ref=e121]
+                    - checkbox
+                  - columnheader "Kimlik" [ref=e122]:
+                    - button "Kimlik" [ref=e123]:
+                      - text: Kimlik
+                      - img
+                  - columnheader "Başlık" [ref=e124]:
+                    - button "Başlık" [ref=e125]:
+                      - text: Başlık
+                      - img
+                  - columnheader "Durum" [ref=e126]:
+                    - button "Durum" [ref=e127]:
+                      - text: Durum
+                      - img
+                  - columnheader "Öncelik" [ref=e128]:
+                    - button "Öncelik" [ref=e129]:
+                      - text: Öncelik
+                      - img
+                  - columnheader "Sorumlu" [ref=e130]:
+                    - button "Sorumlu" [ref=e131]:
+                      - text: Sorumlu
+                      - img
+                  - columnheader "Son Tarih" [ref=e132]:
+                    - button "Son Tarih" [ref=e133]:
+                      - text: Son Tarih
+                      - img
+                  - columnheader "Oluşturulma" [ref=e134]:
+                    - button "Oluşturulma" [ref=e135]:
+                      - text: Oluşturulma
+                      - img
+                  - columnheader "Etiketler" [ref=e136]
+                  - columnheader [ref=e137]
+              - rowgroup [ref=e138]:
+                - row "Görev bulunamadı Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin." [ref=e139]:
+                  - cell "Görev bulunamadı Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin." [ref=e140]:
+                    - generic [ref=e141]:
+                      - img [ref=e142]
+                      - paragraph [ref=e145]: Görev bulunamadı
+                      - paragraph [ref=e146]: Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin.
+            - generic [ref=e147]:
+              - generic [ref=e149]: 0 satır
+              - generic [ref=e150]:
+                - generic [ref=e151]:
+                  - generic [ref=e152]: Sayfa başına satır
+                  - combobox "Sayfa başına satır" [ref=e153]:
+                    - img
+                  - combobox [ref=e154]
+                - generic [ref=e155]: Sayfa 1 / 1
+                - generic [ref=e156]:
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+  - generic [ref=e157]:
+    - button "Sohbeti aç" [ref=e158]:
+      - img [ref=e159]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e166] [cursor=pointer]:
+    - img [ref=e167]

@@ -12,19 +12,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   SearchIcon,
   LayoutGridIcon,
   TableIcon,
   UsersIcon,
   UserCheckIcon,
-  BuildingIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -35,22 +27,9 @@ export type { TeamMember }
 
 type ViewMode = "grid" | "table"
 
-const DEPARTMENTS = [
-  "Tümü",
-  "Mühendislik",
-  "Altyapı",
-  "Ürün",
-  "Tasarım",
-  "Analitik",
-  "Pazarlama",
-  "İnsan Kaynakları",
-  "Operasyon",
-]
-
 export default function TeamPage() {
   const { members, addMember, updateMember, deleteMember } = useTeam()
   const [searchQuery, setSearchQuery] = useState("")
-  const [departmentFilter, setDepartmentFilter] = useState("Tümü")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -59,21 +38,18 @@ export default function TeamPage() {
   const stats = useMemo(() => {
     const total = members.length
     const active = members.filter((m) => m.status === "active").length
-    const departments = new Set(members.map((m) => m.department)).size
-    return { total, active, departments }
+    return { total, active }
   }, [members])
 
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
-      const matchesSearch =
+      return (
         m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.role.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesDept =
-        departmentFilter === "Tümü" || m.department === departmentFilter
-      return matchesSearch && matchesDept
+      )
     })
-  }, [members, searchQuery, departmentFilter])
+  }, [members, searchQuery])
 
   const handleOpenEdit = (member: TeamMember) => {
     setEditingMember(member)
@@ -127,14 +103,6 @@ export default function TeamPage() {
       icon: UserCheckIcon,
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
-    },
-    {
-      key: "departments",
-      label: "Departmanlar",
-      value: stats.departments,
-      icon: BuildingIcon,
-      color: "text-blue-500",
-      bg: "bg-blue-500/10",
     },
   ]
 
@@ -199,19 +167,7 @@ export default function TeamPage() {
                   />
                 </div>
 
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                  <SelectTrigger className="h-9 w-[160px] rounded-lg border-border/40 bg-background/40 text-sm">
-                    <SelectValue placeholder="Departman" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DEPARTMENTS.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                </div>
 
               <div className="flex w-full items-center gap-2 sm:w-auto">
                 <div className="flex items-center gap-0.5 rounded-lg border border-border/40 bg-background/40 p-0.5">
@@ -243,7 +199,7 @@ export default function TeamPage() {
                   </Button>
                 </div>
 
-                {(searchQuery || departmentFilter !== "Tümü") && (
+                {searchQuery && (
                   <Badge variant="secondary" className="h-7 px-2.5 text-xs font-medium">
                     {filteredMembers.length} sonuç
                   </Badge>

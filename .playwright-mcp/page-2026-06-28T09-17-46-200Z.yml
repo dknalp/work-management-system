@@ -1,0 +1,250 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e40]:
+    - generic [ref=e43]:
+      - list [ref=e45]:
+        - listitem [ref=e46]:
+          - link "WorkOS" [ref=e47] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e49]
+            - generic [ref=e52]: WorkOS
+      - generic [ref=e53]:
+        - list [ref=e56]:
+          - listitem [ref=e57]:
+            - link "Analitik" [ref=e58] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e59]
+              - generic [ref=e64]: Analitik
+          - listitem [ref=e65]:
+            - link "Pipeline Panosu" [ref=e66] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e67]
+              - generic [ref=e68]: Pipeline Panosu
+          - listitem [ref=e69]:
+            - link "Görevler" [ref=e70] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e71]
+              - generic [ref=e74]: Görevler
+          - listitem [ref=e75]:
+            - link "Takvim" [ref=e76] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e77]
+              - generic [ref=e79]: Takvim
+          - listitem [ref=e80]:
+            - link "Dosyalar" [ref=e81] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e82]
+              - generic [ref=e84]: Dosyalar
+          - listitem [ref=e85]:
+            - link "Ekip" [ref=e86] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e87]
+              - generic [ref=e92]: Ekip
+        - list [ref=e95]:
+          - listitem [ref=e96]:
+            - link "Yönetici" [ref=e97] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=e98]
+              - generic [ref=e100]: Yönetici
+          - listitem [ref=e101]:
+            - link "Ayarlar" [ref=e102] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e103]
+              - generic [ref=e106]: Ayarlar
+      - list [ref=e108]:
+        - listitem [ref=e109]:
+          - button "A Admin admin@workos.com" [ref=e110]:
+            - generic [ref=e112]: A
+            - generic [ref=e113]:
+              - generic [ref=e114]: Admin
+              - generic [ref=e115]: admin@workos.com
+            - img [ref=e116]
+    - main [ref=e120]:
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - button "Toggle Sidebar" [ref=e124]:
+            - img
+            - generic [ref=e125]: Toggle Sidebar
+          - generic [ref=e126]: Analitik
+        - generic [ref=e127]:
+          - button [ref=e128]:
+            - img
+          - button "Yeni Oluştur" [ref=e129]:
+            - img
+            - generic [ref=e130]: Yeni Oluştur
+      - main [ref=e131]:
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - heading "Günaydın, Admin 👋" [level=1] [ref=e134]
+            - paragraph [ref=e135]: Bugün ekibinizde neler oluyor.
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - img [ref=e139]
+              - generic [ref=e142]:
+                - paragraph [ref=e143]: "12"
+                - paragraph [ref=e144]: Toplam Görev
+                - paragraph [ref=e145]: "%25 tamamlandı"
+            - generic [ref=e146]:
+              - img [ref=e148]
+              - generic [ref=e151]:
+                - paragraph [ref=e152]: "3"
+                - paragraph [ref=e153]: Devam Ediyor
+                - paragraph [ref=e154]: şu an aktif
+            - generic [ref=e155]:
+              - img [ref=e157]
+              - generic [ref=e160]:
+                - paragraph [ref=e161]: "3"
+                - paragraph [ref=e162]: Tamamlanan
+                - paragraph [ref=e163]: toplam 12 içinden
+            - generic [ref=e164]:
+              - img [ref=e166]
+              - generic [ref=e168]:
+                - paragraph [ref=e169]: "0"
+                - paragraph [ref=e170]: Gecikmiş
+                - paragraph [ref=e171]: hepsi yolunda
+          - generic [ref=e172]:
+            - generic [ref=e173]:
+              - generic [ref=e174]:
+                - generic [ref=e175]: Görev Aktivitesi
+                - generic [ref=e176]: Oluşturulan - tamamlanan — son 7 gün
+              - generic [ref=e180]:
+                - generic:
+                  - generic:
+                    - generic: Sat
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Oluşturulan
+                          - generic: "0"
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic: Tamamlanan
+                          - generic: "0"
+                - generic [ref=e182]:
+                  - generic [ref=e183]: Tamamlanan
+                  - generic [ref=e185]: Oluşturulan
+                - application [ref=e187]:
+                  - generic [ref=e196]:
+                    - generic [ref=e197]:
+                      - generic [ref=e199]: Tue
+                      - generic [ref=e201]: Wed
+                      - generic [ref=e203]: Thu
+                      - generic [ref=e205]: Fri
+                      - generic [ref=e207]: Sat
+                      - generic [ref=e209]: Sun
+                    - generic [ref=e210]:
+                      - generic [ref=e212]: "0"
+                      - generic [ref=e214]: "1"
+                      - generic [ref=e216]: "2"
+                      - generic [ref=e218]: "3"
+                      - generic [ref=e220]: "4"
+            - generic [ref=e221]:
+              - generic [ref=e222]:
+                - generic [ref=e223]: Ekip İş Yükü
+                - generic [ref=e224]: Sorumluya göre görev dağılımı
+              - generic [ref=e228]:
+                - generic [ref=e230]:
+                  - generic [ref=e231]: Tamamlandı
+                  - generic [ref=e233]: Devam Ediyor
+                  - generic [ref=e235]: Yapılacak
+                - application [ref=e237]:
+                  - generic [ref=e275]:
+                    - generic [ref=e276]:
+                      - generic [ref=e278]: "0"
+                      - generic [ref=e280]: "1"
+                      - generic [ref=e282]: "2"
+                      - generic [ref=e284]: "3"
+                      - generic [ref=e286]: "4"
+                    - generic [ref=e287]:
+                      - generic [ref=e289]: Priya
+                      - generic [ref=e291]: Sarah
+                      - generic [ref=e293]: Marcus
+                      - generic [ref=e295]: Alex
+          - generic [ref=e296]:
+            - generic [ref=e297]:
+              - generic [ref=e298]:
+                - generic [ref=e299]: Yaklaşan Görevler
+                - link "Tümünü gör" [ref=e300] [cursor=pointer]:
+                  - /url: /tasks
+                  - text: Tümünü gör
+                  - img
+              - list [ref=e302]:
+                - listitem [ref=e303]:
+                  - generic [ref=e306]: Integrate Stripe webhook handling
+                  - generic [ref=e307]:
+                    - generic [ref=e308]: high
+                    - generic [ref=e309]: Jul 8
+                - listitem [ref=e310]:
+                  - generic [ref=e313]: Redesign onboarding flow for new users
+                  - generic [ref=e314]:
+                    - generic [ref=e315]: high
+                    - generic [ref=e316]: Jul 10
+                - listitem [ref=e317]:
+                  - generic [ref=e320]: Migrate database to PostgreSQL 16
+                  - generic [ref=e321]:
+                    - generic [ref=e322]: high
+                    - generic [ref=e323]: Jul 12
+                - listitem [ref=e324]:
+                  - generic [ref=e327]: Implement JWT refresh token mechanism
+                  - generic [ref=e328]:
+                    - generic [ref=e329]: high
+                    - generic [ref=e330]: Jul 15
+                - listitem [ref=e331]:
+                  - generic [ref=e334]: Write unit tests for payment module
+                  - generic [ref=e335]:
+                    - generic [ref=e336]: medium
+                    - generic [ref=e337]: Jul 20
+                - listitem [ref=e338]:
+                  - generic [ref=e341]: Optimize image loading with lazy load
+                  - generic [ref=e342]:
+                    - generic [ref=e343]: medium
+                    - generic [ref=e344]: Jul 22
+            - generic [ref=e345]:
+              - heading "Son Etkinlik" [level=3] [ref=e346]
+              - paragraph [ref=e347]: Henüz etkinlik yok. Görev eklemeye veya güncellemeye başlayın.
+  - generic [ref=e348]:
+    - button "Sohbeti aç" [ref=e349]:
+      - img [ref=e350]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e35] [cursor=pointer]:
+    - img [ref=e36]
+  - alert [ref=e39]: Günaydın, Admin 👋
+  - generic [ref=e352]: Priya

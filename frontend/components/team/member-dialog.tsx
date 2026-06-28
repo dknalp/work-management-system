@@ -45,15 +45,6 @@ const ROLES = [
   "HR Specialist",
 ]
 
-const DEPARTMENTS = [
-  "Mühendislik",
-  "Ürün",
-  "Tasarım",
-  "Analitik",
-  "Pazarlama",
-  "İnsan Kaynakları",
-]
-
 const STATUSES: { value: TeamMember["status"]; label: string }[] = [
   { value: "active", label: "Aktif" },
   { value: "away", label: "Uzakta" },
@@ -65,7 +56,6 @@ const emptyForm: Partial<TeamMember> = {
   email: "",
   phone: "",
   role: "",
-  department: "",
   status: "active",
   joinedAt: new Date().toISOString().split("T")[0],
 }
@@ -109,7 +99,6 @@ export function MemberDialog({
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       next.email = "Geçerli bir e-posta girin."
     if (!form.role) next.role = "Rol zorunludur."
-    if (!form.department) next.department = "Departman zorunludur."
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -124,7 +113,6 @@ export function MemberDialog({
       email: form.email!.trim(),
       phone: form.phone?.trim() ?? "",
       role: form.role!,
-      department: form.department!,
       status: form.status ?? "active",
       joinedAt: form.joinedAt ?? new Date().toISOString().split("T")[0],
     }
@@ -200,61 +188,32 @@ export function MemberDialog({
             />
           </div>
 
-          {/* Role + Department */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="role">
-                Rol <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={form.role ?? ""}
-                onValueChange={(v) => set("role", v)}
+          {/* Role */}
+          <div className="space-y-1.5">
+            <Label htmlFor="role">
+              Rol <span className="text-destructive">*</span>
+            </Label>
+            <Select
+              value={form.role ?? ""}
+              onValueChange={(v) => set("role", v)}
+            >
+              <SelectTrigger
+                id="role"
+                className={errors.role ? "border-destructive" : ""}
               >
-                <SelectTrigger
-                  id="role"
-                  className={errors.role ? "border-destructive" : ""}
-                >
-                  <SelectValue placeholder="Rol seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.role && (
-                <p className="text-xs text-destructive">{errors.role}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="department">
-                Departman <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={form.department ?? ""}
-                onValueChange={(v) => set("department", v)}
-              >
-                <SelectTrigger
-                  id="department"
-                  className={errors.department ? "border-destructive" : ""}
-                >
-                  <SelectValue placeholder="Departman seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEPARTMENTS.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.department && (
-                <p className="text-xs text-destructive">{errors.department}</p>
-              )}
-            </div>
+                <SelectValue placeholder="Rol seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.role && (
+              <p className="text-xs text-destructive">{errors.role}</p>
+            )}
           </div>
 
           {/* Status */}

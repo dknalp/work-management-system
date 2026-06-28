@@ -16,6 +16,7 @@ export type User = {
   avatar_url: string | null
   is_active: boolean
   is_admin: boolean
+  role: "admin" | "manager" | "member"
   created_at: string
 }
 
@@ -28,6 +29,7 @@ const MOCK_USERS_SEED: User[] = [
     avatar_url: null,
     is_active: true,
     is_admin: true,
+    role: "admin",
     created_at: "2024-01-01T00:00:00.000Z",
   },
   {
@@ -38,7 +40,30 @@ const MOCK_USERS_SEED: User[] = [
     avatar_url: null,
     is_active: true,
     is_admin: false,
+    role: "member",
     created_at: "2024-01-01T00:00:00.000Z",
+  },
+  {
+    id: "user-3",
+    email: "yetkili@workos.app",
+    name: "Yetkili Kullanıcı",
+    bio: null,
+    avatar_url: null,
+    is_active: true,
+    is_admin: false,
+    role: "manager",
+    created_at: "2024-02-01T00:00:00.000Z",
+  },
+  {
+    id: "user-4",
+    email: "uye@workos.app",
+    name: "Üye Kullanıcı",
+    bio: null,
+    avatar_url: null,
+    is_active: true,
+    is_admin: false,
+    role: "member",
+    created_at: "2024-03-01T00:00:00.000Z",
   },
 ]
 
@@ -46,7 +71,13 @@ function getMockRegistry(): User[] {
   if (typeof window === "undefined") return MOCK_USERS_SEED
   try {
     const raw = localStorage.getItem(MOCK_USERS_KEY)
-    return raw ? JSON.parse(raw) : MOCK_USERS_SEED
+    if (!raw) return MOCK_USERS_SEED
+    const stored: User[] = JSON.parse(raw)
+    // Merge with seed defaults to fill in fields added after initial storage (e.g., role)
+    return stored.map((u) => {
+      const seed = MOCK_USERS_SEED.find((s) => s.id === u.id)
+      return seed ? { ...seed, ...u } : u
+    })
   } catch {
     return MOCK_USERS_SEED
   }
@@ -74,7 +105,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (MOCK_AUTH) {
       const stored = localStorage.getItem(MOCK_USER_KEY)
       if (stored) {
-        try { setUser(JSON.parse(stored)) } catch { /* ignore */ }
+        try {
+          const parsed: User = JSON.parse(stored)
+          const seed = MOCK_USERS_SEED.find((s) => s.id === parsed.id)
+          const merged = seed ? { ...seed, ...parsed, role: parsed.role ?? seed.role } : parsed
+          setUser(merged)
+          // Persist merged back so future loads are correct
+          localStorage.setItem(MOCK_USER_KEY, JSON.stringify(merged))
+        } catch { /* ignore */ }
       }
       setLoading(false)
       return
@@ -101,11 +139,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         avatar_url: null,
         is_active: true,
         is_admin: false,
+        role: "member",
         created_at: new Date().toISOString(),
       }
       localStorage.setItem(MOCK_USER_KEY, JSON.stringify(mockUser))
       document.cookie = "has_session=1; path=/; max-age=86400"
       document.cookie = `is_admin=${mockUser.is_admin ? "1" : "0"}; path=/; max-age=86400`
+      document.cookie = `user_role=${mockUser.role ?? "member"}; path=/; max-age=86400`
       setUser(mockUser)
       return
     }
@@ -120,6 +160,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const data = await res.json()
     tokenStorage.setTokens(data.access_token, data.refresh_token)
+    if (data.user?.role) {
+      document.cookie = `user_role=${data.user.role}; path=/; max-age=${7 * 86400}; SameSite=Lax`
+    }
+    if (data.user?.is_admin) {
+      document.cookie = `is_admin=1; path=/; max-age=${7 * 86400}; SameSite=Lax`
+    }
     setUser(data.user)
   }, [])
 
@@ -128,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(MOCK_USER_KEY)
       document.cookie = "has_session=; path=/; max-age=0"
       document.cookie = "is_admin=; path=/; max-age=0"
+      document.cookie = "user_role=; path=/; max-age=0"
       setUser(null)
       return
     }
@@ -140,6 +187,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => {})
     }
     tokenStorage.clear()
+    document.cookie = "user_role=; path=/; max-age=0"
+    document.cookie = "is_admin=; path=/; max-age=0"
     setUser(null)
   }, [])
 
@@ -177,6 +226,9 @@ export function useMockUsers() {
       updateUser(patch)
       if (patch.is_admin !== undefined) {
         document.cookie = `is_admin=${patch.is_admin ? "1" : "0"}; path=/; max-age=86400`
+      }
+      if (patch.role !== undefined) {
+        document.cookie = `user_role=${patch.role}; path=/; max-age=86400`
       }
     }
   }, [currentUser, updateUser])

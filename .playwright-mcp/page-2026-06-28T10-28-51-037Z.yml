@@ -1,0 +1,370 @@
+- generic:
+  - generic:
+    - heading [level=2]: Command Palette
+    - paragraph: Search for a command to run...
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - list:
+              - listitem:
+                - link:
+                  - /url: /dashboard
+                  - generic:
+                    - img
+                  - generic: WorkOS
+          - generic:
+            - generic:
+              - generic:
+                - list:
+                  - listitem:
+                    - link:
+                      - /url: /dashboard
+                      - img
+                      - generic: Analitik
+                  - listitem:
+                    - link:
+                      - /url: /dashboard/board
+                      - img
+                      - generic: Pipeline Panosu
+                  - listitem:
+                    - link:
+                      - /url: /tasks
+                      - img
+                      - generic: Görevler
+                  - listitem:
+                    - link:
+                      - /url: /calendar
+                      - img
+                      - generic: Takvim
+                  - listitem:
+                    - link:
+                      - /url: /files
+                      - img
+                      - generic: Dosyalar
+                  - listitem:
+                    - link:
+                      - /url: /team
+                      - img
+                      - generic: Ekip
+            - generic:
+              - generic:
+                - list:
+                  - listitem:
+                    - link:
+                      - /url: /admin
+                      - img
+                      - generic: Yönetici
+                  - listitem:
+                    - link:
+                      - /url: /admin/roles
+                      - img
+                      - generic: Rol İzinleri
+                  - listitem:
+                    - link:
+                      - /url: /settings
+                      - img
+                      - generic: Ayarlar
+          - generic:
+            - list:
+              - listitem:
+                - button [expanded]:
+                  - generic:
+                    - generic: A
+                  - generic:
+                    - generic: Admin
+                    - generic: admin@workos.com
+                  - img
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - button:
+              - img
+              - generic: Toggle Sidebar
+            - generic: Rol İzinleri
+          - generic:
+            - button:
+              - img
+            - button:
+              - img
+              - generic: Yeni Oluştur
+      - main:
+        - generic:
+          - generic:
+            - img
+          - generic:
+            - heading [level=1]: Rol İzinleri
+            - paragraph: Her rol için özellik izinlerini yönetin.
+          - button:
+            - img
+            - text: Kaydet
+        - generic:
+          - table:
+            - rowgroup:
+              - row:
+                - columnheader: İzin
+                - columnheader: Yönetici
+                - columnheader: Müdür
+                - columnheader: Üye
+            - rowgroup:
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Görev oluştur
+                    - paragraph: tasks:create
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Kendi görevini düzenle
+                    - paragraph: tasks:edit_own
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Tüm görevleri düzenle
+                    - paragraph: tasks:edit_any
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Kendi görevini sil
+                    - paragraph: tasks:delete_own
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Tüm görevleri sil
+                    - paragraph: tasks:delete_any
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Görev ata
+                    - paragraph: tasks:assign
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Dosya yükle
+                    - paragraph: files:upload
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Dosya sil
+                    - paragraph: files:delete
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox [checked]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Ekibi görüntüle
+                    - paragraph: team:view
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+                - cell:
+                  - generic:
+                    - checkbox
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Ekibi yönet
+                    - paragraph: team:manage
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+                - cell:
+                  - generic:
+                    - checkbox
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: Yönetici paneli
+                    - paragraph: admin:view
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+                - cell:
+                  - generic:
+                    - checkbox
+              - row:
+                - cell:
+                  - generic:
+                    - paragraph: İzinleri yönet
+                    - paragraph: admin:manage_permissions
+                - cell:
+                  - generic:
+                    - checkbox [checked] [disabled]:
+                      - generic:
+                        - img
+                - cell:
+                  - generic:
+                    - checkbox
+                - cell:
+                  - generic:
+                    - checkbox
+          - generic: Yönetici rolü her zaman tüm izinlere sahiptir ve değiştirilemez.
+  - generic:
+    - button [ref=e303]:
+      - img [ref=e291]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button:
+          - img
+      - button:
+        - generic: TG
+        - generic: 10:30
+      - button:
+        - generic: AJ
+        - generic: 09:15
+      - button:
+        - generic: BS
+        - generic: Yesterday
+      - button:
+        - generic: CW
+        - generic: Yesterday
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e298] [cursor=pointer]:
+    - img [ref=e299]
+  - alert
+  - menu "A Admin admin@workos.com" [active] [ref=e304]:
+    - generic [ref=e306]:
+      - generic [ref=e308]: A
+      - generic [ref=e309]:
+        - generic [ref=e310]: Admin
+        - generic [ref=e311]: admin@workos.com
+    - separator [ref=e312]
+    - group [ref=e313]:
+      - menuitem "Profil" [ref=e314]:
+        - img
+        - text: Profil
+      - menuitem "Ayarlar" [ref=e315]:
+        - img
+        - text: Ayarlar
+    - separator [ref=e316]
+    - menuitem "Çıkış Yap" [ref=e317]:
+      - img
+      - text: Çıkış Yap

@@ -1,0 +1,321 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analitik" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analitik
+          - listitem [ref=e30]:
+            - link "Pipeline Panosu" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline Panosu
+          - listitem [ref=e34]:
+            - link "Görevler" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Görevler
+          - listitem [ref=e40]:
+            - link "Takvim" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Takvim
+          - listitem [ref=e45]:
+            - link "Dosyalar" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Dosyalar
+          - listitem [ref=e50]:
+            - link "Ekip" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Ekip
+        - list [ref=e60]:
+          - listitem [ref=e61]:
+            - link "Yönetici" [ref=e62] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=e63]
+              - generic [ref=e65]: Yönetici
+          - listitem [ref=e66]:
+            - link "Rol İzinleri" [ref=e67] [cursor=pointer]:
+              - /url: /admin/roles
+              - img [ref=e68]
+              - generic [ref=e71]: Rol İzinleri
+          - listitem [ref=e72]:
+            - link "Ayarlar" [ref=e73] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e74]
+              - generic [ref=e77]: Ayarlar
+      - list [ref=e79]:
+        - listitem [ref=e80]:
+          - button "A Admin admin@workos.com" [ref=e81]:
+            - generic [ref=e83]: A
+            - generic [ref=e84]:
+              - generic [ref=e85]: Admin
+              - generic [ref=e86]: admin@workos.com
+            - img [ref=e87]
+    - main [ref=e91]:
+      - generic [ref=e93]:
+        - generic [ref=e94]:
+          - button "Toggle Sidebar" [ref=e95]:
+            - img
+            - generic [ref=e96]: Toggle Sidebar
+          - generic [ref=e97]: Rol İzinleri
+        - generic [ref=e98]:
+          - button [ref=e99]:
+            - img
+          - button "Yeni Oluştur" [ref=e100]:
+            - img
+            - generic [ref=e101]: Yeni Oluştur
+      - main [ref=e102]:
+        - generic [ref=e103]:
+          - img [ref=e105]
+          - generic [ref=e107]:
+            - heading "Rol İzinleri" [level=1] [ref=e108]
+            - paragraph [ref=e109]: Her rol için özellik izinlerini yönetin.
+          - button "Kaydet" [ref=e110]:
+            - img
+            - text: Kaydet
+        - generic [ref=e111]:
+          - table [ref=e112]:
+            - rowgroup [ref=e113]:
+              - row "İzin Yönetici Müdür Üye" [ref=e114]:
+                - columnheader "İzin" [ref=e115]
+                - columnheader "Yönetici" [ref=e116]
+                - columnheader "Müdür" [ref=e117]
+                - columnheader "Üye" [ref=e118]
+            - rowgroup [ref=e119]:
+              - row "Görev oluştur tasks:create" [ref=e120]:
+                - cell "Görev oluştur tasks:create" [ref=e121]:
+                  - generic [ref=e122]:
+                    - paragraph [ref=e123]: Görev oluştur
+                    - paragraph [ref=e124]: tasks:create
+                - cell [ref=e125]:
+                  - checkbox [checked] [disabled] [ref=e127]:
+                    - generic:
+                      - img
+                - cell [ref=e128]:
+                  - checkbox [checked] [ref=e130]:
+                    - generic:
+                      - img
+                - cell [ref=e131]:
+                  - checkbox [checked] [ref=e133]:
+                    - generic:
+                      - img
+              - row "Kendi görevini düzenle tasks:edit_own" [ref=e134]:
+                - cell "Kendi görevini düzenle tasks:edit_own" [ref=e135]:
+                  - generic [ref=e136]:
+                    - paragraph [ref=e137]: Kendi görevini düzenle
+                    - paragraph [ref=e138]: tasks:edit_own
+                - cell [ref=e139]:
+                  - checkbox [checked] [disabled] [ref=e141]:
+                    - generic:
+                      - img
+                - cell [ref=e142]:
+                  - checkbox [checked] [ref=e144]:
+                    - generic:
+                      - img
+                - cell [ref=e145]:
+                  - checkbox [checked] [ref=e147]:
+                    - generic:
+                      - img
+              - row "Tüm görevleri düzenle tasks:edit_any" [ref=e148]:
+                - cell "Tüm görevleri düzenle tasks:edit_any" [ref=e149]:
+                  - generic [ref=e150]:
+                    - paragraph [ref=e151]: Tüm görevleri düzenle
+                    - paragraph [ref=e152]: tasks:edit_any
+                - cell [ref=e153]:
+                  - checkbox [checked] [disabled] [ref=e155]:
+                    - generic:
+                      - img
+                - cell [ref=e156]:
+                  - checkbox [checked] [ref=e158]:
+                    - generic:
+                      - img
+                - cell [ref=e159]:
+                  - checkbox [ref=e161]
+              - row "Kendi görevini sil tasks:delete_own" [ref=e162]:
+                - cell "Kendi görevini sil tasks:delete_own" [ref=e163]:
+                  - generic [ref=e164]:
+                    - paragraph [ref=e165]: Kendi görevini sil
+                    - paragraph [ref=e166]: tasks:delete_own
+                - cell [ref=e167]:
+                  - checkbox [checked] [disabled] [ref=e169]:
+                    - generic:
+                      - img
+                - cell [ref=e170]:
+                  - checkbox [checked] [ref=e172]:
+                    - generic:
+                      - img
+                - cell [ref=e173]:
+                  - checkbox [checked] [ref=e175]:
+                    - generic:
+                      - img
+              - row "Tüm görevleri sil tasks:delete_any" [ref=e176]:
+                - cell "Tüm görevleri sil tasks:delete_any" [ref=e177]:
+                  - generic [ref=e178]:
+                    - paragraph [ref=e179]: Tüm görevleri sil
+                    - paragraph [ref=e180]: tasks:delete_any
+                - cell [ref=e181]:
+                  - checkbox [checked] [disabled] [ref=e183]:
+                    - generic:
+                      - img
+                - cell [ref=e184]:
+                  - checkbox [checked] [ref=e186]:
+                    - generic:
+                      - img
+                - cell [ref=e187]:
+                  - checkbox [ref=e189]
+              - row "Görev ata tasks:assign" [ref=e190]:
+                - cell "Görev ata tasks:assign" [ref=e191]:
+                  - generic [ref=e192]:
+                    - paragraph [ref=e193]: Görev ata
+                    - paragraph [ref=e194]: tasks:assign
+                - cell [ref=e195]:
+                  - checkbox [checked] [disabled] [ref=e197]:
+                    - generic:
+                      - img
+                - cell [ref=e198]:
+                  - checkbox [checked] [ref=e200]:
+                    - generic:
+                      - img
+                - cell [ref=e201]:
+                  - checkbox [ref=e203]
+              - row "Dosya yükle files:upload" [ref=e204]:
+                - cell "Dosya yükle files:upload" [ref=e205]:
+                  - generic [ref=e206]:
+                    - paragraph [ref=e207]: Dosya yükle
+                    - paragraph [ref=e208]: files:upload
+                - cell [ref=e209]:
+                  - checkbox [checked] [disabled] [ref=e211]:
+                    - generic:
+                      - img
+                - cell [ref=e212]:
+                  - checkbox [checked] [ref=e214]:
+                    - generic:
+                      - img
+                - cell [ref=e215]:
+                  - checkbox [checked] [ref=e217]:
+                    - generic:
+                      - img
+              - row "Dosya sil files:delete" [ref=e218]:
+                - cell "Dosya sil files:delete" [ref=e219]:
+                  - generic [ref=e220]:
+                    - paragraph [ref=e221]: Dosya sil
+                    - paragraph [ref=e222]: files:delete
+                - cell [ref=e223]:
+                  - checkbox [checked] [disabled] [ref=e225]:
+                    - generic:
+                      - img
+                - cell [ref=e226]:
+                  - checkbox [checked] [ref=e228]:
+                    - generic:
+                      - img
+                - cell [ref=e229]:
+                  - checkbox [ref=e231]
+              - row "Ekibi görüntüle team:view" [ref=e232]:
+                - cell "Ekibi görüntüle team:view" [ref=e233]:
+                  - generic [ref=e234]:
+                    - paragraph [ref=e235]: Ekibi görüntüle
+                    - paragraph [ref=e236]: team:view
+                - cell [ref=e237]:
+                  - checkbox [checked] [disabled] [ref=e239]:
+                    - generic:
+                      - img
+                - cell [ref=e240]:
+                  - checkbox [ref=e242]
+                - cell [ref=e243]:
+                  - checkbox [ref=e245]
+              - row "Ekibi yönet team:manage" [ref=e246]:
+                - cell "Ekibi yönet team:manage" [ref=e247]:
+                  - generic [ref=e248]:
+                    - paragraph [ref=e249]: Ekibi yönet
+                    - paragraph [ref=e250]: team:manage
+                - cell [ref=e251]:
+                  - checkbox [checked] [disabled] [ref=e253]:
+                    - generic:
+                      - img
+                - cell [ref=e254]:
+                  - checkbox [ref=e256]
+                - cell [ref=e257]:
+                  - checkbox [ref=e259]
+              - row "Yönetici paneli admin:view" [ref=e260]:
+                - cell "Yönetici paneli admin:view" [ref=e261]:
+                  - generic [ref=e262]:
+                    - paragraph [ref=e263]: Yönetici paneli
+                    - paragraph [ref=e264]: admin:view
+                - cell [ref=e265]:
+                  - checkbox [checked] [disabled] [ref=e267]:
+                    - generic:
+                      - img
+                - cell [ref=e268]:
+                  - checkbox [ref=e270]
+                - cell [ref=e271]:
+                  - checkbox [ref=e273]
+              - row "İzinleri yönet admin:manage_permissions" [ref=e274]:
+                - cell "İzinleri yönet admin:manage_permissions" [ref=e275]:
+                  - generic [ref=e276]:
+                    - paragraph [ref=e277]: İzinleri yönet
+                    - paragraph [ref=e278]: admin:manage_permissions
+                - cell [ref=e279]:
+                  - checkbox [checked] [disabled] [ref=e281]:
+                    - generic:
+                      - img
+                - cell [ref=e282]:
+                  - checkbox [ref=e284]
+                - cell [ref=e285]:
+                  - checkbox [ref=e287]
+          - generic [ref=e288]: Yönetici rolü her zaman tüm izinlere sahiptir ve değiştirilemez.
+  - generic [ref=e289]:
+    - button "Sohbeti aç" [ref=e290]:
+      - img [ref=e291]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e298] [cursor=pointer]:
+    - img [ref=e299]
+  - alert [ref=e302]

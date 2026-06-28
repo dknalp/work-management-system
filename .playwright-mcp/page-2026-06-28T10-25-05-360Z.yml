@@ -1,0 +1,233 @@
+- generic:
+  - generic:
+    - heading [level=2]: Command Palette
+    - paragraph: Search for a command to run...
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - list:
+              - listitem:
+                - link:
+                  - /url: /dashboard
+                  - generic:
+                    - img
+                  - generic: WorkOS
+          - generic:
+            - generic:
+              - generic:
+                - list:
+                  - listitem:
+                    - link:
+                      - /url: /dashboard
+                      - img
+                      - generic: Analitik
+                  - listitem:
+                    - link:
+                      - /url: /dashboard/board
+                      - img
+                      - generic: Pipeline Panosu
+                  - listitem:
+                    - link:
+                      - /url: /tasks
+                      - img
+                      - generic: Görevler
+                  - listitem:
+                    - link:
+                      - /url: /calendar
+                      - img
+                      - generic: Takvim
+                  - listitem:
+                    - link:
+                      - /url: /files
+                      - img
+                      - generic: Dosyalar
+                  - listitem:
+                    - link:
+                      - /url: /team
+                      - img
+                      - generic: Ekip
+            - generic:
+              - generic:
+                - list:
+                  - listitem:
+                    - link:
+                      - /url: /admin
+                      - img
+                      - generic: Yönetici
+                  - listitem:
+                    - link:
+                      - /url: /admin/roles
+                      - img
+                      - generic: Rol İzinleri
+                  - listitem:
+                    - link:
+                      - /url: /settings
+                      - img
+                      - generic: Ayarlar
+          - generic:
+            - list:
+              - listitem:
+                - button:
+                  - generic:
+                    - generic: A
+                  - generic:
+                    - generic: Admin
+                    - generic: admin@workos.com
+                  - img
+    - main:
+      - generic:
+        - generic:
+          - generic:
+            - button:
+              - img
+              - generic: Toggle Sidebar
+            - generic: Görevler
+          - generic:
+            - button:
+              - img
+            - button:
+              - img
+              - generic: Yeni Oluştur
+      - main:
+        - generic:
+          - generic:
+            - heading [level=1]: Görevler
+            - paragraph: 0 görev
+          - generic:
+            - generic:
+              - generic:
+                - img
+                - textbox:
+                  - /placeholder: Ne yapılması gerekiyor?
+              - generic:
+                - combobox:
+                  - generic: Todo
+                  - img
+                - combobox:
+                  - generic: Medium
+                  - img
+                - generic:
+                  - textbox:
+                    - /placeholder: Sorumlu
+                - textbox
+              - generic:
+                - textbox:
+                  - /placeholder: Alt görev ekle… (Her biri için Enter)
+              - textbox:
+                - /placeholder: Açıklama ekle…
+          - generic:
+            - generic:
+              - generic:
+                - img
+                - textbox:
+                  - /placeholder: Görev ara...
+              - button:
+                - img
+                - text: Sütunlar
+            - generic:
+              - generic:
+                - table:
+                  - rowgroup:
+                    - row:
+                      - columnheader:
+                        - checkbox
+                      - columnheader:
+                        - button:
+                          - text: Kimlik
+                          - img
+                      - columnheader:
+                        - button:
+                          - text: Başlık
+                          - img
+                      - columnheader:
+                        - button:
+                          - text: Durum
+                          - img
+                      - columnheader:
+                        - button:
+                          - text: Öncelik
+                          - img
+                      - columnheader:
+                        - button:
+                          - text: Sorumlu
+                          - img
+                      - columnheader:
+                        - button:
+                          - text: Son Tarih
+                          - img
+                      - columnheader:
+                        - button:
+                          - text: Oluşturulma
+                          - img
+                      - columnheader: Etiketler
+                      - columnheader
+                  - rowgroup:
+                    - row:
+                      - cell:
+                        - generic:
+                          - img
+                          - paragraph: Görev bulunamadı
+                          - paragraph: Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin.
+            - generic:
+              - generic:
+                - generic: 0 satır
+              - generic:
+                - generic:
+                  - generic: Sayfa başına satır
+                  - combobox:
+                    - generic: "10"
+                    - img
+                - generic: Sayfa 1 / 1
+                - generic:
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+  - generic:
+    - button [ref=e201]:
+      - img [ref=e151]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button:
+          - img
+      - button:
+        - generic: TG
+        - generic: 10:30
+      - button:
+        - generic: AJ
+        - generic: 09:15
+      - button:
+        - generic: BS
+        - generic: Yesterday
+      - button:
+        - generic: CW
+        - generic: Yesterday
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e158] [cursor=pointer]:
+    - img [ref=e159]
+  - alert
+  - dialog "Create task" [ref=e203]:
+    - heading "Create task" [level=2] [ref=e205]
+    - generic [ref=e206]:
+      - textbox "Görev başlığı *" [active] [ref=e207]
+      - generic [ref=e208]:
+        - combobox [ref=e209]:
+          - generic: Orta
+          - img
+        - combobox [ref=e210]:
+          - generic: Sorumlu
+          - img
+      - textbox [ref=e211]
+    - generic [ref=e212]:
+      - button "İptal" [ref=e213]
+      - button "Görev oluştur" [disabled]
+    - button "Close" [ref=e214]:
+      - img
+      - generic [ref=e215]: Close

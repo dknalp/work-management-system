@@ -1,0 +1,29 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - img [ref=e9]
+      - generic [ref=e12]:
+        - heading "Tekrar hoş geldiniz" [level=1] [ref=e13]
+        - paragraph [ref=e14]: Devam etmek için hesabınıza giriş yapın.
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - generic [ref=e17]: E-posta
+        - textbox "E-posta" [ref=e18]:
+          - /placeholder: you@example.com
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]: Şifre
+          - link "Şifrenizi mi unuttunuz?" [ref=e22] [cursor=pointer]:
+            - /url: /forgot-password
+        - generic [ref=e23]:
+          - textbox "Şifre" [ref=e24]:
+            - /placeholder: ••••••••
+          - button "Show password" [ref=e25]:
+            - img [ref=e26]
+      - button "Giriş yap" [ref=e29]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e35] [cursor=pointer]:
+    - img [ref=e36]

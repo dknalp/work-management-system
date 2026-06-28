@@ -1,0 +1,218 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analitik" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analitik
+          - listitem [ref=e30]:
+            - link "Pipeline Panosu" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline Panosu
+          - listitem [ref=e34]:
+            - link "Görevler" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Görevler
+          - listitem [ref=e40]:
+            - link "Takvim" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Takvim
+          - listitem [ref=e45]:
+            - link "Dosyalar" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Dosyalar
+          - listitem [ref=e162]:
+            - link "Ekip" [ref=e163] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e164]
+              - generic [ref=e169]: Ekip
+        - list [ref=e52]:
+          - listitem [ref=e170]:
+            - link "Yönetici" [ref=e171] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=e172]
+              - generic [ref=e174]: Yönetici
+          - listitem [ref=e175]:
+            - link "Rol İzinleri" [ref=e176] [cursor=pointer]:
+              - /url: /admin/roles
+              - img [ref=e177]
+              - generic [ref=e180]: Rol İzinleri
+          - listitem [ref=e53]:
+            - link "Ayarlar" [ref=e54] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e55]
+              - generic [ref=e58]: Ayarlar
+      - list [ref=e60]:
+        - listitem [ref=e61]:
+          - button "A Admin admin@workos.com" [ref=e181]:
+            - generic [ref=e64]: A
+            - generic [ref=e65]:
+              - generic [ref=e66]: Admin
+              - generic [ref=e182]: admin@workos.com
+            - img [ref=e67]
+    - main [ref=e71]:
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - button "Toggle Sidebar" [ref=e75]:
+            - img
+            - generic [ref=e76]: Toggle Sidebar
+          - generic [ref=e77]: Görevler
+        - generic [ref=e78]:
+          - button [ref=e79]:
+            - img
+          - button "Yeni Oluştur" [ref=e80]:
+            - img
+            - generic [ref=e81]: Yeni Oluştur
+      - main [ref=e82]:
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - heading "Görevler" [level=1] [ref=e85]
+            - paragraph [ref=e183]: 0 görev
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - img [ref=e89]
+              - textbox "Ne yapılması gerekiyor?" [active] [ref=e90]
+            - generic:
+              - generic:
+                - generic [ref=e91]:
+                  - combobox [ref=e92]:
+                    - generic: Todo
+                    - img
+                  - combobox [ref=e94]:
+                    - generic: Medium
+                    - img
+                  - textbox "Sorumlu" [ref=e97]
+                  - textbox [ref=e98]
+                - textbox "Alt görev ekle… (Her biri için Enter)" [ref=e100]
+                - textbox "Açıklama ekle…" [ref=e101]
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - generic [ref=e104]:
+                - img
+                - textbox "Görev ara..." [ref=e105]
+              - button "Sütunlar" [ref=e106]:
+                - img
+                - text: Sütunlar
+            - table [ref=e109]:
+              - rowgroup [ref=e110]:
+                - row "Tümünü Seç Kimlik Başlık Durum Öncelik Sorumlu Son Tarih Oluşturulma Etiketler" [ref=e111]:
+                  - columnheader "Tümünü Seç" [ref=e112]:
+                    - checkbox "Tümünü Seç" [ref=e184]
+                  - columnheader "Kimlik" [ref=e114]:
+                    - button "Kimlik" [ref=e185]:
+                      - text: Kimlik
+                      - img
+                  - columnheader "Başlık" [ref=e116]:
+                    - button "Başlık" [ref=e186]:
+                      - text: Başlık
+                      - img
+                  - columnheader "Durum" [ref=e118]:
+                    - button "Durum" [ref=e187]:
+                      - text: Durum
+                      - img
+                  - columnheader "Öncelik" [ref=e120]:
+                    - button "Öncelik" [ref=e188]:
+                      - text: Öncelik
+                      - img
+                  - columnheader "Sorumlu" [ref=e122]:
+                    - button "Sorumlu" [ref=e189]:
+                      - text: Sorumlu
+                      - img
+                  - columnheader "Son Tarih" [ref=e124]:
+                    - button "Son Tarih" [ref=e190]:
+                      - text: Son Tarih
+                      - img
+                  - columnheader "Oluşturulma" [ref=e126]:
+                    - button "Oluşturulma" [ref=e191]:
+                      - text: Oluşturulma
+                      - img
+                  - columnheader "Etiketler" [ref=e128]
+                  - columnheader [ref=e129]
+              - rowgroup [ref=e130]:
+                - row "Görev bulunamadı Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin." [ref=e131]:
+                  - cell "Görev bulunamadı Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin." [ref=e132]:
+                    - generic [ref=e133]:
+                      - img [ref=e134]
+                      - paragraph [ref=e137]: Görev bulunamadı
+                      - paragraph [ref=e138]: Filtrelerinizi ayarlamayı veya yeni görev eklemeyi deneyin.
+            - generic [ref=e139]:
+              - generic [ref=e141]: 0 satır
+              - generic [ref=e142]:
+                - generic [ref=e143]:
+                  - generic [ref=e144]: Sayfa başına satır
+                  - combobox "Sayfa başına satır" [ref=e145]:
+                    - generic: "10"
+                    - img
+                - generic [ref=e147]: Sayfa 1 / 1
+                - generic [ref=e148]:
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+                  - button [disabled]:
+                    - img
+  - generic [ref=e149]:
+    - button "Sohbeti aç" [ref=e150]:
+      - img [ref=e151]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e193]:
+        - img [ref=e195]
+        - generic [ref=e198]:
+          - generic [ref=e199]: Görev oluşturuldu
+          - generic [ref=e200]: Test task for delete verification
+  - button "Open Next.js Dev Tools" [ref=e158] [cursor=pointer]:
+    - img [ref=e159]
+  - alert [ref=e192]

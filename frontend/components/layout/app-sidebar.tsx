@@ -23,10 +23,13 @@ import {
   UsersIcon,
   Settings2Icon,
   ShieldIcon,
+  KeyRoundIcon,
 } from "lucide-react"
 
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { usePermission } from "@/hooks/use-permission"
 
 const navMain = [
     {
@@ -72,25 +75,25 @@ const navSecondary = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user } = useAuth()
+  const canViewTeam = usePermission("team:view")
+  const canViewAdmin = usePermission("admin:view")
 
-  const navMainWithActive = navMain.map((item) => ({
-    ...item,
-    isActive:
-      pathname === item.url ||
-      (item.url !== "/dashboard" && pathname.startsWith(item.url)),
-  }))
-
-  const adminItem = user?.is_admin
-    ? [{ title: "Yönetici", url: "/admin", icon: <ShieldIcon />, isActive: pathname === "/admin" || pathname.startsWith("/admin/") }]
-    : []
-
-  const navSecondaryWithActive = [
-    ...adminItem,
-    ...navSecondary.map((item) => ({
+  const navMainWithActive = navMain
+    .filter((item) => {
+      if (item.url === "/team") return canViewTeam
+      return true
+    })
+    .map((item) => ({
       ...item,
-      isActive: pathname === item.url,
-    })),
-  ]
+      isActive:
+        pathname === item.url ||
+        (item.url !== "/dashboard" && pathname.startsWith(item.url)),
+    }))
+
+  const navSecondaryWithActive = navSecondary.map((item) => ({
+    ...item,
+    isActive: pathname === item.url,
+  }))
 
   const sidebarUser = {
     name: user?.name ?? "...",
@@ -122,7 +125,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <NavMain items={navMainWithActive} />
-        <NavSecondary items={navSecondaryWithActive} className="mt-auto" />
+        <div className="mt-auto">
+          {canViewAdmin && (
+            <SidebarMenu className="px-2 pb-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/admin"} size="sm">
+                  <Link href="/admin">
+                    <ShieldIcon />
+                    <span>Yönetici</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem className="pl-4">
+                <SidebarMenuButton asChild isActive={pathname === "/admin/roles"} size="sm">
+                  <Link href="/admin/roles">
+                    <KeyRoundIcon />
+                    <span>Rol İzinleri</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          )}
+          <NavSecondary items={navSecondaryWithActive} />
+        </div>
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">

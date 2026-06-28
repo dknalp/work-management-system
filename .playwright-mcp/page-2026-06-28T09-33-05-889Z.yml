@@ -1,0 +1,151 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analitik" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analitik
+          - listitem [ref=e30]:
+            - link "Pipeline Panosu" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline Panosu
+          - listitem [ref=e34]:
+            - link "Görevler" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Görevler
+          - listitem [ref=e40]:
+            - link "Takvim" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Takvim
+          - listitem [ref=e45]:
+            - link "Dosyalar" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Dosyalar
+          - listitem [ref=e50]:
+            - link "Ekip" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Ekip
+        - list [ref=e60]:
+          - listitem [ref=e61]:
+            - link "Yönetici" [ref=e62] [cursor=pointer]:
+              - /url: /admin
+              - img [ref=e63]
+              - generic [ref=e65]: Yönetici
+          - listitem [ref=e66]:
+            - link "Ayarlar" [ref=e67] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e68]
+              - generic [ref=e71]: Ayarlar
+      - list [ref=e73]:
+        - listitem [ref=e74]:
+          - button "A Admin admin@workos.com" [ref=e75]:
+            - generic [ref=e77]: A
+            - generic [ref=e78]:
+              - generic [ref=e79]: Admin
+              - generic [ref=e80]: admin@workos.com
+            - img [ref=e81]
+    - main [ref=e85]:
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - button "Toggle Sidebar" [ref=e89]:
+            - img
+            - generic [ref=e90]: Toggle Sidebar
+          - generic [ref=e91]: Etkinlik Günlüğü
+        - generic [ref=e92]:
+          - button [ref=e93]:
+            - img
+          - button "Yeni Oluştur" [ref=e94]:
+            - img
+            - generic [ref=e95]: Yeni Oluştur
+      - main [ref=e96]:
+        - generic [ref=e97]:
+          - link "Admin Panel" [ref=e98] [cursor=pointer]:
+            - /url: /admin
+            - img [ref=e99]
+            - text: Admin Panel
+          - generic [ref=e101]:
+            - img [ref=e103]
+            - heading "Activity Log" [level=1] [ref=e105]
+          - generic [ref=e106]:
+            - button "Bugün" [ref=e107]
+            - button "Bu Hafta" [ref=e108]
+            - button "Bu Ay" [ref=e109]
+            - button "Tümü" [ref=e110]
+        - generic [ref=e111]:
+          - complementary [ref=e112]:
+            - generic [ref=e113]:
+              - paragraph [ref=e114]: Çalışanlar
+              - button "∞ Tüm Ekip 0" [ref=e115]:
+                - generic [ref=e116]: ∞
+                - generic [ref=e117]: Tüm Ekip
+                - generic [ref=e118]: "0"
+              - paragraph [ref=e120]: Bu dönemde aktivite yok.
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e123]:
+                - paragraph [ref=e124]: Tüm Ekip · Tümü
+                - paragraph [ref=e125]: 0 işlem
+              - generic [ref=e126]:
+                - img
+                - textbox "Görev veya kişi ara…" [ref=e127]
+            - generic [ref=e129]:
+              - img [ref=e130]
+              - paragraph [ref=e132]: Bu dönemde aktivite yok.
+  - generic [ref=e133]:
+    - button "Sohbeti aç" [ref=e134]:
+      - img [ref=e135]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e142] [cursor=pointer]:
+    - img [ref=e143]
+  - alert [ref=e146]

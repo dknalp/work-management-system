@@ -8,6 +8,25 @@ import {
   CircleDotIcon,
   CircleIcon,
 } from "lucide-react"
+import { usePermission } from "@/hooks/use-permission"
+
+type DeleteCellProps = {
+  onDelete: () => void
+}
+
+function DeleteCell({ onDelete }: DeleteCellProps) {
+  const canDelete = usePermission("tasks:delete_any")
+  if (!canDelete) return null
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onDelete() }}
+      className="flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all group-hover/row:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+      aria-label="Delete task"
+    >
+      <Trash2Icon className="size-3.5" />
+    </button>
+  )
+}
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -248,7 +267,10 @@ export function createColumns(
         <SortableHeader column={column} label="Son Tarih" />
       ),
       cell: ({ row }) => {
-        const date = new Date(row.original.dueDate)
+        const raw = row.original.dueDate
+        if (!raw) return <span className="text-sm text-muted-foreground">—</span>
+        const date = new Date(raw)
+        if (isNaN(date.getTime())) return <span className="text-sm text-muted-foreground">—</span>
         const now = new Date()
         const isOverdue = date < now && row.original.status !== "done"
         return (
@@ -269,7 +291,10 @@ export function createColumns(
         <SortableHeader column={column} label="Oluşturulma" />
       ),
       cell: ({ row }) => {
-        const date = new Date(row.original.createdAt)
+        const raw = row.original.createdAt
+        if (!raw) return <span className="text-sm text-muted-foreground">—</span>
+        const date = new Date(raw)
+        if (isNaN(date.getTime())) return <span className="text-sm text-muted-foreground">—</span>
         return (
           <span className="text-sm whitespace-nowrap text-muted-foreground">
             {format(date, "MMM d, yyyy")}
@@ -311,17 +336,7 @@ export function createColumns(
     {
       id: "actions",
       enableHiding: false,
-      cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 text-muted-foreground hover:text-destructive"
-          onClick={() => onDelete(row.original.id)}
-          aria-label="Görevi sil"
-        >
-          <Trash2Icon className="size-4" />
-        </Button>
-      ),
+      cell: ({ row }) => <DeleteCell onDelete={() => onDelete(row.original.id)} />,
     },
   ]
 }

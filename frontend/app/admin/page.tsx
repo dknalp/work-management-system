@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React from "react"
 import Link from "next/link"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
@@ -8,47 +8,48 @@ import { SiteHeader } from "@/components/layout/site-header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { MemberDialog } from "@/components/team/member-dialog"
-import { DeleteMemberDialog } from "@/components/team/delete-member-dialog"
-import { useAuth, useMockUsers, MOCK_AUTH } from "@/contexts/auth-context"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useAuth, type User } from "@/contexts/auth-context"
+import { apiClient } from "@/lib/api"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { useTasks } from "@/contexts/task-context"
-import { useTeam, TeamMember } from "@/contexts/team-context"
-import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import {
   ShieldIcon,
   UsersIcon,
   CheckSquareIcon,
   ActivityIcon,
-  PlusIcon,
-  PencilIcon,
-  Trash2Icon,
   HardDriveIcon,
   InfoIcon,
   CheckCircle2Icon,
   ExternalLinkIcon,
-  LinkIcon,
   UnlinkIcon,
   XCircleIcon,
+  PlusIcon,
 } from "lucide-react"
 import { redirect, useSearchParams } from "next/navigation"
 import { getStorageConfig, updateStoragePath } from "@/lib/actions/files"
 import { getDriveConnectionStatus, getConnectDriveUrl, disconnectDrive, type DriveConnectionStatus } from "@/lib/actions/drive"
 import { Input } from "@/components/ui/input"
 
-const STATUS_DOT: Record<TeamMember["status"], string> = {
-  active: "bg-emerald-500",
-  away: "bg-amber-500",
-  offline: "bg-slate-400",
-}
-
-function StatusBadge({ status }: { status: TeamMember["status"] }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs capitalize text-muted-foreground">
-      <span className={cn("size-1.5 rounded-full", STATUS_DOT[status])} />
-      {status}
-    </span>
-  )
+const ROLE_LABELS: Record<"admin" | "manager" | "member", string> = {
+  admin: "Yönetici",
+  manager: "Yetkili",
+  member: "Üye",
 }
 
 function initials(name: string) {
@@ -169,9 +170,7 @@ function DriveSection() {
               </svg>
               {actionLoading ? "Yönlendiriliyor…" : "Google hesabıyla bağlan"}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              Google hesabınıza yönlendirileceksiniz.
-            </p>
+            <p className="text-xs text-muted-foreground">Google hesabınıza yönlendirileceksiniz.</p>
           </div>
         )}
       </div>
@@ -281,109 +280,201 @@ function StorageSection() {
   )
 }
 
+const EMPTY_FORM = { name: "", email: "", password: "", role: "member" as "admin" | "manager" | "member" }
+
 function UsersSection() {
   const { user: currentUser } = useAuth()
-  const { mockUsers, updateMockUser } = useMockUsers()
+  const [users, setUsers] = React.useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = React.useState(true)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [form, setForm] = React.useState(EMPTY_FORM)
+  const [creating, setCreating] = React.useState(false)
+
+  React.useEffect(() => {
+    apiClient<User[]>("/admin/users")
+      .then(setUsers)
+      .catch(() => {})
+      .finally(() => setLoadingUsers(false))
+  }, [])
+
+  const handleRoleChange = async (u: User, role: "admin" | "manager" | "member") => {
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role, is_admin: role === "admin" } : x)))
+    try {
+      await apiClient(`/admin/users/${u.id}/role`, {
+        method: "PATCH",
+        body: JSON.stringify({ role }),
+      })
+      toast.success(`${u.name}'ın rolü ${ROLE_LABELS[role]} olarak güncellendi.`)
+    } catch {
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? u : x)))
+      toast.error("Rol güncellenemedi.")
+    }
+  }
+
+  const handleToggleActive = async (u: User) => {
+    const next = !u.is_active
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, is_active: next } : x)))
+    try {
+      await apiClient(`/admin/users/${u.id}/toggle-active`, { method: "PATCH" })
+      toast.success(next ? `${u.name} etkinleştirildi.` : `${u.name} devre dışı bırakıldı.`)
+    } catch {
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? u : x)))
+      toast.error("Durum güncellenemedi.")
+    }
+  }
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.name.trim() || !form.email.trim() || form.password.length < 8) return
+    setCreating(true)
+    try {
+      const created = await apiClient<User>("/admin/users", {
+        method: "POST",
+        body: JSON.stringify({ name: form.name.trim(), email: form.email.trim(), password: form.password, role: form.role }),
+      })
+      setUsers((prev) => [created, ...prev])
+      setCreateOpen(false)
+      setForm(EMPTY_FORM)
+      toast.success(`${created.name} oluşturuldu.`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Kullanıcı oluşturulamadı.")
+    } finally {
+      setCreating(false)
+    }
+  }
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card shadow-sm">
-      <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-        <div>
-          <h2 className="text-sm font-semibold">Kullanıcılar</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {mockUsers.length} hesap
-          </p>
+    <>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Yeni Kullanıcı Oluştur</DialogTitle>
+            <DialogDescription>Sisteme yeni bir kullanıcı ekleyin. Kullanıcı oluşturulduktan sonra giriş yapabilir.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-4 py-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-name">Ad Soyad</Label>
+              <Input id="new-name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ali Yılmaz" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-email">E-posta</Label>
+              <Input id="new-email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="ali@sirket.com" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-password">Şifre (min. 8 karakter)</Label>
+              <Input id="new-password" type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} placeholder="••••••••" required minLength={8} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-role">Sistem Rolü</Label>
+              <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v as "admin" | "manager" | "member" }))}>
+                <SelectTrigger id="new-role"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Yönetici</SelectItem>
+                  <SelectItem value="manager">Yetkili</SelectItem>
+                  <SelectItem value="member">Üye</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>İptal</Button>
+              <Button type="submit" disabled={creating}>{creating ? "Oluşturuluyor…" : "Oluştur"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+        <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+          <div>
+            <h2 className="text-sm font-semibold">Sistem Kullanıcıları</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{users.length} hesap</p>
+          </div>
+          <Button size="sm" className="gap-1.5 text-xs" onClick={() => { setForm(EMPTY_FORM); setCreateOpen(true) }}>
+            <PlusIcon className="size-3.5" />
+            Yeni Kullanıcı
+          </Button>
+        </div>
+        <div className="overflow-x-auto">
+          {loadingUsers ? (
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">Yükleniyor…</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/40 text-xs text-muted-foreground">
+                  <th className="px-5 py-3 text-left font-medium">Kullanıcı</th>
+                  <th className="px-4 py-3 text-left font-medium">Sistem Rolü</th>
+                  <th className="px-4 py-3 text-left font-medium">Aktif</th>
+                  <th className="px-4 py-3 text-left font-medium">Oluşturulma</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {users.map((u) => {
+                  const isSelf = u.id === currentUser?.id
+                  return (
+                    <tr key={u.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                            {initials(u.name)}
+                          </div>
+                          <div>
+                            <p className="font-medium leading-tight">
+                              {u.name}
+                              {isSelf && (
+                                <span className="ml-1.5 text-xs text-muted-foreground font-normal">(siz)</span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{u.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Select
+                          value={u.role ?? "member"}
+                          disabled={isSelf}
+                          onValueChange={(newRole) =>
+                            handleRoleChange(u, newRole as "admin" | "manager" | "member")
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-28 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin" className="text-xs">Yönetici</SelectItem>
+                            <SelectItem value="manager" className="text-xs">Yetkili</SelectItem>
+                            <SelectItem value="member" className="text-xs">Üye</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Switch
+                          checked={u.is_active}
+                          disabled={isSelf}
+                          onCheckedChange={() => handleToggleActive(u)}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
+                        {new Date(u.created_at).toLocaleDateString("tr-TR", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border/40 text-xs text-muted-foreground">
-              <th className="px-5 py-3 text-left font-medium">Kullanıcı</th>
-              <th className="px-4 py-3 text-left font-medium">Yönetici</th>
-              <th className="px-4 py-3 text-left font-medium">Aktif</th>
-              <th className="px-4 py-3 text-left font-medium">Oluşturulma</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/40">
-            {mockUsers.map((u) => {
-              const isSelf = u.id === currentUser?.id
-              return (
-                <tr key={u.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                        {initials(u.name)}
-                      </div>
-                      <div>
-                        <p className="font-medium leading-tight">
-                          {u.name}
-                          {isSelf && (
-                            <span className="ml-1.5 text-xs text-muted-foreground font-normal">(siz)</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{u.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={u.is_admin}
-                        disabled={isSelf}
-                        onCheckedChange={(checked) => {
-                          updateMockUser(u.id, { is_admin: checked })
-                          toast.success(
-                            checked
-                              ? `${u.name} kullanıcısına yönetici erişimi verildi.`
-                              : `${u.name} kullanıcısının yönetici erişimi iptal edildi.`
-                          )
-                        }}
-                      />
-                      {isSelf && (
-                        <span className="text-xs text-muted-foreground">kilitli</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Switch
-                      checked={u.is_active}
-                      disabled={isSelf}
-                      onCheckedChange={(checked) => {
-                        updateMockUser(u.id, { is_active: checked })
-                        toast.success(
-                          checked
-                            ? `${u.name} etkinleştirildi.`
-                            : `${u.name} devre dışı bırakıldı.`
-                        )
-                      }}
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
-                    {new Date(u.created_at).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    </>
   )
 }
 
 export default function AdminPage() {
   const { user, loading } = useAuth()
   const { tasks, activity } = useTasks()
-  const { members, addMember, updateMember, deleteMember } = useTeam()
-
-  const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   if (loading) return null
   if (!user?.is_admin) redirect("/dashboard")
@@ -391,41 +482,6 @@ export default function AdminPage() {
   const tasksByStatus = {
     "in-progress": tasks.filter((t) => t.status === "in-progress").length,
     done: tasks.filter((t) => t.status === "done").length,
-  }
-
-  const handleOpenAdd = () => {
-    setEditingMember(null)
-    setIsDialogOpen(true)
-  }
-
-  const handleOpenEdit = (member: TeamMember) => {
-    setEditingMember(member)
-    setIsDialogOpen(true)
-  }
-
-  const handleSave = (member: TeamMember) => {
-    const isEdit = members.some((m) => m.id === member.id)
-    if (isEdit) {
-      updateMember(member.id, member)
-      toast.success("Üye güncellendi", {
-        description: `${member.name} güncellendi.`,
-      })
-    } else {
-      addMember(member)
-      toast.success("Üye eklendi", {
-        description: `${member.name} ekibe eklendi.`,
-      })
-    }
-  }
-
-  const handleConfirmDelete = () => {
-    if (!deletingId) return
-    const member = members.find((m) => m.id === deletingId)
-    deleteMember(deletingId)
-    setDeletingId(null)
-    toast.success("Üye kaldırıldı", {
-      description: member ? `${member.name} kaldırıldı.` : "Üye kaldırıldı.",
-    })
   }
 
   return (
@@ -452,7 +508,7 @@ export default function AdminPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "Toplam Görev", value: tasks.length, icon: CheckSquareIcon, color: "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/40" },
-              { label: "Ekip Üyeleri", value: members.length, icon: UsersIcon, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40" },
+              { label: "Kullanıcılar", value: "—", icon: UsersIcon, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40" },
               { label: "Devam Ediyor", value: tasksByStatus["in-progress"], icon: ActivityIcon, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/40" },
               { label: "Tamamlandı", value: tasksByStatus.done, icon: CheckSquareIcon, color: "text-violet-600 bg-violet-50 dark:text-violet-400 dark:bg-violet-950/40" },
             ].map(({ label, value, icon: Icon, color }) => (
@@ -476,8 +532,8 @@ export default function AdminPage() {
           {/* Storage Configuration */}
           <StorageSection />
 
-          {/* Users section — only in mock auth mode */}
-          {MOCK_AUTH && <UsersSection />}
+          {/* System users */}
+          <UsersSection />
 
           {/* Recent activity */}
           <div className="rounded-xl border border-border/60 bg-card shadow-sm">
@@ -495,11 +551,11 @@ export default function AdminPage() {
               ) : (
                 activity.slice(0, 7).map((entry) => {
                   const name = entry.userName ?? "Unknown User"
-                  const initials = name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
+                  const ini = name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()
                   return (
                     <div key={entry.id} className="flex items-center gap-3 px-5 py-3">
                       <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                        {initials}
+                        {ini}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground">
@@ -516,92 +572,7 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-
-          {/* Team Directory */}
-          <div className="rounded-xl border border-border/60 bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
-              <div>
-                <h2 className="text-sm font-semibold">Ekip Rehberi</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">{members.length} üye</p>
-              </div>
-              <Button size="sm" onClick={handleOpenAdd} className="gap-1.5">
-                <PlusIcon className="size-3.5" />
-                Üye Ekle
-              </Button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border/40 text-xs text-muted-foreground">
-                    <th className="px-5 py-3 text-left font-medium">Üye</th>
-                    <th className="px-4 py-3 text-left font-medium">Rol</th>
-                    <th className="px-4 py-3 text-left font-medium">Departman</th>
-                    <th className="px-4 py-3 text-left font-medium">Durum</th>
-                    <th className="px-4 py-3 text-left font-medium">Katılım Tarihi</th>
-                    <th className="px-4 py-3 text-right font-medium">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {members.map((m) => (
-                    <tr key={m.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                            {initials(m.name)}
-                          </div>
-                          <div>
-                            <p className="font-medium leading-tight">{m.name}</p>
-                            <p className="text-xs text-muted-foreground">{m.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{m.role}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{m.department}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={m.status} />
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">
-                        {new Date(m.joinedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleOpenEdit(m)}
-                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            aria-label={`Edit ${m.name}`}
-                          >
-                            <PencilIcon className="size-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setDeletingId(m.id)}
-                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={`Remove ${m.name}`}
-                          >
-                            <Trash2Icon className="size-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </main>
-
-        <MemberDialog
-          member={editingMember}
-          open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
-          onSave={handleSave}
-        />
-
-        <DeleteMemberDialog
-          open={!!deletingId}
-          memberName={members.find((m) => m.id === deletingId)?.name}
-          onOpenChange={(open) => { if (!open) setDeletingId(null) }}
-          onConfirm={handleConfirmDelete}
-        />
       </SidebarInset>
     </SidebarProvider>
   )

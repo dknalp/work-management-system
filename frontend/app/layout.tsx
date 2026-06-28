@@ -4,6 +4,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/layout/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthProvider } from "@/contexts/auth-context"
+import { PermissionsProvider } from "@/contexts/permissions-context"
 import { TaskProvider } from "@/contexts/task-context"
 import { CommandPalette } from "@/components/command-palette"
 import { TeamProvider } from "@/contexts/team-context"
@@ -43,10 +44,10 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <AuthProvider><TaskProvider><TeamProvider><CommandPalette />
+          <AuthProvider><PermissionsProvider><TaskProvider><TeamProvider><CommandPalette />
             <TooltipProvider>{children}<ChatWidgetWrapper /></TooltipProvider>
             <Toaster />
-          </TeamProvider></TaskProvider></AuthProvider>
+          </TeamProvider></TaskProvider></PermissionsProvider></AuthProvider>
         </ThemeProvider>
       </body>
     </html>

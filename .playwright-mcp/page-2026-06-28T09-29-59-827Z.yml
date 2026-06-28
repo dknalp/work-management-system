@@ -1,0 +1,107 @@
+- generic [ref=e1]:
+  - generic [active]:
+    - generic [ref=e421]:
+      - generic [ref=e422]:
+        - generic [ref=e423]:
+          - navigation [ref=e424]:
+            - button "previous" [disabled] [ref=e425]:
+              - img "previous" [ref=e426]
+            - generic [ref=e428]:
+              - generic [ref=e429]: 1/
+              - text: "1"
+            - button "next" [disabled] [ref=e430]:
+              - img "next" [ref=e431]
+          - img
+        - generic [ref=e433]:
+          - link "Next.js 16.1.7 (stale) Turbopack" [ref=e434] [cursor=pointer]:
+            - /url: https://nextjs.org/docs/messages/version-staleness
+            - img [ref=e435]
+            - generic "There is a newer version (16.2.9) available, upgrade recommended!" [ref=e437]: Next.js 16.1.7 (stale)
+            - generic [ref=e438]: Turbopack
+          - img
+      - dialog "Runtime RangeError" [ref=e440]:
+        - generic [ref=e443]:
+          - generic [ref=e444]:
+            - generic [ref=e445]:
+              - generic [ref=e447]: Runtime RangeError
+              - generic [ref=e448]:
+                - button "Copy Error Info" [ref=e449] [cursor=pointer]:
+                  - img [ref=e450]
+                - button "No related documentation found" [disabled] [ref=e452]:
+                  - img [ref=e453]
+                - button "Attach Node.js inspector" [ref=e455] [cursor=pointer]:
+                  - img [ref=e456]
+            - generic [ref=e465]: Invalid time value
+          - generic [ref=e466]:
+            - generic [ref=e467]:
+              - paragraph [ref=e469]:
+                - img [ref=e471]
+                - generic [ref=e474]: components/tasks/task-columns.tsx (261:20) @ cell
+                - button "Open in editor" [ref=e475] [cursor=pointer]:
+                  - img [ref=e477]
+              - generic [ref=e480]:
+                - generic [ref=e481]: "259 | )}"
+                - generic [ref=e482]: 260 | >
+                - generic [ref=e483]: "> 261 | {format(date, \"MMM d, yyyy\")}"
+                - generic [ref=e484]: "| ^"
+                - generic [ref=e485]: 262 | </span>
+                - generic [ref=e486]: 263 | )
+                - generic [ref=e487]: "264 | },"
+            - generic [ref=e488]:
+              - generic [ref=e489]:
+                - paragraph [ref=e490]:
+                  - text: Call Stack
+                  - generic [ref=e491]: "27"
+                - button "Show 20 ignore-listed frame(s)" [ref=e492] [cursor=pointer]:
+                  - text: Show 20 ignore-listed frame(s)
+                  - img [ref=e493]
+              - generic [ref=e495]:
+                - generic [ref=e496]:
+                  - text: cell
+                  - button "Open cell in editor" [ref=e497] [cursor=pointer]:
+                    - img [ref=e498]
+                - text: components/tasks/task-columns.tsx (261:20)
+              - generic [ref=e500]:
+                - generic [ref=e501]:
+                  - text: <unknown>
+                  - button "Open <unknown> in editor" [ref=e502] [cursor=pointer]:
+                    - img [ref=e503]
+                - text: components/tasks/task-table.tsx (189:34)
+              - generic [ref=e505]:
+                - generic [ref=e506]: Array.map
+                - text: <anonymous>
+              - generic [ref=e507]:
+                - generic [ref=e508]:
+                  - text: <unknown>
+                  - button "Open <unknown> in editor" [ref=e509] [cursor=pointer]:
+                    - img [ref=e510]
+                - text: components/tasks/task-table.tsx (187:42)
+              - generic [ref=e512]:
+                - generic [ref=e513]: Array.map
+                - text: <anonymous>
+              - generic [ref=e514]:
+                - generic [ref=e515]:
+                  - text: TaskTable
+                  - button "Open TaskTable in editor" [ref=e516] [cursor=pointer]:
+                    - img [ref=e517]
+                - text: components/tasks/task-table.tsx (177:40)
+              - generic [ref=e519]:
+                - generic [ref=e520]:
+                  - text: TasksPage
+                  - button "Open TasksPage in editor" [ref=e521] [cursor=pointer]:
+                    - img [ref=e522]
+                - text: app/tasks/page.tsx (47:13)
+        - generic [ref=e524]: "1"
+        - generic [ref=e525]: "2"
+    - generic [ref=e165] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e166]:
+        - img [ref=e167]
+      - generic [ref=e526]:
+        - button "Open issues overlay" [ref=e527]:
+          - generic [ref=e528]:
+            - generic [ref=e529]: "0"
+            - generic [ref=e530]: "1"
+          - generic [ref=e531]: Issue
+        - button "Collapse issues badge" [ref=e532]:
+          - img [ref=e533]
+  - 'heading "Application error: a client-side exception has occurred while loading localhost (see the browser console for more information)." [level=2] [ref=e537]'

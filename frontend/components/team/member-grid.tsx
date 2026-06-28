@@ -9,7 +9,6 @@ import {
   Pencil,
   Trash2,
   Mail,
-  BuildingIcon,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -64,15 +63,6 @@ const statusConfig: Record<
   },
 }
 
-const departmentColors: Record<string, string> = {
-  Engineering: "text-blue-600 dark:text-blue-400",
-  Product: "text-violet-600 dark:text-violet-400",
-  Design: "text-pink-600 dark:text-pink-400",
-  Analytics: "text-teal-600 dark:text-teal-400",
-  Marketing: "text-orange-600 dark:text-orange-400",
-  "Human Resources": "text-rose-600 dark:text-rose-400",
-}
-
 export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -84,8 +74,6 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
           .toUpperCase()
         const colorIndex = member.name.charCodeAt(0) % avatarColors.length
         const statusCfg = statusConfig[member.status]
-        const deptColor =
-          departmentColors[member.department] ?? "text-muted-foreground"
 
         return (
           <div
@@ -166,17 +154,6 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
                 <span className={cn("size-1.5 rounded-full", statusCfg.dot)} />
                 {statusCfg.label}
               </Badge>
-
-              {/* Department */}
-              <div
-                className={cn(
-                  "flex items-center gap-1 text-xs font-medium",
-                  deptColor
-                )}
-              >
-                <BuildingIcon className="size-3" />
-                {member.department}
-              </div>
 
               {/* Email */}
               <p className="w-full truncate px-1 text-xs text-muted-foreground">

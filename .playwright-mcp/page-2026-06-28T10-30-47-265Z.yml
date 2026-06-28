@@ -1,0 +1,157 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analitik" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analitik
+          - listitem [ref=e30]:
+            - link "Pipeline Panosu" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline Panosu
+          - listitem [ref=e34]:
+            - link "Görevler" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Görevler
+          - listitem [ref=e40]:
+            - link "Takvim" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Takvim
+          - listitem [ref=e45]:
+            - link "Dosyalar" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Dosyalar
+        - list [ref=e52]:
+          - listitem [ref=e53]:
+            - link "Ayarlar" [ref=e54] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e55]
+              - generic [ref=e58]: Ayarlar
+      - list [ref=e60]:
+        - listitem [ref=e61]:
+          - button ". ..." [ref=e62]:
+            - generic [ref=e64]: .
+            - generic [ref=e66]: ...
+            - img [ref=e67]
+    - main [ref=e71]:
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - button "Toggle Sidebar" [ref=e75]:
+            - img
+            - generic [ref=e76]: Toggle Sidebar
+          - generic [ref=e77]: Analitik
+        - generic [ref=e78]:
+          - button [ref=e79]:
+            - img
+          - button "Yeni Oluştur" [ref=e80]:
+            - img
+            - generic [ref=e81]: Yeni Oluştur
+      - main [ref=e82]:
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - heading "Günaydın, there 👋" [level=1] [ref=e85]
+            - paragraph [ref=e86]: Bugün ekibinizde neler oluyor.
+          - generic [ref=e87]:
+            - generic [ref=e88]:
+              - img [ref=e90]
+              - generic [ref=e93]:
+                - paragraph [ref=e94]: "0"
+                - paragraph [ref=e95]: Toplam Görev
+                - paragraph [ref=e96]: "%0 tamamlandı"
+            - generic [ref=e97]:
+              - img [ref=e99]
+              - generic [ref=e102]:
+                - paragraph [ref=e103]: "0"
+                - paragraph [ref=e104]: Devam Ediyor
+                - paragraph [ref=e105]: şu an aktif
+            - generic [ref=e106]:
+              - img [ref=e108]
+              - generic [ref=e111]:
+                - paragraph [ref=e112]: "0"
+                - paragraph [ref=e113]: Tamamlanan
+                - paragraph [ref=e114]: toplam 0 içinden
+            - generic [ref=e115]:
+              - img [ref=e117]
+              - generic [ref=e119]:
+                - paragraph [ref=e120]: "0"
+                - paragraph [ref=e121]: Gecikmiş
+                - paragraph [ref=e122]: hepsi yolunda
+          - generic [ref=e123]:
+            - generic [ref=e125]:
+              - generic [ref=e126]: Görev Aktivitesi
+              - generic [ref=e127]: Oluşturulan - tamamlanan — son 7 gün
+            - generic [ref=e132]:
+              - generic [ref=e133]:
+                - generic [ref=e134]: Ekip İş Yükü
+                - generic [ref=e135]: Sorumluya göre görev dağılımı
+              - paragraph [ref=e138]: Henüz görev verisi yok
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - generic [ref=e141]:
+                - generic [ref=e142]: Yaklaşan Görevler
+                - link "Tümünü gör" [ref=e143] [cursor=pointer]:
+                  - /url: /tasks
+                  - text: Tümünü gör
+                  - img
+              - generic [ref=e145]:
+                - img [ref=e147]
+                - paragraph [ref=e150]: Yaklaşan görev yok
+            - generic [ref=e151]:
+              - heading "Son Etkinlik" [level=3] [ref=e152]
+              - paragraph [ref=e153]: Henüz etkinlik yok. Görev eklemeye veya güncellemeye başlayın.
+  - generic [ref=e154]:
+    - button "Sohbeti aç" [ref=e155]:
+      - img [ref=e156]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e163] [cursor=pointer]:
+    - img [ref=e164]

@@ -1,0 +1,217 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Command Palette" [level=2] [ref=e3]
+    - paragraph [ref=e4]: Search for a command to run...
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "WorkOS" [ref=e12] [cursor=pointer]:
+            - /url: /dashboard
+            - img [ref=e14]
+            - generic [ref=e17]: WorkOS
+      - generic [ref=e18]:
+        - list [ref=e21]:
+          - listitem [ref=e22]:
+            - link "Analitik" [ref=e23] [cursor=pointer]:
+              - /url: /dashboard
+              - img [ref=e24]
+              - generic [ref=e29]: Analitik
+          - listitem [ref=e30]:
+            - link "Pipeline Panosu" [ref=e31] [cursor=pointer]:
+              - /url: /dashboard/board
+              - img [ref=e32]
+              - generic [ref=e33]: Pipeline Panosu
+          - listitem [ref=e34]:
+            - link "Görevler" [ref=e35] [cursor=pointer]:
+              - /url: /tasks
+              - img [ref=e36]
+              - generic [ref=e39]: Görevler
+          - listitem [ref=e40]:
+            - link "Takvim" [ref=e41] [cursor=pointer]:
+              - /url: /calendar
+              - img [ref=e42]
+              - generic [ref=e44]: Takvim
+          - listitem [ref=e45]:
+            - link "Dosyalar" [ref=e46] [cursor=pointer]:
+              - /url: /files
+              - img [ref=e47]
+              - generic [ref=e49]: Dosyalar
+          - listitem [ref=e50]:
+            - link "Ekip" [ref=e51] [cursor=pointer]:
+              - /url: /team
+              - img [ref=e52]
+              - generic [ref=e57]: Ekip
+        - list [ref=e60]:
+          - listitem [ref=e61]:
+            - link "Ayarlar" [ref=e62] [cursor=pointer]:
+              - /url: /settings
+              - img [ref=e63]
+              - generic [ref=e66]: Ayarlar
+      - list [ref=e68]:
+        - listitem [ref=e69]:
+          - button ". ..." [ref=e70]:
+            - generic [ref=e72]: .
+            - generic [ref=e74]: ...
+            - img [ref=e75]
+    - main [ref=e79]:
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - button "Toggle Sidebar" [ref=e83]:
+            - img
+            - generic [ref=e84]: Toggle Sidebar
+          - generic [ref=e85]: Takvim
+        - generic [ref=e86]:
+          - button [ref=e87]:
+            - img
+          - button "Yeni Oluştur" [ref=e88]:
+            - img
+            - generic [ref=e89]: Yeni Oluştur
+      - main [ref=e90]:
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - generic [ref=e93]:
+              - generic [ref=e94]:
+                - button [ref=e95]:
+                  - img
+                - heading "June 2026" [level=2] [ref=e96]
+                - button [ref=e97]:
+                  - img
+              - generic [ref=e99]: 0 görev
+            - generic [ref=e100]:
+              - generic [ref=e101]: Pz
+              - generic [ref=e102]: Pt
+              - generic [ref=e103]: Sa
+              - generic [ref=e104]: Ça
+              - generic [ref=e105]: Pe
+              - generic [ref=e106]: Cu
+              - generic [ref=e107]: Ct
+            - generic [ref=e108]:
+              - generic [ref=e109]:
+                - button "31" [ref=e110]:
+                  - generic [ref=e111]: "31"
+                - button "1" [ref=e112]:
+                  - generic [ref=e113]: "1"
+                - button "2" [ref=e114]:
+                  - generic [ref=e115]: "2"
+                - button "3" [ref=e116]:
+                  - generic [ref=e117]: "3"
+                - button "4" [ref=e118]:
+                  - generic [ref=e119]: "4"
+                - button "5" [ref=e120]:
+                  - generic [ref=e121]: "5"
+                - button "6" [ref=e122]:
+                  - generic [ref=e123]: "6"
+              - generic [ref=e124]:
+                - button "7" [ref=e125]:
+                  - generic [ref=e126]: "7"
+                - button "8" [ref=e127]:
+                  - generic [ref=e128]: "8"
+                - button "9" [ref=e129]:
+                  - generic [ref=e130]: "9"
+                - button "10" [ref=e131]:
+                  - generic [ref=e132]: "10"
+                - button "11" [ref=e133]:
+                  - generic [ref=e134]: "11"
+                - button "12" [ref=e135]:
+                  - generic [ref=e136]: "12"
+                - button "13" [ref=e137]:
+                  - generic [ref=e138]: "13"
+              - generic [ref=e139]:
+                - button "14" [ref=e140]:
+                  - generic [ref=e141]: "14"
+                - button "15" [ref=e142]:
+                  - generic [ref=e143]: "15"
+                - button "16" [ref=e144]:
+                  - generic [ref=e145]: "16"
+                - button "17" [ref=e146]:
+                  - generic [ref=e147]: "17"
+                - button "18" [ref=e148]:
+                  - generic [ref=e149]: "18"
+                - button "19" [ref=e150]:
+                  - generic [ref=e151]: "19"
+                - button "20" [ref=e152]:
+                  - generic [ref=e153]: "20"
+              - generic [ref=e154]:
+                - button "21" [ref=e155]:
+                  - generic [ref=e156]: "21"
+                - button "22" [ref=e157]:
+                  - generic [ref=e158]: "22"
+                - button "23" [ref=e159]:
+                  - generic [ref=e160]: "23"
+                - button "24" [ref=e161]:
+                  - generic [ref=e162]: "24"
+                - button "25" [ref=e163]:
+                  - generic [ref=e164]: "25"
+                - button "26" [ref=e165]:
+                  - generic [ref=e166]: "26"
+                - button "27" [ref=e167]:
+                  - generic [ref=e168]: "27"
+              - generic [ref=e169]:
+                - button "28" [ref=e170]:
+                  - generic [ref=e171]: "28"
+                - button "29" [ref=e172]:
+                  - generic [ref=e173]: "29"
+                - button "30" [ref=e174]:
+                  - generic [ref=e175]: "30"
+                - button "1" [ref=e176]:
+                  - generic [ref=e177]: "1"
+                - button "2" [ref=e178]:
+                  - generic [ref=e179]: "2"
+                - button "3" [ref=e180]:
+                  - generic [ref=e181]: "3"
+                - button "4" [ref=e182]:
+                  - generic [ref=e183]: "4"
+          - generic [ref=e184]:
+            - generic [ref=e185]:
+              - generic [ref=e186]:
+                - heading "Bugün" [level=2] [ref=e187]
+                - paragraph [ref=e188]: June 28, 2026
+              - button "Görev Ekle" [ref=e189]:
+                - img
+                - text: Görev Ekle
+            - generic [ref=e191]:
+              - img [ref=e193]
+              - generic [ref=e195]:
+                - paragraph [ref=e196]: Bu gün görev yok
+                - paragraph [ref=e197]: “Görev Ekle”ye tıklayarak buraya bir şey planlayın.
+  - generic [ref=e198]:
+    - button "Sohbeti aç" [ref=e199]:
+      - img [ref=e200]
+    - generic:
+      - generic:
+        - paragraph: Mesajlar
+        - button "Kapat":
+          - img
+      - generic:
+        - button "TG Team General 10:30 Hey! How's the project going?":
+          - generic: TG
+          - generic:
+            - generic:
+              - paragraph: Team General
+              - generic: 10:30
+            - paragraph: Hey! How's the project going?
+        - button "AJ Alice Johnson 09:15 Can you review my PR?":
+          - generic: AJ
+          - generic:
+            - generic:
+              - paragraph: Alice Johnson
+              - generic: 09:15
+            - paragraph: Can you review my PR?
+        - button "BS Bob Smith Yesterday Thanks!":
+          - generic: BS
+          - generic:
+            - generic:
+              - paragraph: Bob Smith
+              - generic: Yesterday
+            - paragraph: Thanks!
+        - button "CW Carol Williams Yesterday Meeting at 3pm":
+          - generic: CW
+          - generic:
+            - generic:
+              - paragraph: Carol Williams
+              - generic: Yesterday
+            - paragraph: Meeting at 3pm
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e207] [cursor=pointer]:
+    - img [ref=e208]

@@ -77,20 +77,6 @@ const statusConfig: Record<
   },
 }
 
-const departmentColors: Record<string, string> = {
-  Engineering:
-    "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-  Product:
-    "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
-  Design: "bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20",
-  Analytics:
-    "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20",
-  Marketing:
-    "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
-  "Human Resources":
-    "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
@@ -161,34 +147,6 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
           {row.getValue("email")}
         </span>
       ),
-    },
-    {
-      accessorKey: "department",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-3 h-8 gap-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Departman
-          <ArrowUpDownIcon className="size-3" />
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const dept = row.getValue("department") as string
-        const colorClass =
-          departmentColors[dept] ??
-          "bg-muted/50 text-muted-foreground border-border/40"
-        return (
-          <Badge
-            variant="outline"
-            className={cn("border text-xs font-medium", colorClass)}
-          >
-            {dept}
-          </Badge>
-        )
-      },
     },
     {
       accessorKey: "status",

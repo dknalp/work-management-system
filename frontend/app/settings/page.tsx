@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SiteHeader } from "@/components/layout/site-header"
@@ -28,6 +28,8 @@ const TABS = [
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("appearance")
   const [emailNotifs, setEmailNotifs] = useState(true)
@@ -99,7 +101,7 @@ export default function SettingsPage() {
                           onClick={() => { setTheme(t.name); toast.success(`Theme set to ${t.label}`) }}
                           className={cn(
                             "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
-                            theme === t.name
+                            mounted && theme === t.name
                               ? "border-primary bg-primary/5"
                               : "border-border hover:border-border/80 hover:bg-muted/40"
                           )}
@@ -110,13 +112,13 @@ export default function SettingsPage() {
                           >
                             <div className="size-3 rounded-full" style={{ backgroundColor: t.primary }} />
                             <div className="size-2 rounded-full opacity-60" style={{ backgroundColor: t.accent }} />
-                            {theme === t.name && (
+                            {mounted && theme === t.name && (
                               <div className="absolute right-1 top-1">
                                 <CheckIcon className="size-3" style={{ color: t.primary }} />
                               </div>
                             )}
                           </div>
-                          <span className={cn("text-xs font-medium", theme === t.name ? "text-primary" : "text-muted-foreground")}>
+                          <span className={cn("text-xs font-medium", mounted && theme === t.name ? "text-primary" : "text-muted-foreground")}>
                             {t.label}
                           </span>
                         </button>

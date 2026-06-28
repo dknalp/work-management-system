@@ -12,12 +12,15 @@ work-management-system/
 
 All frontend work happens under `frontend/`. Run all commands from the `frontend/` directory.
 
+## CRITICAL RULES
+
+**NEVER start dev servers or backend processes on your own.** Do not run `pnpm dev`, `uvicorn`, `npm start`, or any server/process that binds to a port. The user manages their own servers. If verification requires a running server, ask the user to start it — do not start it yourself.
+
 ## Commands
 
 Run from the `frontend/` directory:
 
 ```bash
-pnpm dev        # Start dev server with Turbopack
 pnpm build      # Production build
 pnpm lint       # ESLint
 pnpm typecheck  # TypeScript check (tsc --noEmit)
