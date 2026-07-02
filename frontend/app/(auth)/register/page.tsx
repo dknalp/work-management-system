@@ -40,7 +40,7 @@ export default function RegisterPage() {
       const data = await res.json()
       tokenStorage.setTokens(data.access_token, data.refresh_token)
       updateUser(data.user)
-      router.replace("/dashboard")
+      router.replace("/analytics")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed")
     } finally {

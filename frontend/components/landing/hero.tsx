@@ -25,7 +25,7 @@ export function Hero() {
             className="shadow-soft h-12 w-full rounded-full bg-foreground px-8 text-base font-semibold text-background transition-opacity hover:opacity-90 sm:w-auto"
             asChild
           >
-            <Link href="/dashboard">Try Demo</Link>
+            <Link href="/analytics">Try Demo</Link>
           </Button>
           <Button
             size="lg"

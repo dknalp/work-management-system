@@ -26,7 +26,7 @@ function LoginForm() {
     try {
       await login(email, password)
       const from = searchParams.get("from")
-      router.replace(from && from.startsWith("/") ? from : "/dashboard")
+      router.replace(from && from.startsWith("/") ? from : "/analytics")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed")
     } finally {

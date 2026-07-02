@@ -79,7 +79,7 @@ export default function DocsPage() {
         </nav>
         <div className="border-t border-border/50 p-3">
           <Link
-            href="/dashboard"
+            href="/analytics"
             className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <ExternalLinkIcon className="size-3" /> Uygulamaya Dön

@@ -10,6 +10,10 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import {
@@ -24,24 +28,29 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import {
-  MessageSquareIcon,
-  PaperclipIcon,
   PencilIcon,
   Trash2Icon,
+  CalendarIcon,
+  UserIcon,
+  ChevronDownIcon,
+  CopyIcon,
+  ArrowRightIcon,
+  FlagIcon,
 } from "lucide-react"
 import { Task } from "@/types/task"
 import { usePermission } from "@/hooks/use-permission"
+import { useTeam } from "@/contexts/team-context"
+import { Column } from "./kanban-column"
 
 export type { Task }
 
 interface KanbanCardProps {
   task: Task
   isOverlay?: boolean
+  columns?: Column[]
   onDelete?: (taskId: string) => void
-  onUpdate?: (
-    taskId: string,
-    updates: Partial<Pick<Task, "title" | "priority" | "tags">>
-  ) => void
+  onUpdate?: (taskId: string, updates: Partial<Task>) => void
+  onDuplicate?: (taskId: string) => void
 }
 
 const priorityColors = {
@@ -50,19 +59,39 @@ const priorityColors = {
   high: "bg-rose-500/10 text-rose-500 border-rose-500/20",
 }
 
+const priorityLabels = {
+  low: "Düşük",
+  medium: "Orta",
+  high: "Yüksek",
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+}
+
 export function KanbanCard({
   task,
   isOverlay,
+  columns,
   onDelete,
   onUpdate,
+  onDuplicate,
 }: KanbanCardProps) {
   const canEdit = usePermission("board:edit")
+  const { members } = useTeam()
   const [detailOpen, setDetailOpen] = useState(false)
   const [editTitle, setEditTitle] = useState(task.title)
-  const [editPriority, setEditPriority] = useState<Task["priority"]>(
-    task.priority
-  )
+  const [editDescription, setEditDescription] = useState(task.description ?? "")
+  const [editPriority, setEditPriority] = useState<Task["priority"]>(task.priority)
   const [editTagsInput, setEditTagsInput] = useState(task.tags.join(", "))
+  const [editAssignees, setEditAssignees] = useState<string[]>(task.assignees ?? [])
+  const [editDueDate, setEditDueDate] = useState(task.dueDate ?? "")
+  const [assigneeOpen, setAssigneeOpen] = useState(false)
 
   const {
     setNodeRef,
@@ -90,8 +119,11 @@ export function KanbanCard({
 
   function openDetail() {
     setEditTitle(task.title)
+    setEditDescription(task.description ?? "")
     setEditPriority(task.priority)
     setEditTagsInput(task.tags.join(", "))
+    setEditAssignees(task.assignees ?? [])
+    setEditDueDate(task.dueDate ?? "")
     setDetailOpen(true)
   }
 
@@ -100,8 +132,21 @@ export function KanbanCard({
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean)
-    onUpdate?.(task.id, { title: editTitle, priority: editPriority, tags })
+    onUpdate?.(task.id, {
+      title: editTitle,
+      priority: editPriority,
+      tags,
+      description: editDescription,
+      assignees: editAssignees,
+      dueDate: editDueDate,
+    })
     setDetailOpen(false)
+  }
+
+  function toggleAssignee(name: string) {
+    setEditAssignees((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
+    )
   }
 
   function handleDelete() {
@@ -109,14 +154,12 @@ export function KanbanCard({
     onDelete?.(task.id)
   }
 
-  const firstAssignee = (task.assignees ?? [])[0] ?? null
-  const assigneeInitials = firstAssignee
-    ? firstAssignee
-        .split(" ")
-        .map((n: string) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
+  const assignees = task.assignees ?? []
+  const firstAssignee = assignees[0] ?? null
+  const assigneeInitials = firstAssignee ? getInitials(firstAssignee) : null
+
+  const dueDateDisplay = task.dueDate
+    ? new Date(task.dueDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
     : null
 
   if (isDragging) {
@@ -143,14 +186,10 @@ export function KanbanCard({
               isOverlay &&
                 "z-50 scale-105 rotate-1 cursor-grabbing border-primary shadow-xl"
             )}
-            onDoubleClick={(e) => {
-              if (!canEdit) return
-              e.stopPropagation()
-              openDetail()
-            }}
+            onClick={openDetail}
           >
-            <CardContent className="space-y-3 p-4 font-sans">
-              <div className="flex items-start justify-between gap-2">
+            <CardContent className="space-y-2.5 p-4 font-sans">
+              <div className="flex items-center justify-between gap-2">
                 <Badge
                   variant="outline"
                   className={cn(
@@ -158,55 +197,114 @@ export function KanbanCard({
                     priorityColors[task.priority]
                   )}
                 >
-                  {task.priority}
+                  {priorityLabels[task.priority]}
                 </Badge>
+                {dueDateDisplay && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <CalendarIcon className="size-2.5" />
+                    {dueDateDisplay}
+                  </span>
+                )}
               </div>
 
               <p className="text-sm leading-tight font-medium text-foreground/90">
                 {task.title}
               </p>
 
-              <div className="flex flex-wrap gap-1">
-                {task.tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="h-4 bg-muted/50 px-1.5 text-[10px] font-normal text-muted-foreground"
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
+              {task.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {task.tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="secondary"
+                      className="h-4 bg-muted/50 px-1.5 text-[10px] font-normal text-muted-foreground"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
 
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <MessageSquareIcon className="size-3" />
-                    <span className="text-[10px]">2</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <PaperclipIcon className="size-3" />
-                    <span className="text-[10px]">1</span>
+              {assignees.length > 0 && (
+                <div className="flex items-center justify-between pt-0.5">
+                  <span className="text-[10px] text-muted-foreground truncate max-w-[55%]">
+                    {assignees.length === 1
+                      ? firstAssignee!.split(" ")[0]
+                      : `${firstAssignee!.split(" ")[0]} +${assignees.length - 1}`}
+                  </span>
+                  <div className="flex -space-x-1.5">
+                    {assignees.slice(0, 3).map((name) => (
+                      <Avatar key={name} className="size-6 border-2 border-background shrink-0">
+                        <AvatarFallback className="text-[7px]">{getInitials(name)}</AvatarFallback>
+                      </Avatar>
+                    ))}
                   </div>
                 </div>
-                {assigneeInitials && (
-                  <Avatar className="size-6 border-2 border-background">
-                    <AvatarFallback className="text-[8px]">
-                      {assigneeInitials}
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-              </div>
+              )}
             </CardContent>
           </Card>
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-40">
+        <ContextMenuContent className="w-48">
+          {canEdit && columns && columns.filter((c) => c.id !== task.status).length > 0 && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="gap-2">
+                <ArrowRightIcon className="size-3.5" />
+                Taşı
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-44">
+                {columns
+                  .filter((c) => c.id !== task.status)
+                  .map((col) => (
+                    <ContextMenuItem
+                      key={col.id}
+                      onSelect={() => onUpdate?.(task.id, { status: col.id as Task["status"] })}
+                    >
+                      {col.title}
+                    </ContextMenuItem>
+                  ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
+
+          {canEdit && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="gap-2">
+                <FlagIcon className="size-3.5" />
+                Öncelik
+              </ContextMenuSubTrigger>
+              <ContextMenuSubContent className="w-36">
+                {(["low", "medium", "high"] as const).map((p) => (
+                  <ContextMenuItem
+                    key={p}
+                    className={task.priority === p ? "font-semibold" : ""}
+                    onSelect={() => onUpdate?.(task.id, { priority: p })}
+                  >
+                    {priorityLabels[p]}
+                    {task.priority === p && <span className="ml-auto text-xs">✓</span>}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
+
+          <ContextMenuSeparator />
+
           {canEdit && (
             <ContextMenuItem className="gap-2" onSelect={openDetail}>
               <PencilIcon className="size-3.5" />
               Görevi Düzenle
             </ContextMenuItem>
           )}
+
+          {canEdit && (
+            <ContextMenuItem className="gap-2" onSelect={() => onDuplicate?.(task.id)}>
+              <CopyIcon className="size-3.5" />
+              Çoğalt
+            </ContextMenuItem>
+          )}
+
+          <ContextMenuSeparator />
+
           {canEdit && (
             <ContextMenuItem
               variant="destructive"
@@ -221,14 +319,14 @@ export function KanbanCard({
       </ContextMenu>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">
               Görev Detayı
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-1">
             <div className="space-y-1.5">
               <Label
                 htmlFor="card-title"
@@ -240,8 +338,27 @@ export function KanbanCard({
                 id="card-title"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                rows={3}
+                rows={2}
                 className="resize-none text-sm"
+                disabled={!canEdit}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="card-desc"
+                className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+              >
+                Açıklama
+              </Label>
+              <Textarea
+                id="card-desc"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={3}
+                placeholder="Görev hakkında notlar…"
+                className="resize-none text-sm"
+                disabled={!canEdit}
               />
             </div>
 
@@ -254,18 +371,108 @@ export function KanbanCard({
                   <button
                     key={p}
                     type="button"
+                    disabled={!canEdit}
                     onClick={() => setEditPriority(p)}
                     className={cn(
-                      "flex-1 rounded-lg border px-3 py-1.5 text-xs font-semibold tracking-wider uppercase transition-all",
+                      "flex-1 rounded-lg border px-3 py-1.5 text-xs font-semibold tracking-wider uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed",
                       editPriority === p
-                        ? priorityColors[p] +
-                            " ring-2 ring-current ring-offset-1"
+                        ? priorityColors[p] + " ring-2 ring-current ring-offset-1"
                         : "border-border text-muted-foreground hover:border-primary/30"
                     )}
                   >
-                    {p}
+                    {priorityLabels[p]}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Atanan Kişiler
+                </Label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => setAssigneeOpen((v) => !v)}
+                    className={cn(
+                      "flex min-h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm transition-colors",
+                      "hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    <span className="flex flex-wrap items-center gap-1 min-w-0 flex-1">
+                      {editAssignees.length > 0 ? (
+                        editAssignees.map((name) => (
+                          <span key={name} className="flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                            <Avatar className="size-3.5 shrink-0">
+                              <AvatarFallback className="text-[7px]">{getInitials(name)}</AvatarFallback>
+                            </Avatar>
+                            {name.split(" ")[0]}
+                          </span>
+                        ))
+                      ) : (
+                        <>
+                          <UserIcon className="size-3.5 text-muted-foreground shrink-0" />
+                          <span className="text-muted-foreground text-sm">Seç…</span>
+                        </>
+                      )}
+                    </span>
+                    <ChevronDownIcon className="size-3.5 text-muted-foreground shrink-0 ml-1" />
+                  </button>
+                  {assigneeOpen && (
+                    <div className="absolute z-50 top-full mt-1 w-full rounded-md border border-border bg-popover shadow-md overflow-hidden max-h-52 overflow-y-auto">
+                      {members.map((member) => {
+                        const selected = editAssignees.includes(member.name)
+                        return (
+                          <button
+                            key={member.id}
+                            type="button"
+                            onClick={() => toggleAssignee(member.name)}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors",
+                              selected && "bg-primary/5 text-primary"
+                            )}
+                          >
+                            <Avatar className="size-5 shrink-0">
+                              <AvatarFallback className="text-[8px]">{getInitials(member.name)}</AvatarFallback>
+                            </Avatar>
+                            <span className="truncate flex-1">{member.name}</span>
+                            {selected && <span className="text-xs text-primary shrink-0">✓</span>}
+                          </button>
+                        )
+                      })}
+                      {editAssignees.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => { setEditAssignees([]); setAssigneeOpen(false) }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:bg-muted border-t border-border transition-colors"
+                        >
+                          <UserIcon className="size-3.5" />
+                          Tümünü kaldır
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="card-due"
+                  className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                >
+                  Bitiş Tarihi
+                </Label>
+                <input
+                  id="card-due"
+                  type="date"
+                  value={editDueDate}
+                  onChange={(e) => setEditDueDate(e.target.value)}
+                  disabled={!canEdit}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                />
               </div>
             </div>
 
@@ -275,7 +482,7 @@ export function KanbanCard({
                 className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
               >
                 Etiketler{" "}
-                <span className="font-normal normal-case">
+                <span className="normal-case font-normal text-muted-foreground/70">
                   (virgülle ayırın)
                 </span>
               </Label>
@@ -285,7 +492,8 @@ export function KanbanCard({
                 value={editTagsInput}
                 onChange={(e) => setEditTagsInput(e.target.value)}
                 placeholder="Tasarım, API, İnceleme"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                disabled={!canEdit}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
           </div>
@@ -316,7 +524,7 @@ export function KanbanCard({
                   onClick={handleSave}
                   disabled={!editTitle.trim()}
                 >
-                  Değişiklikleri kaydet
+                  Kaydet
                 </Button>
               )}
             </div>

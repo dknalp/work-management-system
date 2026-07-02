@@ -25,12 +25,13 @@ import {
 import { useTasks } from "@/contexts/task-context"
 
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Pipeline Board", href: "/dashboard/board", icon: KanbanSquare },
-  { label: "Tasks", href: "/tasks", icon: CheckSquare },
-  { label: "Calendar", href: "/calendar", icon: CalendarDays },
-  { label: "Team", href: "/team", icon: Users },
-  { label: "Files", href: "/files", icon: FolderOpen },
+  { label: "Ana Sayfa", href: "/home", icon: LayoutDashboard },
+  { label: "Analitik", href: "/analytics", icon: LayoutDashboard },
+  { label: "Kanban Panosu", href: "/board", icon: KanbanSquare },
+  { label: "Görevler", href: "/tasks", icon: CheckSquare },
+  { label: "Takvim", href: "/calendar", icon: CalendarDays },
+  { label: "Ekip", href: "/team", icon: Users },
+  { label: "Dosyalar", href: "/files", icon: FolderOpen },
 ]
 
 const STATUS_ICON: Record<string, React.ElementType> = {

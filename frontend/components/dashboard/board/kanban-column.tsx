@@ -8,7 +8,7 @@ import {
 } from "@dnd-kit/sortable"
 import { KanbanCard, Task } from "./kanban-card"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontalIcon, PlusIcon, XIcon } from "lucide-react"
+import { PlusIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { usePermission } from "@/hooks/use-permission"
 
@@ -22,20 +22,23 @@ export type Column = {
 interface KanbanColumnProps {
   column: Column
   tasks: Task[]
+  columns?: Column[]
   onAddCard: (columnId: string, title: string) => void
   onDeleteCard: (taskId: string) => void
-  onUpdateCard: (
-    taskId: string,
-    updates: Partial<Pick<Task, "title" | "priority" | "tags">>
-  ) => void
+  onUpdateCard: (taskId: string, updates: Partial<Task>) => void
+  onDuplicateCard?: (taskId: string) => void
+  headerSlot?: React.ReactNode
 }
 
 export function KanbanColumn({
   column,
   tasks,
+  columns,
   onAddCard,
   onDeleteCard,
   onUpdateCard,
+  onDuplicateCard,
+  headerSlot,
 }: KanbanColumnProps) {
   const canEdit = usePermission("board:edit")
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks])
@@ -94,35 +97,34 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex h-full max-h-full w-full min-w-[300px] flex-col rounded-2xl border border-border/50 bg-muted/30 p-4"
+      className="flex h-full max-h-full w-full flex-col rounded-2xl border border-border/50 bg-muted/30 p-4"
     >
-      {/* Header */}
-      <div className="group/header mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="size-2 rounded-full bg-primary/40 transition-colors group-hover/header:bg-primary" />
-          <h3 className="text-sm font-semibold tracking-tight">
-            {column.title}
-          </h3>
-          <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground tabular-nums">
-            {tasks.length}
-          </span>
+      {/* Header — prefer slot from parent (has drag handle + rename/delete controls) */}
+      {headerSlot ?? (
+        <div className="group/header mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="size-2 rounded-full bg-primary/40 transition-colors group-hover/header:bg-primary" />
+            <h3 className="text-sm font-semibold tracking-tight">
+              {column.title}
+            </h3>
+            <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground tabular-nums">
+              {tasks.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/header:opacity-100">
+            {canEdit && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={startAddingCard}
+              >
+                <PlusIcon className="size-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/header:opacity-100">
-          {canEdit && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              onClick={startAddingCard}
-            >
-              <PlusIcon className="size-3.5" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon" className="size-7">
-            <MoreHorizontalIcon className="size-3.5" />
-          </Button>
-        </div>
-      </div>
+      )}
 
       {/* Content */}
       <div className="scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent flex min-h-[200px] flex-1 flex-col gap-3 overflow-y-auto pr-1">
@@ -131,8 +133,10 @@ export function KanbanColumn({
             <KanbanCard
               key={task.id}
               task={task}
+              columns={columns}
               onDelete={onDeleteCard}
               onUpdate={onUpdateCard}
+              onDuplicate={onDuplicateCard}
             />
           ))}
           {tasks.length === 0 && !isAddingCard && (

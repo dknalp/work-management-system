@@ -6,8 +6,9 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { NotificationsPopover } from "@/components/notifications-popover"
 
 const routeLabels: Record<string, string> = {
-  "/dashboard": "Analitik",
-  "/dashboard/board": "Pipeline Panosu",
+  "/home": "Ana Sayfa",
+  "/analytics": "Analitik",
+  "/board": "Kanban Panosu",
   "/tasks": "Görevler",
   "/calendar": "Takvim",
   "/files": "Dosyalar",
@@ -22,7 +23,8 @@ const routeLabels: Record<string, string> = {
 function getRouteLabel(pathname: string): string {
   if (routeLabels[pathname]) return routeLabels[pathname]
   if (pathname.startsWith("/files/")) return "Dosyalar"
-  return "Analitik"
+  if (pathname.startsWith("/projects/")) return "Projeler"
+  return "Ana Sayfa"
 }
 
 export function SiteHeader() {

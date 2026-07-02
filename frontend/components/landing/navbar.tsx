@@ -40,7 +40,7 @@ export function Navbar() {
             <span className="sr-only">GitHub</span>
           </Link>
           <Button className="h-9 rounded-full px-6 font-semibold" asChild>
-            <Link href="/dashboard">Try Demo</Link>
+            <Link href="/analytics">Try Demo</Link>
           </Button>
         </div>
       </div>

@@ -14,7 +14,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
-  LayoutDashboardIcon,
+  HomeIcon,
+  BarChart3Icon,
   KanbanIcon,
   CheckSquareIcon,
   CalendarIcon,
@@ -33,16 +34,22 @@ import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { usePermission } from "@/hooks/use-permission"
 import { getLinksForRole, type CustomNavLink } from "@/lib/custom-nav"
+import { SidebarProjects } from "@/components/layout/sidebar-projects"
 
 const navMain = [
-    {
-    title: "Analitik",
-    url: "/dashboard",
-    icon: <LayoutDashboardIcon />,
+  {
+    title: "Ana Sayfa",
+    url: "/home",
+    icon: <HomeIcon />,
   },
   {
-    title: "Pipeline Panosu",
-    url: "/dashboard/board",
+    title: "Analitik",
+    url: "/analytics",
+    icon: <BarChart3Icon />,
+  },
+  {
+    title: "Pipeline'lar",
+    url: "/pipelines",
     icon: <KanbanIcon />,
   },
   {
@@ -104,7 +111,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navMainWithActive = navMain
     .filter((item) => {
       if (item.url === "/tasks") return canViewTasks
-      if (item.url === "/dashboard/board") return canViewBoard
+      if (item.url === "/pipelines") return canViewBoard
       if (item.url === "/calendar") return canViewCalendar
       if (item.url === "/files") return canViewFiles
       if (item.url === "/team") return canViewTeam
@@ -112,9 +119,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     })
     .map((item) => ({
       ...item,
-      isActive:
-        pathname === item.url ||
-        (item.url !== "/dashboard" && pathname.startsWith(item.url)),
+      isActive: pathname === item.url,
     }))
 
   const navSecondaryWithActive = navSecondary.map((item) => ({
@@ -137,8 +142,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:p-2!"
             >
-              <a href="/dashboard" className="flex items-center gap-2.5">
-                <img src="/kiwimi-office-logo.png" alt="Kiwimi Office" className="size-7 rounded-lg object-contain" />
+              <a href="/home" className="flex items-center gap-2.5">
+                <img src="/kiwimi-office-black-logo.png" alt="Kiwimi Office" className="size-7 rounded-lg object-contain" />
                 <span className="text-base font-semibold tracking-tight">
                   Kiwimi Office
                 </span>
@@ -150,6 +155,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <NavMain items={navMainWithActive} />
+        <SidebarProjects />
         {customLinks.length > 0 && (
           <SidebarMenu className="px-2">
             {customLinks.map((link) => (

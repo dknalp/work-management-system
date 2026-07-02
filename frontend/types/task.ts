@@ -37,6 +37,7 @@ export type Task = {
   subTasks?: SubTask[]
   description?: string
   comments?: Comment[]
+  projectId?: string
 }
 
 export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [

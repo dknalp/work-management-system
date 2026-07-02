@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 
 const PROTECTED_PREFIXES = [
-  "/dashboard",
+  "/home",
+  "/analytics",
+  "/board",
   "/tasks",
   "/calendar",
   "/files",
@@ -30,7 +32,7 @@ export function proxy(req: NextRequest) {
   const isAdminRole = isAdminCookie || userRole === "admin"
 
   if (isAdminRoute && hasSession && !isAdminRole) {
-    return NextResponse.redirect(new URL("/dashboard", req.url))
+    return NextResponse.redirect(new URL("/home", req.url))
   }
 
   if (isProtected && !hasSession) {
@@ -42,13 +44,13 @@ export function proxy(req: NextRequest) {
 
   if (isAuthRoute && hasSession) {
     const url = req.nextUrl.clone()
-    url.pathname = "/dashboard"
+    url.pathname = "/home"
     url.searchParams.delete("from")
     return NextResponse.redirect(url)
   }
 
   if (pathname === "/" && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", req.url))
+    return NextResponse.redirect(new URL("/home", req.url))
   }
 
   return NextResponse.next()

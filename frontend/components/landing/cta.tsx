@@ -18,7 +18,7 @@ export function CTA() {
           className="shadow-soft h-14 rounded-full bg-foreground px-10 text-base font-semibold text-background hover:bg-foreground/90"
           asChild
         >
-          <Link href="/dashboard">Try Demo</Link>
+          <Link href="/analytics">Try Demo</Link>
         </Button>
       </div>
     </section>

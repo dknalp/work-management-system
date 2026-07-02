@@ -12,9 +12,19 @@ work-management-system/
 
 Frontend commands run from `frontend/`. Backend commands run from `backend/`.
 
+## Performance Policy
+
+- You may run `pnpm lint` or `tsc --noEmit` when needed.
+- Do not wrap them in long shell pipelines (`grep`, `sed`, `awk`, `xargs`, `find`, `head`, `tail`, complex pipes, or command chains) unless I explicitly request it.
+- Prefer running commands directly and inspect the output yourself instead of filtering it through shell pipelines.
+- Avoid repeatedly re-running the same validation command after every edit.
+- Run validation only when it provides new information.
+
 ## CRITICAL RULES
 
 **NEVER start dev servers or backend processes on your own.** Do not run `pnpm dev`, `uvicorn`, `npm start`, or any server/process that binds to a port. The user manages their own servers. If verification requires a running server, ask the user to start it — do not start it yourself.
+
+**NEVER run `pnpm typecheck` (or `tsc --noEmit`) without explicit user instruction.** It is resource-intensive and can crash the user's machine. Do not run it as part of verification, post-edit checks, or any autonomous workflow.
 
 ## Commands
 
@@ -22,7 +32,6 @@ Frontend commands run from `frontend/`. Backend commands run from `backend/`.
 ```bash
 pnpm build      # Production build
 pnpm lint       # ESLint
-pnpm typecheck  # TypeScript check (tsc --noEmit)
 pnpm format     # Prettier (writes in place)
 ```
 

@@ -17,7 +17,7 @@ export function AccessDenied() {
           Bu sayfayı görüntülemek için gerekli izniniz bulunmuyor. Yöneticinizle iletişime geçin.
         </p>
       </div>
-      <Button variant="outline" onClick={() => router.push("/dashboard")}>
+      <Button variant="outline" onClick={() => router.push("/analytics")}>
         Dashboard&apos;a Dön
       </Button>
     </div>
