@@ -11,7 +11,6 @@ import { tokenStorage } from "@/lib/auth"
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "")
 const WS_BASE = API_BASE.replace(/^https/, "wss").replace(/^http/, "ws")
 
-const LS_NOTIF_KEY = "wms:notifications"
 const LS_READ_KEY  = "wms:notifications:read"
 const LS_CHAT_READ = "wms:chat:read"
 const MAX_STORED   = 100
@@ -40,14 +39,8 @@ type NotificationsContextValue = {
   markChatSent: (contactId: string, roomId: string) => void
 }
 
-// ── localStorage helpers ──────────────────────────────────────────────────────
+// ── localStorage helpers (read state only) ────────────────────────────────────
 
-function loadNotifications(): AppNotification[] {
-  try { return JSON.parse(localStorage.getItem(LS_NOTIF_KEY) ?? "[]") } catch { return [] }
-}
-function saveNotifications(ns: AppNotification[]) {
-  try { localStorage.setItem(LS_NOTIF_KEY, JSON.stringify(ns.slice(0, MAX_STORED))) } catch {}
-}
 function loadReadIds(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(LS_READ_KEY) ?? "[]")) } catch { return new Set() }
 }
@@ -77,26 +70,25 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const { user } = useAuth()
   const { activity } = useTasks()
 
-  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  // Task-derived notifications come from activity (API-backed)
+  const [wsNotifications, setWsNotifications] = useState<AppNotification[]>([])
   const [readIds, setReadIds] = useState<Set<string>>(new Set())
   const [chatUnread, setChatUnread] = useState<Record<string, number>>({})
 
   const seenActivityIds = useRef<Set<string>>(new Set())
   const activityInitialized = useRef(false)
 
-  // Load persisted notifications on mount
+  // Load persisted read state on mount
   useEffect(() => {
-    setNotifications(loadNotifications())
     setReadIds(loadReadIds())
   }, [])
 
-  // ── Task activity → notifications ─────────────────────────────────────────
+  // ── Task activity → notifications (derived from API activity) ─────────────
 
   useEffect(() => {
     if (activity.length === 0) return
 
     if (!activityInitialized.current) {
-      // First load: mark all existing items as already seen
       activityInitialized.current = true
       activity.forEach((a) => seenActivityIds.current.add(a.id))
       return
@@ -106,26 +98,8 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     if (newItems.length === 0) return
     newItems.forEach((a) => seenActivityIds.current.add(a.id))
 
-    const newNotifs: AppNotification[] = newItems.map((a) => ({
-      id: `task-${a.id}`,
-      type: "task" as const,
-      title: a.taskTitle,
-      body: a.detail ? `${a.type} — ${a.detail}` : a.type,
-      timestamp: a.timestamp,
-      metadata: { task_id: a.taskId },
-    }))
-
-    setNotifications((prev) => {
-      const merged = [...newNotifs, ...prev].slice(0, MAX_STORED)
-      saveNotifications(merged)
-      return merged
-    })
-
-    // Toast for each new task event
     newItems.forEach((a) => {
-      toast(a.taskTitle, {
-        description: a.detail ?? a.type,
-      })
+      toast(a.taskTitle, { description: a.detail ?? a.type })
     })
   }, [activity])
 
@@ -153,30 +127,18 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
             contact_id: string; sender_name: string; text: string; room_id: string
           }
 
-          // Check if this room is currently "read" in chat localStorage
-          const chatReadMap = loadChatRead()
-          const lastRead = chatReadMap[room_id]
-          const now = new Date().toISOString()
-
-          // Increment chat unread badge
           setChatUnread((prev) => ({ ...prev, [contact_id]: (prev[contact_id] ?? 0) + 1 }))
 
-          // Add to notification list
           const notif: AppNotification = {
             id: `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
             type: "message",
             title: sender_name,
             body: text.length > 80 ? text.slice(0, 80) + "…" : text,
-            timestamp: now,
+            timestamp: new Date().toISOString(),
             metadata: { contact_id, room_id },
           }
-          setNotifications((prev) => {
-            const merged = [notif, ...prev].slice(0, MAX_STORED)
-            saveNotifications(merged)
-            return merged
-          })
+          setWsNotifications((prev) => [notif, ...prev].slice(0, MAX_STORED))
 
-          // Toast
           toast(sender_name, {
             description: text.length > 60 ? text.slice(0, 60) + "…" : text,
             action: { label: "Mesajlar", onClick: () => {} },
@@ -195,9 +157,21 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
   }, [user?.id])
 
-  // ── Chat unread: compute from localStorage on mount ───────────────────────
+  // ── Merge: activity-derived + WebSocket notifications ─────────────────────
 
-  // (chat-widget will call markChatRead / markChatSent to update)
+  const notifications: AppNotification[] = React.useMemo(() => {
+    const taskNotifs: AppNotification[] = activity.map((a) => ({
+      id: `task-${a.id}`,
+      type: "task" as const,
+      title: a.taskTitle,
+      body: a.detail ? `${a.type} — ${a.detail}` : a.type,
+      timestamp: a.timestamp,
+      metadata: { task_id: a.taskId },
+    }))
+    return [...wsNotifications, ...taskNotifs]
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, MAX_STORED)
+  }, [activity, wsNotifications])
 
   // ── Marks ─────────────────────────────────────────────────────────────────
 

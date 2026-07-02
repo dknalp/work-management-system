@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { TaskTable } from "@/components/tasks/task-table"
 import { QuickAddTask } from "@/components/tasks/quick-add-task"
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal"
@@ -8,57 +8,18 @@ import { useTasks } from "@/contexts/task-context"
 import { Task } from "@/types/task"
 import { toast } from "sonner"
 
-const STORAGE_PREFIX = "wms:project-tasks:"
-
-function loadProjectTaskIds(projectId: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + projectId)
-    return new Set(JSON.parse(raw ?? "[]"))
-  } catch {
-    return new Set()
-  }
-}
-
-function saveProjectTaskIds(projectId: string, ids: Set<string>) {
-  localStorage.setItem(STORAGE_PREFIX + projectId, JSON.stringify([...ids]))
-}
-
 export function ProjectTasksTab({ projectId }: { projectId: string }) {
   const { tasks, addTask, updateTask, deleteTask, deleteTasks } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [projectTaskIds, setProjectTaskIds] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    setProjectTaskIds(loadProjectTaskIds(projectId))
-  }, [projectId])
 
   const projectTasks = useMemo(
-    () => tasks.filter((t) => projectTaskIds.has(t.id)),
-    [tasks, projectTaskIds]
+    () => tasks.filter((t) => t.projectId === projectId),
+    [tasks, projectId]
   )
 
   function handleAdd(task: Task) {
-    const next = new Set(projectTaskIds).add(task.id)
-    setProjectTaskIds(next)
-    saveProjectTaskIds(projectId, next)
     addTask({ ...task, projectId })
     toast.success("Görev oluşturuldu", { description: task.title })
-  }
-
-  function handleDelete(id: string) {
-    deleteTask(id)
-    const next = new Set(projectTaskIds)
-    next.delete(id)
-    setProjectTaskIds(next)
-    saveProjectTaskIds(projectId, next)
-  }
-
-  function handleDeleteMany(ids: string[]) {
-    deleteTasks(ids)
-    const next = new Set(projectTaskIds)
-    ids.forEach((id) => next.delete(id))
-    setProjectTaskIds(next)
-    saveProjectTaskIds(projectId, next)
   }
 
   return (
@@ -68,8 +29,8 @@ export function ProjectTasksTab({ projectId }: { projectId: string }) {
         <TaskTable
           initialData={projectTasks}
           onRowClick={(task) => setSelectedTask(task)}
-          onDelete={handleDelete}
-          onDeleteMany={handleDeleteMany}
+          onDelete={deleteTask}
+          onDeleteMany={deleteTasks}
           onStatusChange={(id, status) => updateTask(id, { status })}
         />
       </div>

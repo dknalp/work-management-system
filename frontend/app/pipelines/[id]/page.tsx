@@ -10,6 +10,7 @@ import { usePipelines } from "@/contexts/pipeline-context"
 import { useProjects } from "@/contexts/project-context"
 import { PROJECT_COLORS } from "@/types/project"
 import { cn } from "@/lib/utils"
+import { apiClient } from "@/lib/api"
 import Link from "next/link"
 import {
   Dialog,
@@ -27,31 +28,20 @@ import {
   ChevronRightIcon,
 } from "lucide-react"
 
-function useKanbanStats(storageKey: string) {
+function useKanbanStats(pipelineId: string | undefined) {
   const [stats, setStats] = useState({ total: 0, done: 0, progress: 0 })
 
   useEffect(() => {
-    function compute() {
-      try {
-        const raw = localStorage.getItem(storageKey)
-        if (!raw) { setStats({ total: 0, done: 0, progress: 0 }); return }
-        const data = JSON.parse(raw)
-        const cards: { status: string }[] = Array.isArray(data.cards) ? data.cards : []
+    if (!pipelineId) { setStats({ total: 0, done: 0, progress: 0 }); return }
+    apiClient<{ state: { cards?: { status: string }[] } | null }>(`/kanban/${pipelineId}`)
+      .then((data) => {
+        const cards = data.state?.cards ?? []
         const total = cards.length
         const done = cards.filter((c) => c.status === "done").length
         setStats({ total, done, progress: total > 0 ? Math.round((done / total) * 100) : 0 })
-      } catch {
-        setStats({ total: 0, done: 0, progress: 0 })
-      }
-    }
-    compute()
-    window.addEventListener("storage", compute)
-    window.addEventListener("wms:kanban-changed", compute)
-    return () => {
-      window.removeEventListener("storage", compute)
-      window.removeEventListener("wms:kanban-changed", compute)
-    }
-  }, [storageKey])
+      })
+      .catch(() => setStats({ total: 0, done: 0, progress: 0 }))
+  }, [pipelineId])
 
   return stats
 }
@@ -63,9 +53,7 @@ export default function PipelinePage() {
 
   const pipeline = pipelines.find((p) => p.id === params.id)
   const project = pipeline ? projects.find((p) => p.id === pipeline.projectId) : undefined
-  const kanbanKey = pipeline ? `wms:kanban:pipeline-${pipeline.id}` : ""
-
-  const { total, done, progress } = useKanbanStats(kanbanKey)
+  const { total, done, progress } = useKanbanStats(pipeline?.id)
 
   const [addColumnOpen, setAddColumnOpen] = useState(false)
   const [columnTitle, setColumnTitle] = useState("")
@@ -186,7 +174,7 @@ export default function PipelinePage() {
               {/* Board */}
               <div className="flex-1 overflow-hidden">
                 <KanbanBoard
-                  storageKey={kanbanKey}
+                  pipelineId={pipeline.id}
                   onAddColumn={handleAddColumnReady}
                 />
               </div>

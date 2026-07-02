@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { useParams, useSearchParams, useRouter } from "next/navigation"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SiteHeader } from "@/components/layout/site-header"
@@ -9,6 +9,7 @@ import { ProjectOverviewTab } from "@/components/projects/project-overview-tab"
 import { ProjectTasksTab } from "@/components/projects/project-tasks-tab"
 import { PipelinesList } from "@/components/pipelines/pipelines-list"
 import { useProjects } from "@/contexts/project-context"
+import { useTasks } from "@/contexts/task-context"
 import { PROJECT_COLORS } from "@/types/project"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -30,43 +31,20 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"]
 
-function useProjectStats(storageKey: string) {
-  const [stats, setStats] = useState({ total: 0, done: 0, progress: 0 })
-
-  useEffect(() => {
-    function compute() {
-      try {
-        const raw = localStorage.getItem(storageKey)
-        if (!raw) { setStats({ total: 0, done: 0, progress: 0 }); return }
-        const data = JSON.parse(raw)
-        const cards: { status: string }[] = Array.isArray(data.cards) ? data.cards : []
-        const total = cards.length
-        const done = cards.filter((c) => c.status === "done").length
-        setStats({ total, done, progress: total > 0 ? Math.round((done / total) * 100) : 0 })
-      } catch {
-        setStats({ total: 0, done: 0, progress: 0 })
-      }
-    }
-    compute()
-    // re-compute on storage changes (cross-tab or same-tab via custom event)
-    window.addEventListener("storage", compute)
-    return () => window.removeEventListener("storage", compute)
-  }, [storageKey])
-
-  return stats
-}
-
 export default function ProjectPage() {
   const params = useParams<{ slug: string }>()
   const searchParams = useSearchParams()
   const router = useRouter()
   const { projects } = useProjects()
+  const { tasks } = useTasks()
 
   const view = (searchParams.get("view") as TabKey) || "overview"
   const project = projects.find((p) => p.slug === params.slug)
-  const kanbanKey = project ? `wms:kanban:${project.id}` : ""
 
-  const { total, done, progress } = useProjectStats(kanbanKey)
+  const projectTasks = project ? tasks.filter((t) => t.projectId === project.id) : []
+  const total = projectTasks.length
+  const done = projectTasks.filter((t) => t.status === "done").length
+  const progress = total > 0 ? Math.round((done / total) * 100) : 0
 
   function setView(tab: TabKey) {
     router.replace(`/projects/${params.slug}?view=${tab}`)
@@ -179,7 +157,7 @@ export default function ProjectPage() {
               <div className="flex-1 overflow-hidden">
                 {view === "overview" && (
                   <div className="h-full overflow-y-auto">
-                    <ProjectOverviewTab storageKey={kanbanKey} />
+                    <ProjectOverviewTab projectId={project.id} />
                   </div>
                 )}
 

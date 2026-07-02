@@ -1,9 +1,11 @@
 "use client"
 
-import React, { createContext, useContext, useCallback, useEffect, useState } from "react"
-import { Task } from "@/types/task"
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
 import { useAuth, type User } from "@/contexts/auth-context"
+import type { Task } from "@/types/task"
+
+// ── Activity types ────────────────────────────────────────────────────────────
 
 export type ActivityType =
   | "task_created"
@@ -24,44 +26,7 @@ export type ActivityEntry = {
   userName?: string | null
 }
 
-type ApiActivity = {
-  id: string
-  type: string
-  task_id: string
-  task_title: string
-  detail?: string | null
-  timestamp: string
-  user_id?: string | null
-  user_name?: string | null
-}
-
-interface TaskContextValue {
-  tasks: Task[]
-  loading: boolean
-  addTask: (task: Task) => void
-  updateTask: (id: string, updates: Partial<Task>) => void
-  deleteTask: (id: string) => void
-  deleteTasks: (ids: string[]) => void
-  activity: ActivityEntry[]
-  refreshActivity: () => void
-}
-
-const TaskContext = createContext<TaskContextValue | null>(null)
-
-function toApiTask(task: Task) {
-  return {
-    id: task.id,
-    title: task.title,
-    status: task.status,
-    priority: task.priority,
-    assignees: task.assignees ?? [],
-    due_date: task.dueDate || null,
-    tags: task.tags,
-    description: task.description,
-    completed_at: task.completedAt ?? null,
-    created_at: task.createdAt,
-  }
-}
+// ── Internal API types ────────────────────────────────────────────────────────
 
 type ApiTask = {
   id: string
@@ -73,7 +38,35 @@ type ApiTask = {
   tags?: string[] | null
   description?: string | null
   completed_at?: string | null
+  project_id?: string | null
   created_at: string
+}
+
+type ApiActivity = {
+  id: string
+  type: string
+  task_id: string
+  task_title: string
+  detail?: string | null
+  timestamp: string
+  user_id?: string | null
+  user_name?: string | null
+}
+
+function toApiTask(task: Task) {
+  return {
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    priority: task.priority,
+    assignees: task.assignees ?? [],
+    due_date: task.dueDate || null,
+    tags: task.tags,
+    description: task.description ?? null,
+    completed_at: task.completedAt ?? null,
+    project_id: task.projectId ?? null,
+    created_at: task.createdAt,
+  }
 }
 
 function fromApiTask(t: ApiTask): Task {
@@ -87,6 +80,7 @@ function fromApiTask(t: ApiTask): Task {
     tags: t.tags ?? [],
     description: t.description ?? undefined,
     completedAt: t.completed_at ?? undefined,
+    projectId: t.project_id ?? undefined,
     createdAt: t.created_at,
   }
 }
@@ -110,7 +104,7 @@ async function pushActivity(
   user: User | null,
   detail?: string
 ) {
-  await apiClient("/activity", {
+  await apiClient("/api/v1/activity", {
     method: "POST",
     body: JSON.stringify({
       id: crypto.randomUUID(),
@@ -125,6 +119,23 @@ async function pushActivity(
   }).catch(() => {})
 }
 
+// ── Context value ─────────────────────────────────────────────────────────────
+
+interface TaskContextValue {
+  tasks: Task[]
+  loading: boolean
+  addTask: (task: Task) => void
+  updateTask: (id: string, updates: Partial<Task>) => void
+  deleteTask: (id: string) => void
+  deleteTasks: (ids: string[]) => void
+  activity: ActivityEntry[]
+  refreshActivity: () => void
+}
+
+const TaskContext = createContext<TaskContextValue | null>(null)
+
+// ── Provider ──────────────────────────────────────────────────────────────────
+
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -133,7 +144,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   const fetchTasks = useCallback(async () => {
     try {
-      const data = await apiClient<ApiTask[]>("/tasks")
+      const data = await apiClient<ApiTask[]>("/api/v1/tasks")
       setTasks(data.map(fromApiTask))
     } catch {
       // keep previous state on error
@@ -144,7 +155,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   const fetchActivity = useCallback(async () => {
     try {
-      const data = await apiClient<ApiActivity[]>("/activity?limit=200")
+      const data = await apiClient<ApiActivity[]>("/api/v1/activity?limit=200")
       setActivity(data.map(fromApiActivity))
     } catch {
       // keep previous state on error
@@ -159,7 +170,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const addTask = useCallback(
     async (task: Task) => {
       try {
-        const created = await apiClient<ApiTask>("/tasks", {
+        const created = await apiClient<ApiTask>("/api/v1/tasks", {
           method: "POST",
           body: JSON.stringify(toApiTask(task)),
         })
@@ -168,7 +179,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         setActivity((prev) => [
           {
             id: crypto.randomUUID(),
-            type: "task_created",
+            type: "task_created" as ActivityType,
             taskId: task.id,
             taskTitle: task.title,
             timestamp: new Date().toISOString(),
@@ -178,7 +189,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           ...prev,
         ])
       } catch {
-        // revert on error — refetch
         fetchTasks()
       }
     },
@@ -187,7 +197,6 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   const updateTask = useCallback(
     async (id: string, updates: Partial<Task>) => {
-      // Optimistic update
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
       )
@@ -200,10 +209,11 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       if (updates.dueDate !== undefined) apiUpdates.due_date = updates.dueDate || null
       if (updates.tags !== undefined) apiUpdates.tags = updates.tags
       if (updates.description !== undefined) apiUpdates.description = updates.description
+      if (updates.projectId !== undefined) apiUpdates.project_id = updates.projectId ?? null
 
       try {
-        await apiClient(`/tasks/${id}`, {
-          method: "PUT",
+        await apiClient<ApiTask>(`/api/v1/tasks/${id}`, {
+          method: "PATCH",
           body: JSON.stringify(apiUpdates),
         })
 
@@ -234,7 +244,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       const task = tasks.find((t) => t.id === id)
       setTasks((prev) => prev.filter((t) => t.id !== id))
       try {
-        await apiClient(`/tasks/${id}`, { method: "DELETE" })
+        await apiClient(`/api/v1/tasks/${id}`, { method: "DELETE" })
         if (task) {
           await pushActivity("task_deleted", task, user)
           await fetchActivity()
@@ -252,7 +262,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
       try {
         await Promise.all(
-          ids.map((id) => apiClient(`/tasks/${id}`, { method: "DELETE" }))
+          ids.map((id) => apiClient(`/api/v1/tasks/${id}`, { method: "DELETE" }))
         )
         await Promise.all(
           toDelete.map((task) => pushActivity("task_deleted", task, user))
@@ -267,7 +277,16 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <TaskContext.Provider
-      value={{ tasks, loading, addTask, updateTask, deleteTask, deleteTasks, activity, refreshActivity: fetchActivity }}
+      value={{
+        tasks,
+        loading,
+        addTask,
+        updateTask,
+        deleteTask,
+        deleteTasks,
+        activity,
+        refreshActivity: fetchActivity,
+      }}
     >
       {children}
     </TaskContext.Provider>

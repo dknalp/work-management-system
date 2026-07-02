@@ -26,6 +26,7 @@ def list_tasks(
     status_filter: Optional[str] = Query(default=None, alias="status"),
     priority: Optional[str] = Query(default=None),
     assignee: Optional[str] = Query(default=None),
+    project_id: Optional[str] = Query(default=None),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     actor: Actor = Depends(get_current_actor),
@@ -38,6 +39,8 @@ def list_tasks(
         q = q.where(Task.priority == priority)
     if assignee:
         q = q.where(Task.assignees.contains(assignee))
+    if project_id:
+        q = q.where(Task.project_id == project_id)
     tasks = session.exec(q.order_by(Task.updated_at.desc()).offset(offset).limit(limit)).all()
     return tasks
 
@@ -58,6 +61,7 @@ def create_task(
         due_date=body.due_date,
         tags=body.tags or [],
         description=body.description,
+        project_id=body.project_id,
         created_at=body.created_at or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         updated_at=datetime.now(timezone.utc),
     )
@@ -99,6 +103,7 @@ def replace_task(
     task.due_date = body.due_date
     task.tags = body.tags or []
     task.description = body.description
+    task.project_id = body.project_id
     task.updated_at = datetime.now(timezone.utc)
 
     if body.status == "done" and task.completed_at is None:

@@ -45,9 +45,9 @@ def create_member(
         name=body.name,
         email=body.email,
         role=body.role,
-        department=body.department,
         status=body.status or "active",
         avatar=body.avatar,
+        phone=body.phone,
         joined_at=body.joined_at or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         created_at=datetime.now(timezone.utc),
     )

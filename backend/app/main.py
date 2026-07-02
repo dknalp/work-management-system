@@ -72,6 +72,9 @@ def migrate_db():
         conn.execute(text(
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignees JSON"
         ))
+        conn.execute(text(
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id VARCHAR(100)"
+        ))
         # Migrate existing single-assignee rows to the new JSON array column
         # Only run if the legacy assignee column still exists
         has_assignee_col = conn.execute(text("""

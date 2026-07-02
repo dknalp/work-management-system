@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useCallback, useEffect, useState } from "react"
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
 
 export type TeamMember = {
@@ -8,10 +8,10 @@ export type TeamMember = {
   name: string
   email: string
   role: string
-  status: "active" | "away" | "offline"
-  avatar?: string
-  joinedAt: string
   phone?: string
+  avatar?: string
+  status: "active" | "away" | "offline"
+  joinedAt: string
 }
 
 type ApiMember = {
@@ -19,9 +19,9 @@ type ApiMember = {
   name: string
   email: string
   role: string
-  status: string
+  status?: string | null
   avatar?: string | null
-  joined_at: string
+  joined_at?: string | null
   phone?: string | null
 }
 
@@ -31,9 +31,9 @@ function fromApi(m: ApiMember): TeamMember {
     name: m.name,
     email: m.email,
     role: m.role,
-    status: m.status as TeamMember["status"],
+    status: (m.status as TeamMember["status"]) ?? "active",
     avatar: m.avatar ?? undefined,
-    joinedAt: m.joined_at,
+    joinedAt: m.joined_at ?? new Date().toISOString(),
     phone: m.phone ?? undefined,
   }
 }
@@ -44,6 +44,7 @@ interface TeamContextValue {
   addMember: (member: TeamMember) => Promise<void>
   updateMember: (id: string, updates: Partial<TeamMember>) => Promise<void>
   deleteMember: (id: string) => Promise<void>
+  refreshMembers: () => void
 }
 
 const TeamContext = createContext<TeamContextValue | null>(null)
@@ -54,10 +55,10 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
 
   const fetchMembers = useCallback(async () => {
     try {
-      const data = await apiClient<ApiMember[]>("/team")
+      const data = await apiClient<ApiMember[]>("/api/v1/team/members")
       setMembers(data.map(fromApi))
     } catch {
-      // keep previous state
+      // keep previous state on error
     } finally {
       setLoading(false)
     }
@@ -67,61 +68,73 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     fetchMembers()
   }, [fetchMembers])
 
-  const addMember = useCallback(async (member: TeamMember) => {
-    try {
-      const created = await apiClient<ApiMember>("/team", {
+  const addMember = useCallback(
+    async (member: TeamMember) => {
+      const created = await apiClient<ApiMember>("/api/v1/team/members", {
         method: "POST",
         body: JSON.stringify({
-          id: member.id,
+          id: member.id || undefined,
           name: member.name,
           email: member.email,
           role: member.role,
-          status: member.status,
-          avatar: member.avatar ?? null,
-          joined_at: member.joinedAt,
           phone: member.phone ?? null,
+          avatar: member.avatar ?? null,
+          status: member.status,
+          joined_at: member.joinedAt || undefined,
         }),
       })
-      setMembers((prev) => [fromApi(created), ...prev])
-    } catch {
-      fetchMembers()
-      throw new Error("Üye eklenemedi")
-    }
-  }, [fetchMembers])
+      setMembers((prev) => [...prev, fromApi(created)])
+    },
+    []
+  )
 
-  const updateMember = useCallback(async (id: string, updates: Partial<TeamMember>) => {
-    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
-    try {
-      const apiUpdates: Record<string, unknown> = {}
-      if (updates.name !== undefined) apiUpdates.name = updates.name
-      if (updates.email !== undefined) apiUpdates.email = updates.email
-      if (updates.role !== undefined) apiUpdates.role = updates.role
-      if (updates.status !== undefined) apiUpdates.status = updates.status
-      if (updates.avatar !== undefined) apiUpdates.avatar = updates.avatar ?? null
-      if (updates.phone !== undefined) apiUpdates.phone = updates.phone ?? null
+  const updateMember = useCallback(
+    async (id: string, updates: Partial<TeamMember>) => {
+      setMembers((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
+      )
+      try {
+        const apiUpdates: Record<string, unknown> = {}
+        if (updates.name !== undefined) apiUpdates.name = updates.name
+        if (updates.email !== undefined) apiUpdates.email = updates.email
+        if (updates.role !== undefined) apiUpdates.role = updates.role
+        if (updates.phone !== undefined) apiUpdates.phone = updates.phone ?? null
+        if (updates.avatar !== undefined) apiUpdates.avatar = updates.avatar ?? null
+        if (updates.status !== undefined) apiUpdates.status = updates.status
+        await apiClient<ApiMember>(`/api/v1/team/members/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(apiUpdates),
+        })
+      } catch {
+        fetchMembers()
+      }
+    },
+    [fetchMembers]
+  )
 
-      await apiClient(`/team/${id}`, {
-        method: "PUT",
-        body: JSON.stringify(apiUpdates),
-      })
-    } catch {
-      fetchMembers()
-      throw new Error("Üye güncellenemedi")
-    }
-  }, [fetchMembers])
-
-  const deleteMember = useCallback(async (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id))
-    try {
-      await apiClient(`/team/${id}`, { method: "DELETE" })
-    } catch {
-      fetchMembers()
-      throw new Error("Üye silinemedi")
-    }
-  }, [fetchMembers])
+  const deleteMember = useCallback(
+    async (id: string) => {
+      setMembers((prev) => prev.filter((m) => m.id !== id))
+      try {
+        await apiClient(`/api/v1/team/members/${id}`, { method: "DELETE" })
+      } catch {
+        fetchMembers()
+      }
+    },
+    [fetchMembers]
+  )
 
   return (
-    <TeamContext.Provider value={{ members, loading, addMember, updateMember, deleteMember }}>
+    <TeamContext.Provider
+      value={{
+        members,
+        loading,
+        addMember,
+        updateMember,
+        deleteMember,
+        refreshMembers: fetchMembers,
+      }}
+    >
       {children}
     </TeamContext.Provider>
   )

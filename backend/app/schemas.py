@@ -109,6 +109,7 @@ class TaskCreate(BaseModel):
     tags: Optional[List[str]] = None
     description: Optional[str] = None
     created_at: Optional[str] = None
+    project_id: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
@@ -120,6 +121,7 @@ class TaskUpdate(BaseModel):
     tags: Optional[List[str]] = None
     description: Optional[str] = None
     completed_at: Optional[datetime] = None
+    project_id: Optional[str] = None
 
 
 class TaskResponse(BaseModel):
@@ -132,6 +134,7 @@ class TaskResponse(BaseModel):
     tags: Optional[List[str]]
     description: Optional[str]
     completed_at: Optional[datetime]
+    project_id: Optional[str] = None
     created_at: str
 
     model_config = {"from_attributes": True}

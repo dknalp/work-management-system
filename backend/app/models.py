@@ -64,6 +64,7 @@ class Task(SQLModel, table=True):
     tags: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     description: Optional[str] = Field(default=None)
     completed_at: Optional[datetime] = Field(default=None)
+    project_id: Optional[str] = Field(default=None, max_length=100, index=True)
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     updated_at: datetime = Field(default_factory=_now)
 

@@ -23,7 +23,7 @@ export function StatsCards() {
 
   useEffect(() => {
     if (MOCK_AUTH) return
-    apiClient<ApiStats>("/analytics/stats").then(setApiStats).catch(() => {})
+    apiClient<ApiStats>("/api/v1/analytics/summary").then(setApiStats).catch(() => {})
   }, [])
 
   const mockStats = useMemo(() => {
