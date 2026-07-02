@@ -16,6 +16,7 @@ from .database import create_db_and_tables, engine
 from .models import CustomRole, PasswordResetToken, Task, User
 from .routers import auth, users, admin, bots
 from .routers import tasks, activity, team, analytics, permissions
+from .routers import projects, pipelines, kanban, calendar
 from .routers.permissions import seed_default_permissions
 from .routers.v1 import tasks as v1_tasks, team as v1_team, activity as v1_activity
 from .routers.v1 import analytics as v1_analytics, files as v1_files, webhooks as v1_webhooks, me as v1_me
@@ -72,11 +73,17 @@ def migrate_db():
             "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignees JSON"
         ))
         # Migrate existing single-assignee rows to the new JSON array column
-        conn.execute(text("""
-            UPDATE tasks
-            SET assignees = to_json(ARRAY[assignee]::text[])
-            WHERE assignees IS NULL AND assignee IS NOT NULL AND assignee != ''
-        """))
+        # Only run if the legacy assignee column still exists
+        has_assignee_col = conn.execute(text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name='tasks' AND column_name='assignee'
+        """)).fetchone()
+        if has_assignee_col:
+            conn.execute(text("""
+                UPDATE tasks
+                SET assignees = to_json(ARRAY[assignee]::text[])
+                WHERE assignees IS NULL AND assignee IS NOT NULL AND assignee != ''
+            """))
         conn.execute(text("""
             UPDATE tasks SET assignees = '[]'::json WHERE assignees IS NULL
         """))
@@ -158,6 +165,10 @@ app.include_router(activity.router)
 app.include_router(team.router)
 app.include_router(analytics.router)
 app.include_router(permissions.router)
+app.include_router(projects.router)
+app.include_router(pipelines.router)
+app.include_router(kanban.router)
+app.include_router(calendar.router)
 
 # v1 public API — accepts both JWT and API key auth
 _V1 = "/api/v1"

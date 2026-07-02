@@ -135,3 +135,52 @@ class ChatMessage(SQLModel, table=True):
     sender_type: str = Field(max_length=10)  # "user" | "bot"
     text: str = Field(max_length=4000)
     created_at: datetime = Field(default_factory=_now)
+
+
+class Project(SQLModel, table=True):
+    __tablename__ = "projects"
+
+    id: str = Field(primary_key=True, max_length=100)
+    name: str = Field(max_length=200)
+    slug: str = Field(unique=True, index=True, max_length=200)
+    color: str = Field(default="blue", max_length=50)
+    emoji: str = Field(default="🚀", max_length=10)
+    owner_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", index=True)
+    is_pinned: bool = Field(default=False)
+    is_expanded: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class Pipeline(SQLModel, table=True):
+    __tablename__ = "pipelines"
+
+    id: str = Field(primary_key=True, max_length=100)
+    project_id: str = Field(max_length=100, index=True)
+    name: str = Field(max_length=200)
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class KanbanBoard(SQLModel, table=True):
+    """Stores the full board state (columns + cards) for a pipeline as JSON."""
+    __tablename__ = "kanban_boards"
+
+    pipeline_id: str = Field(primary_key=True, max_length=100)
+    state: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class CalendarEvent(SQLModel, table=True):
+    __tablename__ = "calendar_events"
+
+    id: str = Field(primary_key=True, max_length=100)
+    title: str = Field(max_length=500)
+    date: str = Field(max_length=20, index=True)  # yyyy-MM-dd
+    time: Optional[str] = Field(default=None, max_length=10)
+    priority: str = Field(default="medium", max_length=20)
+    remind: bool = Field(default=False)
+    assignee_names: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
+    owner_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", index=True)
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)

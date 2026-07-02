@@ -58,17 +58,23 @@ FILE_STORAGE_PATH=               # Override where uploaded files are stored on d
 Next.js 16 App Router project under `frontend/`. All routes live under `frontend/app/`, all reusable UI under `frontend/components/`.
 
 **Pages:**
-- `/` — Landing page (marketing, no sidebar)
-- `/dashboard` — Overview with KPI cards, charts, upcoming tasks, recent activity
-- `/dashboard/board` — Kanban pipeline board
+- `/` — Landing page (marketing, no sidebar); authenticated users are redirected to `/home`
+- `/home` — Main app home (overview with KPI cards, charts, upcoming tasks, recent activity)
+- `/board` — Kanban pipeline board (standalone route)
+- `/dashboard` — Dashboard alias; `/dashboard/board` also exists
+- `/analytics` and `/analytics/board` — Analytics views
 - `/calendar` — Calendar view
 - `/tasks` — Task list
 - `/team` — Team member management
 - `/files/[[...path]]` — File explorer (catch-all route for nested directories)
+- `/pipelines` and `/pipelines/[id]` — Pipeline list and detail
+- `/projects/[slug]` — Project detail
+- `/docs` — Docs page
 - `/profile` — User profile page
 - `/settings` — App settings page
-- `/admin` — Admin panel (requires `is_admin`; redirects to `/dashboard` otherwise)
+- `/admin` — Admin panel (requires `is_admin`; redirects to `/home` otherwise)
 - `/admin/activity` — Full activity log
+- `/admin/roles` — Role permission management
 - `/(auth)/login`, `/(auth)/register`, `/(auth)/forgot-password`, `/(auth)/reset-password` — Auth pages (no sidebar, own layout)
 
 **API Routes:**
@@ -93,7 +99,9 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 **Auth:** `frontend/contexts/auth-context.tsx` provides `AuthProvider` / `useAuth()` (exposes `user`, `loading`, `login`, `logout`, `updateUser`). When `NEXT_PUBLIC_MOCK_AUTH=true`, auth bypasses the real API and stores a mock user in `localStorage` (`wms:mock_user`). In real mode, `frontend/lib/auth.ts` stores JWT tokens in `localStorage` (`wos_access_token`, `wos_refresh_token`) and syncs a `has_session` cookie. `frontend/proxy.ts` is the Next.js middleware (named `proxy.ts` instead of the conventional `middleware.ts`): it reads the `has_session`, `is_admin`, and `user_role` cookies to gate all protected routes, redirect away from auth pages when already logged in, and block non-admin users from `/admin`. `frontend/lib/api.ts` is the typed API client (base URL from `NEXT_PUBLIC_API_URL`, defaults to `http://localhost:8000`) with automatic token refresh on 401.
 
-**Contexts:** Four global providers wrap the app in `frontend/app/layout.tsx` (in nesting order): `AuthProvider`, `PermissionsProvider` (`frontend/contexts/permissions-context.tsx` — RBAC checks, use `usePermissions()`), `TaskProvider` (`frontend/contexts/task-context.tsx` — shared task CRUD + activity log, use `useTasks()`), and `TeamProvider` (`frontend/contexts/team-context.tsx`, use `useTeam()`). Always use these hooks instead of prop-drilling.
+**Contexts:** Four global providers wrap the app in `frontend/app/layout.tsx` (in nesting order): `AuthProvider`, `PermissionsProvider` (`frontend/contexts/permissions-context.tsx` — RBAC checks, use `usePermissions()`), `TaskProvider` (`frontend/contexts/task-context.tsx` — shared task CRUD + activity log, use `useTasks()`), and `TeamProvider` (`frontend/contexts/team-context.tsx`, use `useTeam()`). Always use these hooks instead of prop-drilling. Additional page-scoped contexts in `frontend/contexts/`: `CalendarContext`, `NotificationsContext`, `PipelineContext`, `PresenceContext`, `ProjectContext`.
+
+**Custom hooks:** `frontend/contexts/` also contains standalone hooks (not providers): `use-local-storage.ts`, `use-mobile.ts`, `use-permission.ts`, `use-pinned-folders.ts`. Check here before writing a new hook.
 
 **Naming collision:** There are two unrelated `Task` types. `frontend/types/task.ts` defines the Tasks-page `Task` (fields: `title`, `status`, `assignee`, `dueDate`, `tags`). `frontend/components/dashboard/board/kanban-card.tsx` defines the Kanban `Task` (fields: `content`, `columnId`, `priority`, `tags`). Never import one where the other is expected.
 
@@ -113,6 +121,10 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 **Path alias:** `@/*` maps to the `frontend/` root (e.g. `@/components/ui/button`).
 
+**Lib:** `frontend/lib/` contains: `api.ts` (typed API client), `auth.ts` (token storage helpers), `permissions.ts` (RBAC helper functions), `utils.ts` (Tailwind `cn()` merge), `server-auth.ts` (server-side auth helpers), `storage-config.ts` (file storage path resolution), `file-content.ts` (file content reading/parsing), `google-oauth.ts` (Google OAuth helpers), `custom-nav.ts` (navigation helpers), and `actions/` (Next.js Server Actions: `files.ts`, `upload.ts`, `bots.ts`, `drive.ts`).
+
+**Types:** Shared TypeScript types live in `frontend/types/`. Contains `task.ts` (Tasks-page `Task` type + `MOCK_TASKS` seed), `pipeline.ts`, and `project.ts`.
+
 **Fonts:** Geist (sans), Instrument Serif, Geist Mono — loaded via `next/font/google` and exposed as CSS variables (`--font-sans`, `--font-instrument-serif`, `--font-mono`) in `frontend/app/layout.tsx`. (Note: the variable is named `--font-sans` even though the font is Geist, not Inter.)
 
 **Theme:** Dark/light via `next-themes` (`frontend/components/layout/theme-provider.tsx`). Toggle in `frontend/components/layout/mode-toggle.tsx`.
@@ -121,15 +133,16 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 FastAPI + SQLModel application in `backend/app/`. SQLModel combines Pydantic v2 and SQLAlchemy; Alembic handles migrations. Activate the venv at `backend/.venv` before running any Python commands.
 
-**Entry point:** `backend/app/main.py` — creates the app, registers all routers, configures CORS (allowed origin from `FRONTEND_URL` env var, defaults to `http://localhost:3000`). On startup: creates tables, seeds initial tasks, and seeds default RBAC permissions.
+**Entry point:** `backend/app/main.py` — creates the app, registers all routers, configures CORS (allowed origin from `FRONTEND_URL` env var, defaults to `http://localhost:3000`). On startup: creates tables, runs idempotent column migrations (`migrate_db()`), seeds initial tasks (only on first run when no users exist), seeds roles, seeds default RBAC permissions, and cleans up expired tokens.
 
-**Flat module layout** (no subdirectories except `routers/`):
-- `app/models.py` — all SQLModel table models (`User`, `Task`, `RolePermission`, `PasswordResetToken`, etc.)
+**Flat module layout**:
+- `app/models.py` — all SQLModel table models (`User`, `Task`, `RolePermission`, `PasswordResetToken`, `CustomRole`, etc.)
 - `app/schemas.py` — all Pydantic request/response schemas
 - `app/database.py` — engine (`DATABASE_URL` env var, defaults to `postgresql://postgres:postgres@localhost:5432/workos`), `get_session` FastAPI dependency
 - `app/security.py` — JWT creation/decoding (python-jose), password hashing (passlib/bcrypt)
 - `app/deps.py` — `get_current_user` FastAPI dependency
-- `app/routers/` — one file per domain: `auth`, `users`, `admin`, `tasks`, `activity`, `team`, `analytics`, `permissions`
+- `app/routers/` — one file per domain: `auth`, `users`, `admin`, `bots`, `tasks`, `activity`, `team`, `analytics`, `permissions`
+- `app/routers/v1/` — versioned public API (`/api/v1`): `me`, `tasks`, `team`, `activity`, `analytics`, `files`, `webhooks`, `chat`, `presence` — accepts both JWT and API key auth
 
 **Auth:** JWT access + refresh tokens. `POST /auth/register`, `POST /auth/login` return both. `POST /auth/refresh` rotates access token. Password reset is mock-email only (prints reset URL to stdout). Google OAuth is wired in the auth router.
 

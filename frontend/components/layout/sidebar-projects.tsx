@@ -31,7 +31,6 @@ import {
   Trash2Icon,
   LayoutDashboardIcon,
   KanbanIcon,
-  FolderIcon,
   CheckSquareIcon,
   ChevronRightIcon,
 } from "lucide-react"
@@ -57,7 +56,6 @@ const SUB_VIEWS = [
   { key: "overview", label: "Genel Bakış", Icon: LayoutDashboardIcon },
   { key: "pipelines", label: "Pipeline'lar", Icon: KanbanIcon },
   { key: "tasks", label: "Görevler", Icon: CheckSquareIcon },
-  { key: "folders", label: "Klasörler", Icon: FolderIcon },
 ] as const
 
 function ProjectColorBadge({ project }: { project: Project }) {
@@ -282,7 +280,7 @@ function ProjectItem({ project }: { project: Project }) {
           <div className="flex items-center gap-0.5 pr-1 shrink-0">
             <button
               type="button"
-              onClick={() => togglePin(project.id)}
+              onClick={() => togglePin(project.id).catch(() => null)}
               title={project.isPinned ? "Sabitlemeyi kaldır" : "Sabitle"}
               className="size-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
             >
@@ -303,7 +301,7 @@ function ProjectItem({ project }: { project: Project }) {
                   <PencilIcon className="size-3.5 mr-2" />
                   Yeniden Adlandır
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => togglePin(project.id)}>
+                <DropdownMenuItem onClick={() => togglePin(project.id).catch(() => null)}>
                   {project.isPinned ? (
                     <><PinOffIcon className="size-3.5 mr-2" />Sabitlemeyi Kaldır</>
                   ) : (
@@ -371,10 +369,14 @@ export function SidebarProjects() {
     else setSearchQuery("")
   }, [searchOpen, setSearchQuery])
 
-  function handleCreate(name: string, emoji: string, color: ProjectColor) {
-    const project = createProject(name, emoji, color)
-    setCreateOpen(false)
-    toast.success(`"${project.name}" projesi oluşturuldu`)
+  async function handleCreate(name: string, emoji: string, color: ProjectColor) {
+    try {
+      const project = await createProject(name, emoji, color)
+      setCreateOpen(false)
+      toast.success(`"${project.name}" projesi oluşturuldu`)
+    } catch {
+      toast.error("Proje oluşturulamadı")
+    }
   }
 
   return (

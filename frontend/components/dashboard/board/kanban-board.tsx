@@ -58,6 +58,7 @@ const defaultColumns: Column[] = [
 interface KanbanBoardProps {
   onAddColumn?: (addColumnFn: (title: string) => void) => void
   storageKey?: string
+  pipelineId?: string
 }
 
 // ─── Sortable column wrapper with rename + delete controls ───────────────────
@@ -210,7 +211,7 @@ function SortableColumnWrapper({
 
 // ─── Main board ──────────────────────────────────────────────────────────────
 
-export function KanbanBoard({ onAddColumn, storageKey }: KanbanBoardProps) {
+export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoardProps) {
   const id = React.useId()
   const globalCtx = useTasks()
 
@@ -222,26 +223,48 @@ export function KanbanBoard({ onAddColumn, storageKey }: KanbanBoardProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [orderedIds, setOrderedIds] = useState<string[]>([])
 
-  // Load per-project state from localStorage
+  // Load board state — from API when pipelineId is set, else localStorage
   useEffect(() => {
-    if (!storageKey) { setHydrated(true); return }
-    try {
-      const raw = localStorage.getItem(storageKey)
-      if (raw) {
-        const saved = JSON.parse(raw)
-        if (Array.isArray(saved.columns) && saved.columns.length > 0) setColumns(saved.columns)
-        if (Array.isArray(saved.cards)) setLocalCards(saved.cards)
-      }
-    } catch { /* ignore */ }
-    setHydrated(true)
-  }, [storageKey])
+    if (pipelineId) {
+      import("@/lib/api").then(({ apiClient }) => {
+        apiClient<{ state: { columns?: Column[]; cards?: Task[] } | null }>(`/kanban/${pipelineId}`)
+          .then((data) => {
+            if (data.state?.columns && data.state.columns.length > 0) setColumns(data.state.columns)
+            if (data.state?.cards) setLocalCards(data.state.cards)
+          })
+          .catch(() => {/* use defaults */})
+          .finally(() => setHydrated(true))
+      })
+    } else if (storageKey) {
+      try {
+        const raw = localStorage.getItem(storageKey)
+        if (raw) {
+          const saved = JSON.parse(raw)
+          if (Array.isArray(saved.columns) && saved.columns.length > 0) setColumns(saved.columns)
+          if (Array.isArray(saved.cards)) setLocalCards(saved.cards)
+        }
+      } catch { /* ignore */ }
+      setHydrated(true)
+    } else {
+      setHydrated(true)
+    }
+  }, [storageKey, pipelineId])
 
-  // Persist per-project state and notify same-tab listeners
+  // Persist board state — to API when pipelineId is set, else localStorage
   useEffect(() => {
-    if (!storageKey || !hydrated) return
-    localStorage.setItem(storageKey, JSON.stringify({ columns, cards: localCards }))
-    window.dispatchEvent(new CustomEvent("wms:kanban-changed", { detail: { key: storageKey } }))
-  }, [storageKey, columns, localCards, hydrated])
+    if (!hydrated) return
+    if (pipelineId) {
+      import("@/lib/api").then(({ apiClient }) => {
+        apiClient(`/kanban/${pipelineId}`, {
+          method: "PUT",
+          body: JSON.stringify({ pipeline_id: pipelineId, state: { columns, cards: localCards } }),
+        }).catch(() => {/* ignore save errors */})
+      })
+    } else if (storageKey) {
+      localStorage.setItem(storageKey, JSON.stringify({ columns, cards: localCards }))
+      window.dispatchEvent(new CustomEvent("wms:kanban-changed", { detail: { key: storageKey } }))
+    }
+  }, [storageKey, pipelineId, columns, localCards, hydrated])
 
   const tasks = storageKey ? localCards : globalCtx.tasks
 

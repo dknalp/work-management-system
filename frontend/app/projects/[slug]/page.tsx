@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
-  FolderIcon,
   CheckSquareIcon,
   PlusIcon,
   ArrowLeftIcon,
@@ -27,7 +26,6 @@ const TABS = [
   { key: "overview", label: "Genel Bakış", Icon: LayoutDashboardIcon },
   { key: "pipelines", label: "Pipeline'lar", Icon: KanbanIcon },
   { key: "tasks", label: "Görevler", Icon: CheckSquareIcon },
-  { key: "folders", label: "Klasörler", Icon: FolderIcon },
 ] as const
 
 type TabKey = (typeof TABS)[number]["key"]
@@ -195,18 +193,7 @@ export default function ProjectPage() {
                   <ProjectTasksTab projectId={project.id} />
                 )}
 
-                {view === "folders" && (
-                  <div className="flex flex-1 h-full flex-col items-center justify-center gap-3 text-center px-4">
-                    <FolderIcon className="size-12 text-muted-foreground/30" />
-                    <div>
-                      <p className="text-base font-semibold">Klasörler yakında</p>
-                      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                        Proje dosyalarını ve dökümanları klasörler ile organize edebileceksiniz.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                              </div>
             </>
           )}
         </main>

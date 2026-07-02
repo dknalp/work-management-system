@@ -377,6 +377,105 @@ class WebhookResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Projects ──────────────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    id: Optional[str] = None
+    name: str
+    slug: Optional[str] = None
+    color: str = "blue"
+    emoji: str = "🚀"
+    is_pinned: bool = False
+    is_expanded: bool = False
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+    color: Optional[str] = None
+    emoji: Optional[str] = None
+    is_pinned: Optional[bool] = None
+    is_expanded: Optional[bool] = None
+
+
+class ProjectResponse(BaseModel):
+    id: str
+    name: str
+    slug: str
+    color: str
+    emoji: str
+    is_pinned: bool
+    is_expanded: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Pipelines ─────────────────────────────────────────────────────────────────
+
+class PipelineCreate(BaseModel):
+    id: Optional[str] = None
+    project_id: str
+    name: str
+
+
+class PipelineUpdate(BaseModel):
+    name: Optional[str] = None
+
+
+class PipelineResponse(BaseModel):
+    id: str
+    project_id: str
+    name: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Kanban ────────────────────────────────────────────────────────────────────
+
+class KanbanBoardState(BaseModel):
+    pipeline_id: str
+    state: Optional[dict] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+# ── Calendar Events ───────────────────────────────────────────────────────────
+
+class CalendarEventCreate(BaseModel):
+    id: Optional[str] = None
+    title: str
+    date: str
+    time: Optional[str] = None
+    priority: str = "medium"
+    remind: bool = False
+    assignee_names: Optional[List[str]] = None
+
+
+class CalendarEventUpdate(BaseModel):
+    title: Optional[str] = None
+    date: Optional[str] = None
+    time: Optional[str] = None
+    priority: Optional[str] = None
+    remind: Optional[bool] = None
+    assignee_names: Optional[List[str]] = None
+
+
+class CalendarEventResponse(BaseModel):
+    id: str
+    title: str
+    date: str
+    time: Optional[str]
+    priority: str
+    remind: bool
+    assignee_names: Optional[List[str]]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Token responses ───────────────────────────────────────────────────────────
 
 class TokenResponse(BaseModel):

@@ -71,13 +71,13 @@ export function PipelinesList({ projectId, showProjectBadge = true }: PipelinesL
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )
 
-  function handleDelete(pipeline: Pipeline) {
-    deletePipeline(pipeline.id)
-    // Clean up kanban data
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(`wms:kanban:pipeline-${pipeline.id}`)
+  async function handleDelete(pipeline: Pipeline) {
+    try {
+      await deletePipeline(pipeline.id)
+      toast.success(`"${pipeline.name}" silindi`)
+    } catch {
+      toast.error("Pipeline silinemedi")
     }
-    toast.success(`"${pipeline.name}" silindi`)
   }
 
   return (
@@ -166,7 +166,7 @@ export function PipelinesList({ projectId, showProjectBadge = true }: PipelinesL
                     {renamingId === pipeline.id ? (
                       <RenameInline
                         value={pipeline.name}
-                        onConfirm={(v) => { renamePipeline(pipeline.id, v); setRenamingId(null) }}
+                        onConfirm={(v) => { renamePipeline(pipeline.id, v).catch(() => null); setRenamingId(null) }}
                         onCancel={() => setRenamingId(null)}
                       />
                     ) : (

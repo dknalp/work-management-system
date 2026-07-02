@@ -2,14 +2,30 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { Pipeline } from "@/types/pipeline"
+import { apiClient } from "@/lib/api"
 
-const STORAGE_KEY = "wms:pipelines"
+type ApiPipeline = {
+  id: string
+  project_id: string
+  name: string
+  created_at: string
+}
+
+function fromApi(p: ApiPipeline): Pipeline {
+  return {
+    id: p.id,
+    projectId: p.project_id,
+    name: p.name,
+    createdAt: p.created_at,
+  }
+}
 
 interface PipelineContextValue {
   pipelines: Pipeline[]
-  createPipeline: (projectId: string, name: string) => Pipeline
-  deletePipeline: (id: string) => void
-  renamePipeline: (id: string, name: string) => void
+  loading: boolean
+  createPipeline: (projectId: string, name: string) => Promise<Pipeline>
+  deletePipeline: (id: string) => Promise<void>
+  renamePipeline: (id: string, name: string) => Promise<void>
   getPipelinesByProject: (projectId: string) => Pipeline[]
   getPipelineById: (id: string) => Pipeline | undefined
 }
@@ -18,45 +34,49 @@ const PipelineContext = createContext<PipelineContextValue | null>(null)
 
 export function PipelineProvider({ children }: { children: React.ReactNode }) {
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
-  const [hydrated, setHydrated] = useState(false)
+  const [loading, setLoading] = useState(true)
   const pipelinesRef = useRef<Pipeline[]>([])
 
   useEffect(() => {
     pipelinesRef.current = pipelines
   }, [pipelines])
 
-  useEffect(() => {
+  const fetchPipelines = useCallback(async () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) setPipelines(JSON.parse(raw))
-    } catch { /* ignore */ }
-    setHydrated(true)
+      const data = await apiClient<ApiPipeline[]>("/pipelines")
+      setPipelines(data.map(fromApi))
+    } catch {
+      // keep previous state
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    if (!hydrated) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pipelines))
-  }, [pipelines, hydrated])
+    fetchPipelines()
+  }, [fetchPipelines])
 
-  const createPipeline = useCallback((projectId: string, name: string): Pipeline => {
-    const pipeline: Pipeline = {
-      id: `pl-${Date.now()}`,
-      projectId,
-      name: name.trim(),
-      createdAt: new Date().toISOString(),
-    }
+  const createPipeline = useCallback(async (projectId: string, name: string): Promise<Pipeline> => {
+    const created = await apiClient<ApiPipeline>("/pipelines", {
+      method: "POST",
+      body: JSON.stringify({ project_id: projectId, name: name.trim() }),
+    })
+    const pipeline = fromApi(created)
     setPipelines((prev) => [...prev, pipeline])
     return pipeline
   }, [])
 
-  const deletePipeline = useCallback((id: string) => {
+  const deletePipeline = useCallback(async (id: string) => {
+    await apiClient(`/pipelines/${id}`, { method: "DELETE" })
     setPipelines((prev) => prev.filter((p) => p.id !== id))
   }, [])
 
-  const renamePipeline = useCallback((id: string, name: string) => {
-    setPipelines((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, name: name.trim() } : p))
-    )
+  const renamePipeline = useCallback(async (id: string, name: string) => {
+    const updated = await apiClient<ApiPipeline>(`/pipelines/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name: name.trim() }),
+    })
+    setPipelines((prev) => prev.map((p) => (p.id === id ? fromApi(updated) : p)))
   }, [])
 
   const getPipelinesByProject = useCallback((projectId: string): Pipeline[] => {
@@ -71,6 +91,7 @@ export function PipelineProvider({ children }: { children: React.ReactNode }) {
     <PipelineContext.Provider
       value={{
         pipelines,
+        loading,
         createPipeline,
         deletePipeline,
         renamePipeline,

@@ -45,11 +45,15 @@ export function CreatePipelineDialog({
     }, 200)
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!selectedProjectId || !name.trim()) return
-    const pipeline = createPipeline(selectedProjectId, name.trim())
-    handleClose()
-    router.push(`/pipelines/${pipeline.id}`)
+    try {
+      const pipeline = await createPipeline(selectedProjectId, name.trim())
+      handleClose()
+      router.push(`/pipelines/${pipeline.id}`)
+    } catch {
+      // toast would go here if needed
+    }
   }
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId)

@@ -2,41 +2,42 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { Project, ProjectColor } from "@/types/project"
+import { apiClient } from "@/lib/api"
 
-const STORAGE_KEY = "wms:projects"
+type ApiProject = {
+  id: string
+  name: string
+  slug: string
+  color: string
+  emoji: string
+  is_pinned: boolean
+  is_expanded: boolean
+  created_at: string
+}
 
-const SEED_PROJECTS: Project[] = [
-  {
-    id: "proj-1",
-    name: "Web Uygulaması",
-    slug: "web-uygulamasi",
-    color: "blue",
-    emoji: "🌐",
-    isPinned: true,
-    isExpanded: false,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "proj-2",
-    name: "Mobil Uygulama",
-    slug: "mobil-uygulama",
-    color: "purple",
-    emoji: "📱",
-    isPinned: false,
-    isExpanded: false,
-    createdAt: new Date().toISOString(),
-  },
-]
+function fromApi(p: ApiProject): Project {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    color: p.color as ProjectColor,
+    emoji: p.emoji,
+    isPinned: p.is_pinned,
+    isExpanded: p.is_expanded,
+    createdAt: p.created_at,
+  }
+}
 
 interface ProjectContextValue {
   projects: Project[]
+  loading: boolean
   searchQuery: string
   setSearchQuery: (q: string) => void
-  createProject: (name: string, emoji: string, color: ProjectColor) => Project
-  deleteProject: (id: string) => void
-  renameProject: (id: string, name: string) => void
-  togglePin: (id: string) => void
-  toggleExpand: (id: string) => void
+  createProject: (name: string, emoji: string, color: ProjectColor) => Promise<Project>
+  deleteProject: (id: string) => Promise<void>
+  renameProject: (id: string, name: string) => Promise<void>
+  togglePin: (id: string) => Promise<void>
+  toggleExpand: (id: string) => Promise<void>
   pinnedProjects: Project[]
   unpinnedProjects: Project[]
   filteredProjects: Project[]
@@ -53,86 +54,73 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "")
 }
 
-function ensureUniqueSlug(slug: string, existing: Project[]): string {
-  const taken = new Set(existing.map((p) => p.slug))
-  if (!taken.has(slug)) return slug
-  let i = 2
-  while (taken.has(`${slug}-${i}`)) i++
-  return `${slug}-${i}`
-}
-
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [hydrated, setHydrated] = useState(false)
 
-  useEffect(() => {
+  const fetchProjects = useCallback(async () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        setProjects(JSON.parse(raw))
-      } else {
-        setProjects(SEED_PROJECTS)
-      }
+      const data = await apiClient<ApiProject[]>("/projects")
+      setProjects(data.map(fromApi))
     } catch {
-      setProjects(SEED_PROJECTS)
+      // keep previous state on error
+    } finally {
+      setLoading(false)
     }
-    setHydrated(true)
   }, [])
 
   useEffect(() => {
-    if (!hydrated) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
-  }, [projects, hydrated])
+    fetchProjects()
+  }, [fetchProjects])
 
-  const projectsRef = React.useRef<Project[]>(projects)
-  React.useEffect(() => { projectsRef.current = projects }, [projects])
+  const createProject = useCallback(async (name: string, emoji: string, color: ProjectColor): Promise<Project> => {
+    const slug = slugify(name) || "proje"
+    const created = await apiClient<ApiProject>("/projects", {
+      method: "POST",
+      body: JSON.stringify({ name, emoji, color, slug }),
+    })
+    const project = fromApi(created)
+    setProjects((prev) => [...prev, project])
+    return project
+  }, [])
 
-  const createProject = useCallback(
-    (name: string, emoji: string, color: ProjectColor): Project => {
-      const slug = ensureUniqueSlug(slugify(name) || "proje", projectsRef.current)
-      const project: Project = {
-        id: `proj-${Date.now()}`,
-        name: name.trim(),
-        slug,
-        color,
-        emoji,
-        isPinned: false,
-        isExpanded: false,
-        createdAt: new Date().toISOString(),
-      }
-      setProjects((prev) => [...prev, project])
-      return project
-    },
-    []
-  )
-
-  const deleteProject = useCallback((id: string) => {
+  const deleteProject = useCallback(async (id: string) => {
+    await apiClient(`/projects/${id}`, { method: "DELETE" })
     setProjects((prev) => prev.filter((p) => p.id !== id))
   }, [])
 
-  const renameProject = useCallback((id: string, name: string) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, name: name.trim() } : p))
-    )
+  const renameProject = useCallback(async (id: string, name: string) => {
+    const slug = slugify(name) || "proje"
+    const updated = await apiClient<ApiProject>(`/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name, slug }),
+    })
+    setProjects((prev) => prev.map((p) => (p.id === id ? fromApi(updated) : p)))
   }, [])
 
-  const togglePin = useCallback((id: string) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isPinned: !p.isPinned } : p))
-    )
-  }, [])
+  const togglePin = useCallback(async (id: string) => {
+    const project = projects.find((p) => p.id === id)
+    if (!project) return
+    const updated = await apiClient<ApiProject>(`/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ is_pinned: !project.isPinned }),
+    })
+    setProjects((prev) => prev.map((p) => (p.id === id ? fromApi(updated) : p)))
+  }, [projects])
 
-  const toggleExpand = useCallback((id: string) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isExpanded: !p.isExpanded } : p))
-    )
-  }, [])
+  const toggleExpand = useCallback(async (id: string) => {
+    const project = projects.find((p) => p.id === id)
+    if (!project) return
+    const updated = await apiClient<ApiProject>(`/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ is_expanded: !project.isExpanded }),
+    })
+    setProjects((prev) => prev.map((p) => (p.id === id ? fromApi(updated) : p)))
+  }, [projects])
 
-  const filteredProjects = searchQuery.trim()
-    ? projects.filter((p) =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+  const filteredProjects = searchQuery
+    ? projects.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : projects
 
   const pinnedProjects = filteredProjects.filter((p) => p.isPinned)
@@ -142,6 +130,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     <ProjectContext.Provider
       value={{
         projects,
+        loading,
         searchQuery,
         setSearchQuery,
         createProject,

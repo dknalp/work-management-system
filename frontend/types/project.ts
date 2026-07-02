@@ -19,7 +19,7 @@ export interface Project {
   createdAt: string
 }
 
-export type ProjectView = "pipelines" | "folders" | "tasks"
+export type ProjectView = "pipelines" | "tasks"
 
 export const PROJECT_COLORS: Record<ProjectColor, string> = {
   red: "bg-red-500",
