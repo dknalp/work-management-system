@@ -91,14 +91,22 @@ export async function listDriveFiles(folderPath: string = ""): Promise<FileItem[
     parentId = currentId
   }
 
-  const res = await drive.files.list({
-    q: `'${parentId}' in parents and trashed = false`,
-    fields: "files(id,name,mimeType,size,modifiedTime,parents)",
-    pageSize: 100,
-    orderBy: "folder,name",
-  })
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allFiles: any[] = []
+  let pageToken: string | undefined
+  do {
+    const res = await drive.files.list({
+      q: `'${parentId}' in parents and trashed = false`,
+      fields: "nextPageToken,files(id,name,mimeType,size,modifiedTime,parents)",
+      pageSize: 100,
+      orderBy: "folder,name",
+      pageToken,
+    })
+    allFiles.push(...(res.data.files ?? []))
+    pageToken = res.data.nextPageToken ?? undefined
+  } while (pageToken)
 
-  const files = res.data.files ?? []
+  const files = allFiles
 
   return files.map((f): FileItem => {
     const isDir = f.mimeType === "application/vnd.google-apps.folder"
@@ -145,6 +153,32 @@ export async function getDriveFileMeta(fileId: string): Promise<DriveFileMeta | 
     size: parseInt(f.size ?? "0", 10) || 0,
     exportMimeType: googleMimeToExportMime(f.mimeType ?? ""),
   }
+}
+
+export async function searchDriveFiles(query: string): Promise<FileItem[]> {
+  const client = await getAuthorizedClient()
+  if (!client) return []
+  const drive = google.drive({ version: "v3", auth: client })
+  const res = await drive.files.list({
+    q: `name contains '${query.replace(/'/g, "\\'")}' and trashed = false`,
+    fields: "files(id,name,mimeType,size,modifiedTime)",
+    pageSize: 50,
+    orderBy: "folder,name",
+  })
+  return (res.data.files ?? []).map((f): FileItem => {
+    const isDir = f.mimeType === "application/vnd.google-apps.folder"
+    const isGoogleDoc = !!googleMimeToExportMime(f.mimeType ?? "")
+    const ext = isGoogleDoc ? `.${mimeToExt(f.mimeType ?? "")}` : ""
+    return {
+      name: isGoogleDoc ? `${f.name}${ext}` : (f.name ?? ""),
+      path: f.name ?? "",
+      isDirectory: isDir,
+      size: parseInt(f.size ?? "0", 10) || 0,
+      updatedAt: f.modifiedTime ?? new Date().toISOString(),
+      source: "drive",
+      driveFileId: f.id ?? undefined,
+    }
+  })
 }
 
 export async function getDriveDownloadStream(fileId: string): Promise<{

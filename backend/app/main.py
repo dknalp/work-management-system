@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -11,46 +11,99 @@ from sqlmodel import Session, select
 
 load_dotenv()
 
+from sqlalchemy import text
 from .database import create_db_and_tables, engine
-from .models import Task, User
-from .routers import auth, users, admin
+from .models import CustomRole, PasswordResetToken, Task, User
+from .routers import auth, users, admin, bots
 from .routers import tasks, activity, team, analytics, permissions
 from .routers.permissions import seed_default_permissions
+from .routers.v1 import tasks as v1_tasks, team as v1_team, activity as v1_activity
+from .routers.v1 import analytics as v1_analytics, files as v1_files, webhooks as v1_webhooks, me as v1_me
+from .routers.v1 import chat as v1_chat
+from .routers.v1 import presence as v1_presence
 
 SEED_TASKS = [
-    {"id": "TASK-001", "title": "Redesign onboarding flow for new users", "status": "in-progress", "priority": "high", "assignee": "Alex Johnson", "due_date": "2026-07-10", "tags": ["design", "ux"], "created_at": "2026-04-20"},
-    {"id": "TASK-002", "title": "Implement JWT refresh token mechanism", "status": "todo", "priority": "high", "assignee": "Sarah Chen", "due_date": "2026-07-15", "tags": ["backend", "security"], "created_at": "2026-04-21"},
-    {"id": "TASK-003", "title": "Write unit tests for payment module", "status": "todo", "priority": "medium", "assignee": "Marcus Webb", "due_date": "2026-07-20", "tags": ["testing", "backend"], "created_at": "2026-04-22"},
-    {"id": "TASK-004", "title": "Migrate database to PostgreSQL 16", "status": "in-progress", "priority": "high", "assignee": "Priya Nair", "due_date": "2026-07-12", "tags": ["database", "devops"], "created_at": "2026-04-18"},
-    {"id": "TASK-005", "title": "Create reusable date-picker component", "status": "done", "priority": "medium", "assignee": "Alex Johnson", "due_date": "2026-04-30", "tags": ["ui", "frontend"], "created_at": "2026-04-15"},
-    {"id": "TASK-006", "title": "Set up CI/CD pipeline with GitHub Actions", "status": "done", "priority": "high", "assignee": "Marcus Webb", "due_date": "2026-04-28", "tags": ["devops", "ci-cd"], "created_at": "2026-04-14"},
-    {"id": "TASK-007", "title": "Add dark mode support to dashboard", "status": "todo", "priority": "low", "assignee": "Sarah Chen", "due_date": "2026-07-25", "tags": ["ui", "design"], "created_at": "2026-04-23"},
-    {"id": "TASK-008", "title": "Optimize image loading with lazy load", "status": "todo", "priority": "medium", "assignee": "Priya Nair", "due_date": "2026-07-22", "tags": ["performance", "frontend"], "created_at": "2026-04-24"},
-    {"id": "TASK-009", "title": "Integrate Stripe webhook handling", "status": "in-progress", "priority": "high", "assignee": "Alex Johnson", "due_date": "2026-07-08", "tags": ["backend", "payments"], "created_at": "2026-04-25"},
-    {"id": "TASK-010", "title": "Audit and fix accessibility issues", "status": "todo", "priority": "medium", "assignee": "Marcus Webb", "due_date": "2026-07-30", "tags": ["a11y", "frontend"], "created_at": "2026-04-26"},
-    {"id": "TASK-011", "title": "Document REST API endpoints with OpenAPI", "status": "done", "priority": "low", "assignee": "Sarah Chen", "due_date": "2026-04-29", "tags": ["documentation", "backend"], "created_at": "2026-04-16"},
-    {"id": "TASK-012", "title": "Implement real-time notifications via WebSocket", "status": "todo", "priority": "high", "assignee": "Priya Nair", "due_date": "2026-08-01", "tags": ["backend", "realtime"], "created_at": "2026-04-27"},
+    {"id": "TASK-001", "title": "Redesign onboarding flow for new users", "status": "in-progress", "priority": "high", "assignees": ["Alex Johnson"], "due_date": "2026-07-10", "tags": ["design", "ux"], "created_at": "2026-04-20"},
+    {"id": "TASK-002", "title": "Implement JWT refresh token mechanism", "status": "todo", "priority": "high", "assignees": ["Sarah Chen"], "due_date": "2026-07-15", "tags": ["backend", "security"], "created_at": "2026-04-21"},
+    {"id": "TASK-003", "title": "Write unit tests for payment module", "status": "todo", "priority": "medium", "assignees": ["Marcus Webb"], "due_date": "2026-07-20", "tags": ["testing", "backend"], "created_at": "2026-04-22"},
+    {"id": "TASK-004", "title": "Migrate database to PostgreSQL 16", "status": "in-progress", "priority": "high", "assignees": ["Priya Nair", "Alex Johnson"], "due_date": "2026-07-12", "tags": ["database", "devops"], "created_at": "2026-04-18"},
+    {"id": "TASK-005", "title": "Create reusable date-picker component", "status": "done", "priority": "medium", "assignees": ["Alex Johnson"], "due_date": "2026-04-30", "tags": ["ui", "frontend"], "created_at": "2026-04-15"},
+    {"id": "TASK-006", "title": "Set up CI/CD pipeline with GitHub Actions", "status": "done", "priority": "high", "assignees": ["Marcus Webb"], "due_date": "2026-04-28", "tags": ["devops", "ci-cd"], "created_at": "2026-04-14"},
+    {"id": "TASK-007", "title": "Add dark mode support to dashboard", "status": "todo", "priority": "low", "assignees": ["Sarah Chen"], "due_date": "2026-07-25", "tags": ["ui", "design"], "created_at": "2026-04-23"},
+    {"id": "TASK-008", "title": "Optimize image loading with lazy load", "status": "todo", "priority": "medium", "assignees": ["Priya Nair"], "due_date": "2026-07-22", "tags": ["performance", "frontend"], "created_at": "2026-04-24"},
+    {"id": "TASK-009", "title": "Integrate Stripe webhook handling", "status": "in-progress", "priority": "high", "assignees": ["Alex Johnson", "Sarah Chen"], "due_date": "2026-07-08", "tags": ["backend", "payments"], "created_at": "2026-04-25"},
+    {"id": "TASK-010", "title": "Audit and fix accessibility issues", "status": "todo", "priority": "medium", "assignees": ["Marcus Webb"], "due_date": "2026-07-30", "tags": ["a11y", "frontend"], "created_at": "2026-04-26"},
+    {"id": "TASK-011", "title": "Document REST API endpoints with OpenAPI", "status": "done", "priority": "low", "assignees": ["Sarah Chen"], "due_date": "2026-04-29", "tags": ["documentation", "backend"], "created_at": "2026-04-16"},
+    {"id": "TASK-012", "title": "Implement real-time notifications via WebSocket", "status": "todo", "priority": "high", "assignees": ["Priya Nair"], "due_date": "2026-08-01", "tags": ["backend", "realtime"], "created_at": "2026-04-27"},
 ]
 
 def seed_data():
     with Session(engine) as session:
+        # Only seed if no users exist at all — i.e. a brand new installation.
+        # This prevents deleted tasks from coming back after every backend restart.
+        if session.exec(select(User)).first():
+            return
         if not session.exec(select(Task)).first():
             for t in SEED_TASKS:
                 session.add(Task(
                     id=t["id"], title=t["title"], status=t["status"],
-                    priority=t["priority"], assignee=t["assignee"],
+                    priority=t["priority"], assignees=t["assignees"],
                     due_date=t["due_date"], tags=t["tags"],
-                    created_at=t["created_at"], updated_at=datetime.utcnow(),
+                    created_at=t["created_at"], updated_at=datetime.now(timezone.utc),
                 ))
+        session.commit()
+
+
+def seed_roles():
+    with Session(engine) as session:
+        for role_name, is_sys in [("admin", True), ("manager", True), ("member", True)]:
+            if not session.get(CustomRole, role_name):
+                session.add(CustomRole(name=role_name, is_system=True))
+        session.commit()
+
+
+def migrate_db():
+    """Idempotent column migrations for tables that already exist."""
+    with engine.connect() as conn:
+        conn.execute(text(
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE"
+        ))
+        conn.execute(text(
+            "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignees JSON"
+        ))
+        # Migrate existing single-assignee rows to the new JSON array column
+        conn.execute(text("""
+            UPDATE tasks
+            SET assignees = to_json(ARRAY[assignee]::text[])
+            WHERE assignees IS NULL AND assignee IS NOT NULL AND assignee != ''
+        """))
+        conn.execute(text("""
+            UPDATE tasks SET assignees = '[]'::json WHERE assignees IS NULL
+        """))
+        conn.commit()
+
+
+def cleanup_expired_tokens():
+    with Session(engine) as session:
+        expired = session.exec(
+            select(PasswordResetToken).where(
+                PasswordResetToken.expires_at < datetime.now(timezone.utc)
+            )
+        ).all()
+        for token in expired:
+            session.delete(token)
         session.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
+    migrate_db()
     seed_data()
+    seed_roles()
     with Session(engine) as session:
         seed_default_permissions(session)
+    cleanup_expired_tokens()
     yield
 
 
@@ -99,8 +152,21 @@ async def cors_aware_server_error_handler(request: Request, exc: Exception) -> J
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(admin.router)
+app.include_router(bots.router)
 app.include_router(tasks.router)
 app.include_router(activity.router)
 app.include_router(team.router)
 app.include_router(analytics.router)
 app.include_router(permissions.router)
+
+# v1 public API — accepts both JWT and API key auth
+_V1 = "/api/v1"
+app.include_router(v1_me.router, prefix=_V1)
+app.include_router(v1_tasks.router, prefix=_V1)
+app.include_router(v1_team.router, prefix=_V1)
+app.include_router(v1_activity.router, prefix=_V1)
+app.include_router(v1_analytics.router, prefix=_V1)
+app.include_router(v1_files.router, prefix=_V1)
+app.include_router(v1_webhooks.router, prefix=_V1)
+app.include_router(v1_chat.router, prefix=_V1)
+app.include_router(v1_presence.router, prefix=_V1)

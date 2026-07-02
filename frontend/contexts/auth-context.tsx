@@ -16,7 +16,7 @@ export type User = {
   avatar_url: string | null
   is_active: boolean
   is_admin: boolean
-  role: "admin" | "manager" | "member"
+  role: string
   created_at: string
 }
 

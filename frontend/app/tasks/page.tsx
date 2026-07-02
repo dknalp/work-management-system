@@ -9,9 +9,12 @@ import { Task } from "@/types/task"
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal"
 import { QuickAddTask } from "@/components/tasks/quick-add-task"
 import { useTasks } from "@/contexts/task-context"
+import { usePermission } from "@/hooks/use-permission"
+import { AccessDenied } from "@/components/auth/access-denied"
 import { toast } from "sonner"
 
 export default function TasksPage() {
+  const canView = usePermission("tasks:view")
   const { tasks, addTask, updateTask, deleteTask, deleteTasks } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -22,6 +25,15 @@ export default function TasksPage() {
     addTask(task)
     toast.success("Görev oluşturuldu", { description: task.title })
   }
+
+  if (!canView) return (
+    <SidebarProvider
+      style={{ "--sidebar-width": "calc(var(--spacing) * 64)", "--header-height": "calc(var(--spacing) * 14)" } as React.CSSProperties}
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset><SiteHeader /><main className="flex flex-1 items-center justify-center"><AccessDenied /></main></SidebarInset>
+    </SidebarProvider>
+  )
 
   return (
     <SidebarProvider

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { subDays, format } from "date-fns"
 import { useTasks } from "@/contexts/task-context"
@@ -18,6 +18,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { apiClient } from "@/lib/api"
+import { MOCK_AUTH } from "@/contexts/auth-context"
+
+type DailyPoint = { date: string; created: number; completed: number }
 
 const chartConfig = {
   created: {
@@ -32,8 +36,15 @@ const chartConfig = {
 
 export function TaskOverviewChart() {
   const { tasks } = useTasks()
+  const [apiData, setApiData] = useState<DailyPoint[] | null>(null)
 
-  const data = useMemo(() => {
+  useEffect(() => {
+    if (MOCK_AUTH) return
+    apiClient<DailyPoint[]>("/analytics/daily?days=7").then(setApiData).catch(() => {})
+  }, [])
+
+  // Mock/fallback: compute from tasks using completedAt (not createdAt for completed)
+  const mockData = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const date = subDays(new Date(), 6 - i)
       const key = format(date, "yyyy-MM-dd")
@@ -42,14 +53,19 @@ export function TaskOverviewChart() {
         (t) => t.createdAt && format(new Date(t.createdAt), "yyyy-MM-dd") === key
       ).length
       const completed = tasks.filter(
-        (t) =>
-          t.status === "done" &&
-          t.createdAt &&
-          format(new Date(t.createdAt), "yyyy-MM-dd") === key
+        (t) => t.completedAt && format(new Date(t.completedAt), "yyyy-MM-dd") === key
       ).length
       return { label, created, completed }
     })
   }, [tasks])
+
+  const data = apiData
+    ? apiData.map((p) => ({
+        label: format(new Date(p.date), "EEE"),
+        created: p.created,
+        completed: p.completed,
+      }))
+    : mockData
 
   return (
     <Card>

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
@@ -30,7 +30,7 @@ def update_me(
     if body.avatar_url is not None:
         current_user.avatar_url = body.avatar_url
 
-    current_user.updated_at = datetime.utcnow()
+    current_user.updated_at = datetime.now(timezone.utc)
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
@@ -47,7 +47,7 @@ def change_password(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
 
     current_user.hashed_password = hash_password(body.new_password)
-    current_user.updated_at = datetime.utcnow()
+    current_user.updated_at = datetime.now(timezone.utc)
     session.add(current_user)
     session.commit()
 

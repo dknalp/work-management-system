@@ -29,10 +29,11 @@ export type Task = {
   title: string
   status: TaskStatus
   priority: TaskPriority
-  assignee: string
+  assignees: string[]
   dueDate: string
   tags: string[]
   createdAt: string
+  completedAt?: string
   subTasks?: SubTask[]
   description?: string
   comments?: Comment[]

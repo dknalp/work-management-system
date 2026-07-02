@@ -63,7 +63,7 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
   }, [open, load])
 
   const handleRestore = async (item: TrashItem) => {
-    const res = await restoreFromTrash(item.trashName, item.originalName)
+    const res = await restoreFromTrash(item.trashName, item.originalPath || item.originalName)
     if (res.success) {
       toast.success(`"${item.originalName}" geri yüklendi`)
       router.refresh()

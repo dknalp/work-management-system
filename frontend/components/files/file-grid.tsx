@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  Share2Icon,
   ImageIcon,
   ExternalLinkIcon,
   PencilIcon,
@@ -19,11 +20,14 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { getFileIcon, isImageFile } from "./file-utils"
+import { getFileIcon, isImageFile, getFileOpenUrl, getFileDownloadUrl, downloadFile } from "./file-utils"
 import { moveItem } from "@/lib/actions/files"
 import { usePinnedFolders } from "@/hooks/use-pinned-folders"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -39,43 +43,17 @@ interface FileGridProps {
   onRename: (item: FileItem) => void
   onDelete: (path: string) => void
   onMoveTo: (paths: string[]) => void
+  onDownload?: (item: FileItem) => void
   clipboard?: Clipboard
   onCopy?: (paths: string[]) => void
   onCut?: (paths: string[]) => void
-}
-
-function getFileOpenUrl(item: FileItem): string {
-  if (item.source === "drive" && item.driveFileId) {
-    return `https://drive.google.com/file/d/${item.driveFileId}/view`
-  }
-  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
-}
-
-function getFileDownloadUrl(item: FileItem): string {
-  if (item.source === "drive" && item.driveFileId) {
-    return `https://drive.google.com/uc?export=download&id=${item.driveFileId}`
-  }
-  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
-}
-
-function downloadFile(item: FileItem) {
-  if (item.source === "drive" && item.driveFileId) {
-    window.open(getFileDownloadUrl(item), "_blank")
-    return
-  }
-  const a = document.createElement("a")
-  a.href = getFileDownloadUrl(item)
-  a.download = item.name
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
 }
 
 function ImageThumbnail({ item }: { item: FileItem }) {
   const [error, setError] = React.useState(false)
   if (error) return <ImageIcon className="size-12 text-orange-500" />
   const src = item.source === "drive" && item.driveFileId
-    ? `https://drive.google.com/thumbnail?id=${item.driveFileId}&sz=w100`
+    ? `/api/files/drive-raw?id=${encodeURIComponent(item.driveFileId)}`
     : `/api/files/raw?path=${encodeURIComponent(item.path)}`
   return (
     <div className="size-14 overflow-hidden rounded-lg border border-border/50 bg-muted/30">
@@ -97,6 +75,7 @@ export function FileGrid({
   onRename,
   onDelete,
   onMoveTo,
+  onDownload,
   clipboard,
   onCopy,
   onCut,
@@ -108,6 +87,7 @@ export function FileGrid({
     clipboard?.mode === "cut" && clipboard.paths.includes(path)
 
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
+    if (item.source === "drive") { e.preventDefault(); return }
     e.dataTransfer.setData("application/workos-file", item.path)
     e.dataTransfer.effectAllowed = "move"
     const ghost = document.createElement("div")
@@ -122,7 +102,7 @@ export function FileGrid({
 
   const handleDrop = async (e: React.DragEvent, targetItem: FileItem) => {
     e.preventDefault()
-    if (!targetItem.isDirectory) return
+    if (!targetItem.isDirectory || targetItem.source === "drive") return
     const sourcePath = e.dataTransfer.getData("application/workos-file")
     if (!sourcePath || sourcePath === targetItem.path) return
     const itemsToMove = selectedPaths.has(sourcePath) ? Array.from(selectedPaths) : [sourcePath]
@@ -146,7 +126,7 @@ export function FileGrid({
             key={item.path + item.name}
             data-file-path={item.path}
             data-drag-handle={!isParentDir ? "true" : undefined}
-            draggable={!isParentDir}
+            draggable={!isParentDir && item.source !== "drive"}
             onDragStart={(e) => handleDragStart(e, item)}
             onDragOver={(e) => { if (item.isDirectory) e.preventDefault() }}
             onDragEnter={(e) => {
@@ -234,10 +214,23 @@ export function FileGrid({
               >
                 <ExternalLinkIcon className="size-4" /> Aç
               </ContextMenuItem>
-              {!item.isDirectory && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger className="gap-2">
+                  <Share2Icon className="size-4" /> Birlikte Aç
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="w-44">
+                  <ContextMenuItem className="gap-2" onClick={() => {}}>
+                    <ExternalLinkIcon className="size-4" /> Metin Editörü
+                  </ContextMenuItem>
+                  <ContextMenuItem className="gap-2" onClick={() => {}}>
+                    <ExternalLinkIcon className="size-4" /> Web Tarayıcısı
+                  </ContextMenuItem>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+              {item.source !== "drive" && (
                 <ContextMenuItem
                   className="gap-2"
-                  onClick={() => downloadFile(item)}
+                  onClick={() => onDownload ? onDownload(item) : downloadFile(item)}
                 >
                   <DownloadIcon className="size-4" /> İndir
                 </ContextMenuItem>
@@ -251,7 +244,7 @@ export function FileGrid({
                 </ContextMenuItem>
               )}
               <ContextMenuSeparator />
-              {onCopy && (
+              {onCopy && item.source !== "drive" && (
                 <ContextMenuItem
                   className="gap-2"
                   onClick={() => onCopy([item.path])}
@@ -259,7 +252,7 @@ export function FileGrid({
                   <CopyIcon className="size-4" /> Kopyala
                 </ContextMenuItem>
               )}
-              {onCut && (
+              {onCut && item.source !== "drive" && (
                 <ContextMenuItem
                   className="gap-2"
                   onClick={() => onCut([item.path])}
@@ -267,23 +260,24 @@ export function FileGrid({
                   <ScissorsIcon className="size-4" /> Kes
                 </ContextMenuItem>
               )}
-              <ContextMenuSeparator />
-              <ContextMenuItem className="gap-2" onClick={() => onRename(item)}>
-                <PencilIcon className="size-4" /> Yeniden Adlandır
-              </ContextMenuItem>
-              <ContextMenuItem
-                className="gap-2"
-                onClick={() => onMoveTo([item.path])}
-              >
-                <MoveIcon className="size-4" /> Taşı
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                className="gap-2 text-destructive focus:text-destructive"
-                onClick={() => onDelete(item.path)}
-              >
-                <Trash2Icon className="size-4" /> Çöp Kutusuna Taşı
-              </ContextMenuItem>
+              {item.source !== "drive" && (
+                <>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem className="gap-2" onClick={() => onRename(item)}>
+                    <PencilIcon className="size-4" /> Yeniden Adlandır
+                  </ContextMenuItem>
+                  <ContextMenuItem className="gap-2" onClick={() => onMoveTo([item.path])}>
+                    <MoveIcon className="size-4" /> Taşı
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    className="gap-2 text-destructive focus:text-destructive"
+                    onClick={() => onDelete(item.path)}
+                  >
+                    <Trash2Icon className="size-4" /> Çöp Kutusuna Taşı
+                  </ContextMenuItem>
+                </>
+              )}
             </ContextMenuContent>
           </ContextMenu>
         )

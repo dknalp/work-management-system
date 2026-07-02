@@ -1,9 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { FileItem, SearchOptions, SearchResult, searchFiles } from "@/lib/actions/files"
-import { listDriveFiles, getDriveConnectionStatus } from "@/lib/actions/drive"
+import { listDriveFiles, getDriveConnectionStatus, searchDriveFiles } from "@/lib/actions/drive"
 import { FileLayout } from "./file-layout"
 import { FileExplorer } from "./file-explorer"
 import { FileBreadcrumbs } from "./file-breadcrumbs"
@@ -12,6 +12,9 @@ import { useLocalStorage } from "@/hooks/use-local-storage"
 import { cn } from "@/lib/utils"
 import { HardDriveIcon } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { usePermissions } from "@/contexts/permissions-context"
+import { AccessDenied } from "@/components/auth/access-denied"
+import { FileDropZone } from "./file-drop-zone"
 
 type SourceFilter = "all" | "disk" | "drive"
 
@@ -30,11 +33,27 @@ function DriveIcon() {
 }
 
 export function FileClientPage({ items: diskItems, currentPath, isDrivePath = false }: FileClientPageProps) {
+  const { permissions, loading: permLoading } = usePermissions()
   const searchParams = useSearchParams()
   const [viewMode, setViewMode] = useLocalStorage<"grid" | "list">("wms:files:viewMode", "list")
   const [showPreview, setShowPreview] = useLocalStorage<boolean>("wms:files:showPreview", false)
-  const initialSource: SourceFilter = isDrivePath ? "drive" : (searchParams.get("source") === "disk" ? "disk" : "all")
+  const router = useRouter()
+  const sourceParam = searchParams.get("source")
+  const initialSource: SourceFilter = isDrivePath
+    ? "drive"
+    : sourceParam === "disk" ? "disk"
+    : sourceParam === "drive" ? "drive"
+    : "all"
   const [sourceFilter, setSourceFilter] = React.useState<SourceFilter>(initialSource)
+
+  const handleSourceChange = (src: SourceFilter) => {
+    setSourceFilter(src)
+    const params = new URLSearchParams(searchParams.toString())
+    if (src === "all") params.delete("source")
+    else params.set("source", src)
+    const qs = params.toString()
+    router.replace(`/files${currentPath ? `/${currentPath}` : ""}${qs ? `?${qs}` : ""}`)
+  }
   const [driveItems, setDriveItems] = React.useState<FileItem[]>([])
   const [driveConnected, setDriveConnected] = React.useState(false)
   const [driveLoading, setDriveLoading] = React.useState(false)
@@ -66,8 +85,17 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
     setIsSearching(true)
     setSearchResults(null)
     try {
-      const results = await searchFiles(opts)
-      setSearchResults(results)
+      const [diskSettled, driveSettled] = await Promise.allSettled([
+        searchFiles(opts),
+        driveConnected ? searchDriveFiles(opts.query) : Promise.resolve([]),
+      ])
+      const diskResults = diskSettled.status === "fulfilled" ? diskSettled.value : []
+      const driveMatches = driveSettled.status === "fulfilled" ? driveSettled.value : []
+      const driveResults: SearchResult[] = driveMatches.map((item) => ({
+        ...item,
+        matchType: "name" as const,
+      }))
+      setSearchResults([...diskResults, ...driveResults])
     } finally {
       setIsSearching(false)
     }
@@ -79,6 +107,9 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
     setSearchResults(null)
     setIsSearching(false)
   }
+
+  if (permLoading) return null
+  if (!permissions.includes("files:view")) return <AccessDenied />
 
   return (
     <FileLayout
@@ -93,6 +124,7 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
       isSearching={isSearching}
       hasSearchResults={searchResults !== null}
     >
+      <FileDropZone currentPath={currentPath} disabled={isDrivePath}>
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Breadcrumbs row — source filter pills on the right, toolbar at far right */}
         <div className="flex items-center justify-between border-b border-border/50 bg-background/30 px-6 py-2">
@@ -103,7 +135,7 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
             {!isDrivePath && (
               <div className="flex items-center rounded-md border bg-muted/30 p-0.5">
                 <button
-                  onClick={() => setSourceFilter("all")}
+                  onClick={() => handleSourceChange("all")}
                   className={cn(
                     "rounded px-2.5 py-1 text-xs font-medium transition-colors",
                     sourceFilter === "all"
@@ -114,7 +146,7 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
                   Tümü
                 </button>
                 <button
-                  onClick={() => setSourceFilter("disk")}
+                  onClick={() => handleSourceChange("disk")}
                   className={cn(
                     "flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors",
                     sourceFilter === "disk"
@@ -127,7 +159,7 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
                 </button>
                 {driveConnected ? (
                   <button
-                    onClick={() => setSourceFilter("drive")}
+                    onClick={() => handleSourceChange("drive")}
                     className={cn(
                       "flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors",
                       sourceFilter === "drive"
@@ -167,6 +199,7 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
         <FileExplorer
           items={displayItems}
           currentPath={isDrivePath ? currentPath : (sourceFilter === "drive" ? "" : currentPath)}
+          sourceFilter={sourceFilter}
           viewMode={viewMode}
           showPreview={showPreview}
           onTogglePreview={() => setShowPreview((p) => !p)}
@@ -176,6 +209,7 @@ export function FileClientPage({ items: diskItems, currentPath, isDrivePath = fa
           onClearSearch={handleClearSearch}
         />
       </div>
+      </FileDropZone>
     </FileLayout>
   )
 }

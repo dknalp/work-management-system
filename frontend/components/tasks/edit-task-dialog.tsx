@@ -29,6 +29,8 @@ import {
   TASK_STATUSES,
   TASK_PRIORITIES,
 } from "@/types/task"
+import { usePermission } from "@/hooks/use-permission"
+import { useTeam } from "@/contexts/team-context"
 
 interface EditTaskDialogProps {
   task: Task | null
@@ -43,23 +45,23 @@ export function EditTaskDialog({
   onOpenChange,
   onSave,
 }: EditTaskDialogProps) {
+  const canAssign = usePermission("tasks:assign")
+  const { members } = useTeam()
   const [title, setTitle] = useState("")
   const [status, setStatus] = useState<TaskStatus>("todo")
   const [priority, setPriority] = useState<TaskPriority>("medium")
-  const [assignee, setAssignee] = useState("")
+  const [assignees, setAssignees] = useState<string[]>([])
   const [dueDate, setDueDate] = useState("")
   const [tagInput, setTagInput] = useState("")
   const [tags, setTags] = useState<string[]>([])
-  const [errors, setErrors] = useState<{ title?: string; assignee?: string }>(
-    {}
-  )
+  const [errors, setErrors] = useState<{ title?: string }>({})
 
   useEffect(() => {
     if (task) {
       setTitle(task.title)
       setStatus(task.status)
       setPriority(task.priority)
-      setAssignee(task.assignee)
+      setAssignees(task.assignees ?? [])
       setDueDate(task.dueDate)
       setTags(task.tags)
       setErrors({})
@@ -69,7 +71,6 @@ export function EditTaskDialog({
   const validate = () => {
     const e: typeof errors = {}
     if (!title.trim()) e.title = "Başlık zorunludur"
-    if (!assignee.trim()) e.assignee = "Sorumlu zorunludur"
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -81,11 +82,17 @@ export function EditTaskDialog({
       title: title.trim(),
       status,
       priority,
-      assignee: assignee.trim(),
+      assignees,
       dueDate,
       tags,
     })
     onOpenChange(false)
+  }
+
+  function toggleAssignee(name: string) {
+    setAssignees((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
+    )
   }
 
   const addTag = () => {
@@ -192,29 +199,32 @@ export function EditTaskDialog({
             </div>
           </div>
 
-          {/* Assignee */}
+          {/* Assignees */}
           <div className="space-y-2">
-            <Label
-              htmlFor="edit-assignee"
-              className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
-            >
-              Sorumlu <span className="text-rose-500">*</span>
+            <Label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+              Sorumlular
             </Label>
-            <Input
-              id="edit-assignee"
-              value={assignee}
-              onChange={(e) => {
-                setAssignee(e.target.value)
-                setErrors((p) => ({ ...p, assignee: undefined }))
-              }}
-              className={
-                errors.assignee
-                  ? "border-rose-500 focus-visible:ring-rose-500/20"
-                  : "border-border/50 bg-muted/30"
-              }
-            />
-            {errors.assignee && (
-              <p className="text-xs text-rose-500">{errors.assignee}</p>
+            {canAssign ? (
+              <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto rounded-md border border-border/50 bg-muted/30 p-1">
+                {members.map((member) => (
+                  <label
+                    key={member.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={assignees.includes(member.name)}
+                      onChange={() => toggleAssignee(member.name)}
+                      className="accent-primary"
+                    />
+                    {member.name}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-sm">
+                {assignees.length > 0 ? assignees.join(", ") : "—"}
+              </p>
             )}
           </div>
 

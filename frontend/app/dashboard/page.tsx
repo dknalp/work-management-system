@@ -10,10 +10,12 @@ import { RecentActivity } from "@/components/dashboard/recent-activity"
 import { TaskOverviewChart } from "@/components/dashboard/task-overview-chart"
 import { TeamWorkloadChart } from "@/components/dashboard/team-workload-chart"
 import { useAuth } from "@/contexts/auth-context"
+import { usePermission } from "@/hooks/use-permission"
 
 export default function DashboardPage() {
   const { user } = useAuth()
   const firstName = user?.name?.split(" ")[0] ?? "there"
+  const canViewAnalytics = usePermission("analytics:view")
 
   return (
     <SidebarProvider
@@ -36,10 +38,12 @@ export default function DashboardPage() {
               </p>
             </div>
             <StatsCards />
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <TaskOverviewChart />
-              <TeamWorkloadChart />
-            </div>
+            {canViewAnalytics && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <TaskOverviewChart />
+                <TeamWorkloadChart />
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <UpcomingTasks />
               <RecentActivity />

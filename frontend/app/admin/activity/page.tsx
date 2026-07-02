@@ -6,9 +6,10 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SiteHeader } from "@/components/layout/site-header"
 import { useAuth } from "@/contexts/auth-context"
+import { usePermission } from "@/hooks/use-permission"
+import { AccessDenied } from "@/components/auth/access-denied"
 import { useTasks, type ActivityType, type ActivityEntry } from "@/contexts/task-context"
 import { ActivityIcon, ArrowLeftIcon, SearchIcon } from "lucide-react"
-import { redirect } from "next/navigation"
 import { Input } from "@/components/ui/input"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ function groupLabel(iso: string): string {
 
 export default function ActivityLogPage() {
   const { user, loading } = useAuth()
+  const canView = usePermission("admin:view")
   const { activity } = useTasks()
 
   const [timeRange, setTimeRange] = useState<TimeRange>("all")
@@ -172,7 +174,12 @@ export default function ActivityLogPage() {
   }, [feed, timeRange])
 
   if (loading) return null
-  if (!user?.is_admin) redirect("/dashboard")
+  if (!canView) return (
+    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
+      <AppSidebar variant="inset" />
+      <SidebarInset><SiteHeader /><main className="flex flex-1 items-center justify-center"><AccessDenied /></main></SidebarInset>
+    </SidebarProvider>
+  )
 
   const selectedPersonName = selectedUser === "all"
     ? null

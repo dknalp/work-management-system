@@ -11,6 +11,8 @@ import { TeamProvider } from "@/contexts/team-context"
 import { cn } from "@/lib/utils"
 import { ChatWidgetWrapper } from "@/components/chat-widget-wrapper"
 import { Toaster } from "@/components/ui/sonner"
+import { PresenceProvider } from "@/contexts/presence-context"
+import { NotificationsProvider } from "@/contexts/notifications-context"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -44,10 +46,10 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <AuthProvider><PermissionsProvider><TaskProvider><TeamProvider><CommandPalette />
+          <AuthProvider><PresenceProvider><PermissionsProvider><TaskProvider><NotificationsProvider><TeamProvider><CommandPalette />
             <TooltipProvider>{children}<ChatWidgetWrapper /></TooltipProvider>
             <Toaster />
-          </TeamProvider></TaskProvider></PermissionsProvider></AuthProvider>
+          </TeamProvider></NotificationsProvider></TaskProvider></PermissionsProvider></PresenceProvider></AuthProvider>
         </ThemeProvider>
       </body>
     </html>

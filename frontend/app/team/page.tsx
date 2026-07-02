@@ -17,10 +17,13 @@ import {
   TableIcon,
   UsersIcon,
   UserCheckIcon,
+  UserPlusIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useTeam, TeamMember } from "@/contexts/team-context"
+import { usePermission } from "@/hooks/use-permission"
+import { AccessDenied } from "@/components/auth/access-denied"
 
 // Re-export for backward compat
 export type { TeamMember }
@@ -28,6 +31,8 @@ export type { TeamMember }
 type ViewMode = "grid" | "table"
 
 export default function TeamPage() {
+  const canView = usePermission("team:view")
+  const canManage = usePermission("team:manage")
   const { members, addMember, updateMember, deleteMember } = useTeam()
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
@@ -106,6 +111,15 @@ export default function TeamPage() {
     },
   ]
 
+  if (!canView) return (
+    <SidebarProvider
+      style={{ "--sidebar-width": "calc(var(--spacing) * 64)", "--header-height": "calc(var(--spacing) * 14)" } as React.CSSProperties}
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset><SiteHeader /><main className="flex flex-1 items-center justify-center"><AccessDenied /></main></SidebarInset>
+    </SidebarProvider>
+  )
+
   return (
     <SidebarProvider
       style={
@@ -167,6 +181,16 @@ export default function TeamPage() {
                   />
                 </div>
 
+                {canManage && (
+                  <Button
+                    size="sm"
+                    className="h-9 gap-1.5 shrink-0"
+                    onClick={() => { setEditingMember(null); setIsDialogOpen(true) }}
+                  >
+                    <UserPlusIcon className="size-4" />
+                    Üye Ekle
+                  </Button>
+                )}
                 </div>
 
               <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -219,14 +243,14 @@ export default function TeamPage() {
             ) : viewMode === "table" ? (
               <TeamTable
                 members={filteredMembers}
-                onEdit={handleOpenEdit}
-                onDelete={handleRequestDelete}
+                onEdit={canManage ? handleOpenEdit : undefined}
+                onDelete={canManage ? handleRequestDelete : undefined}
               />
             ) : (
               <MemberGrid
                 members={filteredMembers}
-                onEdit={handleOpenEdit}
-                onDelete={handleRequestDelete}
+                onEdit={canManage ? handleOpenEdit : undefined}
+                onDelete={canManage ? handleRequestDelete : undefined}
               />
             )}
           </div>

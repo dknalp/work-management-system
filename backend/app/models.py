@@ -1,8 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from sqlmodel import Field, SQLModel, Column
-from sqlalchemy import JSON, PrimaryKeyConstraint
+from sqlalchemy import JSON, PrimaryKeyConstraint, UniqueConstraint
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class User(SQLModel, table=True):
@@ -16,16 +20,24 @@ class User(SQLModel, table=True):
     avatar_url: Optional[str] = Field(default=None, max_length=500)
     is_active: bool = Field(default=True)
     is_admin: bool = Field(default=False)
-    role: str = Field(default="member", max_length=20)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    role: str = Field(default="member", max_length=50)
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class CustomRole(SQLModel, table=True):
+    __tablename__ = "custom_roles"
+
+    name: str = Field(primary_key=True, max_length=50)
+    is_system: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=_now)
 
 
 class RolePermission(SQLModel, table=True):
     __tablename__ = "role_permissions"
     __table_args__ = (PrimaryKeyConstraint("role", "permission"),)
 
-    role: str = Field(max_length=20)
+    role: str = Field(max_length=50)
     permission: str = Field(max_length=100)
 
 
@@ -37,7 +49,7 @@ class PasswordResetToken(SQLModel, table=True):
     token: str = Field(index=True, max_length=64)
     expires_at: datetime
     used: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_now)
 
 
 class Task(SQLModel, table=True):
@@ -47,12 +59,13 @@ class Task(SQLModel, table=True):
     title: str = Field(max_length=500)
     status: str = Field(default="todo", max_length=50)
     priority: str = Field(default="medium", max_length=50)
-    assignee: str = Field(default="", max_length=200)
+    assignees: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     due_date: Optional[str] = Field(default=None, max_length=20)
     tags: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
     description: Optional[str] = Field(default=None)
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().strftime("%Y-%m-%d"))
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = Field(default=None)
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    updated_at: datetime = Field(default_factory=_now)
 
 
 class ActivityLog(SQLModel, table=True):
@@ -79,4 +92,46 @@ class TeamMember(SQLModel, table=True):
     avatar: Optional[str] = Field(default=None, max_length=500)
     joined_at: str = Field(max_length=20)
     phone: Optional[str] = Field(default=None, max_length=50)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class BotAccount(SQLModel, table=True):
+    __tablename__ = "bot_accounts"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    name: str = Field(max_length=64)
+    description: Optional[str] = Field(default=None, max_length=256)
+    # First 12 chars of the full key — shown in UI for identification
+    key_prefix: str = Field(max_length=20, index=True)
+    # SHA-256 hash of the full key — used for auth lookup
+    key_hash: str = Field(max_length=64, unique=True, index=True)
+    owner_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=_now)
+    last_used_at: Optional[datetime] = Field(default=None)
+
+
+class Webhook(SQLModel, table=True):
+    __tablename__ = "webhooks"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    bot_id: uuid.UUID = Field(foreign_key="bot_accounts.id", index=True)
+    url: str = Field(max_length=2048)
+    events: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    # Optional HMAC secret for signing payloads
+    secret: Optional[str] = Field(default=None, max_length=256)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=_now)
+
+
+class ChatMessage(SQLModel, table=True):
+    __tablename__ = "chat_messages"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    # room_id = sorted([sender_uuid, recipient_uuid]).join("_")
+    room_id: str = Field(max_length=200, index=True)
+    sender_id: str = Field(max_length=100)
+    sender_name: str = Field(max_length=100)
+    sender_type: str = Field(max_length=10)  # "user" | "bot"
+    text: str = Field(max_length=4000)
+    created_at: datetime = Field(default_factory=_now)

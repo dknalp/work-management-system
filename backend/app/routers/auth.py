@@ -141,7 +141,7 @@ def reset_password(body: ResetPasswordRequest, session: Session = Depends(get_se
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
 
     user.hashed_password = hash_password(body.new_password)
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     reset.used = True
     session.add(user)
     session.add(reset)

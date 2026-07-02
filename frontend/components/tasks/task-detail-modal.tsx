@@ -33,6 +33,8 @@ import { SubtasksModal } from "./subtasks-modal"
 import { CommentsModal } from "./comments-modal"
 import { formatDistanceToNow } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
+import { usePermission } from "@/hooks/use-permission"
+import { useTeam } from "@/contexts/team-context"
 
 interface TaskDetailModalProps {
   task: Task | null
@@ -60,6 +62,8 @@ export function TaskDetailModal({
   onTaskChange,
 }: TaskDetailModalProps) {
   const { user } = useAuth()
+  const canAssign = usePermission("tasks:assign")
+  const { members } = useTeam()
   const [newSubTaskTitle, setNewSubTaskTitle] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState<Partial<Task>>({})
@@ -81,7 +85,7 @@ export function TaskDetailModal({
       title: task.title,
       status: task.status,
       priority: task.priority,
-      assignee: task.assignee,
+      assignees: [...(task.assignees ?? [])],
       dueDate: task.dueDate,
       description: task.description ?? "",
       tags: [...task.tags],
@@ -275,14 +279,42 @@ export function TaskDetailModal({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Sorumlu</p>
-                      <Input
-                        value={draft.assignee ?? ""}
-                        onChange={(e) =>
-                          setDraft((d) => ({ ...d, assignee: e.target.value }))
-                        }
-                        className="h-8 text-sm"
-                      />
+                      <p className="text-xs text-muted-foreground mb-1">Sorumlular</p>
+                      {canAssign ? (
+                        <div className="flex flex-col gap-1 max-h-36 overflow-y-auto rounded-md border border-input p-1">
+                          {members.map((member) => {
+                            const checked = (draft.assignees ?? []).includes(member.name)
+                            return (
+                              <label
+                                key={member.id}
+                                className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() =>
+                                    setDraft((d) => {
+                                      const curr = d.assignees ?? []
+                                      return {
+                                        ...d,
+                                        assignees: checked
+                                          ? curr.filter((a) => a !== member.name)
+                                          : [...curr, member.name],
+                                      }
+                                    })
+                                  }
+                                  className="accent-primary"
+                                />
+                                {member.name}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <p className="h-8 flex items-center text-sm text-muted-foreground">
+                          {(draft.assignees ?? []).join(", ") || "—"}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Son tarih</p>
@@ -368,8 +400,10 @@ export function TaskDetailModal({
                   </div>
 
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                    <span className="text-muted-foreground">Sorumlu</span>
-                    <span className="text-foreground">{task.assignee}</span>
+                    <span className="text-muted-foreground">Sorumlular</span>
+                    <span className="text-foreground">
+                      {(task.assignees ?? []).length > 0 ? (task.assignees ?? []).join(", ") : "—"}
+                    </span>
                     <span className="text-muted-foreground">Son tarih</span>
                     <span className="text-foreground">{task.dueDate}</span>
                   </div>

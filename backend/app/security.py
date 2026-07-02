@@ -1,6 +1,8 @@
+import hashlib
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Tuple
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -36,3 +38,16 @@ def decode_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+def generate_api_key() -> Tuple[str, str, str]:
+    """Return (full_key, key_prefix, key_hash). Store only prefix + hash."""
+    raw = secrets.token_hex(32)
+    full_key = f"wms_live_{raw}"
+    key_prefix = full_key[:16]
+    key_hash = hashlib.sha256(full_key.encode()).hexdigest()
+    return full_key, key_prefix, key_hash
+
+
+def hash_api_key(full_key: str) -> str:
+    return hashlib.sha256(full_key.encode()).hexdigest()

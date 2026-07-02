@@ -23,6 +23,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuCheckboxItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -42,9 +55,12 @@ import {
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { Task, TaskStatus } from "@/types/task"
+import { Task, TaskStatus, TaskPriority } from "@/types/task"
 import { createColumns } from "./task-columns"
 import { TaskToolbar } from "./task-toolbar"
+import { useTeam } from "@/contexts/team-context"
+import { usePermission } from "@/hooks/use-permission"
+import { useTasks } from "@/contexts/task-context"
 
 interface TaskTableProps {
   initialData: Task[]
@@ -65,6 +81,11 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [globalFilter, setGlobalFilter] = useState("")
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
+
+  const { members } = useTeam()
+  const { updateTask } = useTasks()
+  const canAssign = usePermission("tasks:assign")
+  const canDeleteAny = usePermission("tasks:delete_any")
 
   const handleDelete = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))
@@ -88,6 +109,26 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
       onStatusChange?.(id, status)
     },
     [onStatusChange]
+  )
+
+  const handlePriorityChange = useCallback(
+    (id: string, priority: TaskPriority) => {
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, priority } : t)))
+      updateTask(id, { priority })
+    },
+    [updateTask]
+  )
+
+  const handleToggleAssignee = useCallback(
+    (task: Task, memberName: string) => {
+      const current = task.assignees ?? []
+      const next = current.includes(memberName)
+        ? current.filter((a) => a !== memberName)
+        : [...current, memberName]
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, assignees: next } : t)))
+      updateTask(task.id, { assignees: next })
+    },
+    [updateTask]
   )
 
   const columns = useMemo(
@@ -124,7 +165,7 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
       const search = filterValue.toLowerCase()
       return (
         row.original.title.toLowerCase().includes(search) ||
-        row.original.assignee.toLowerCase().includes(search) ||
+        (row.original.assignees ?? []).some((a) => a.toLowerCase().includes(search)) ||
         row.original.id.toLowerCase().includes(search) ||
         row.original.tags.some((t) => t.toLowerCase().includes(search))
       )
@@ -133,7 +174,6 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <TaskToolbar
         table={table}
         onDeleteSelected={handleDeleteSelected}
@@ -141,7 +181,6 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
         onGlobalFilterChange={setGlobalFilter}
       />
 
-      {/* Table */}
       <div className="overflow-hidden rounded-lg border border-border/60 bg-background shadow-sm">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-muted/40">
@@ -175,24 +214,90 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className={cn(
-                    "border-border/40 transition-colors hover:bg-muted/30 data-[state=selected]:bg-primary/5",
-                    onRowClick && "cursor-pointer"
-                  )}
-                  onClick={() => onRowClick?.(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-3">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
+                <ContextMenu key={row.id}>
+                  <ContextMenuTrigger asChild>
+                    <TableRow
+                      data-state={row.getIsSelected() && "selected"}
+                      className={cn(
+                        "border-border/40 transition-colors hover:bg-muted/30 data-[state=selected]:bg-primary/5",
+                        onRowClick && "cursor-pointer"
                       )}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                      onClick={() => onRowClick?.(row.original)}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-3">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-56">
+                    <ContextMenuItem onSelect={() => onRowClick?.(row.original)}>
+                      Görevi Aç
+                    </ContextMenuItem>
+
+                    <ContextMenuSeparator />
+
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>Durum</ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        <ContextMenuRadioGroup
+                          value={row.original.status}
+                          onValueChange={(v) => handleStatusChange(row.original.id, v as TaskStatus)}
+                        >
+                          <ContextMenuRadioItem value="todo">Yapılacak</ContextMenuRadioItem>
+                          <ContextMenuRadioItem value="in-progress">Devam Ediyor</ContextMenuRadioItem>
+                          <ContextMenuRadioItem value="done">Tamamlandı</ContextMenuRadioItem>
+                        </ContextMenuRadioGroup>
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>Öncelik</ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        <ContextMenuRadioGroup
+                          value={row.original.priority}
+                          onValueChange={(v) => handlePriorityChange(row.original.id, v as TaskPriority)}
+                        >
+                          <ContextMenuRadioItem value="low">Düşük</ContextMenuRadioItem>
+                          <ContextMenuRadioItem value="medium">Orta</ContextMenuRadioItem>
+                          <ContextMenuRadioItem value="high">Yüksek</ContextMenuRadioItem>
+                        </ContextMenuRadioGroup>
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+
+                    {canAssign && (
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger>Sorumlular</ContextMenuSubTrigger>
+                        <ContextMenuSubContent className="w-48 max-h-64 overflow-y-auto">
+                          {members.map((member) => (
+                            <ContextMenuCheckboxItem
+                              key={member.id}
+                              checked={(row.original.assignees ?? []).includes(member.name)}
+                              onCheckedChange={() => handleToggleAssignee(row.original, member.name)}
+                            >
+                              {member.name}
+                            </ContextMenuCheckboxItem>
+                          ))}
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
+                    )}
+
+                    <ContextMenuSeparator />
+
+                    {canDeleteAny && (
+                      <ContextMenuItem
+                        variant="destructive"
+                        onSelect={() => handleDelete(row.original.id)}
+                      >
+                        Sil
+                      </ContextMenuItem>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
               ))
             ) : (
               <TableRow>
@@ -214,7 +319,6 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
         </Table>
       </div>
 
-      {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
           {table.getFilteredSelectedRowModel().rows.length > 0 && (

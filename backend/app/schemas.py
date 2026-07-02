@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional, List
-from typing import List
+from typing import Literal, Optional, List
 from pydantic import BaseModel, EmailStr, field_validator
 
 
@@ -81,14 +80,31 @@ class RolePermissionsMap(BaseModel):
     permissions: List[str]
 
 
+class RoleCreate(BaseModel):
+    name: str
+    copy_from: Optional[str] = None
+
+
+class RoleResponse(BaseModel):
+    name: str
+    is_system: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 # ── Tasks ─────────────────────────────────────────────────────────────────────
+
+TaskStatus = Literal["todo", "in-progress", "done"]
+TaskPriority = Literal["low", "medium", "high"]
+
 
 class TaskCreate(BaseModel):
     id: Optional[str] = None
     title: str
-    status: str = "todo"
-    priority: str = "medium"
-    assignee: str = ""
+    status: TaskStatus = "todo"
+    priority: TaskPriority = "medium"
+    assignees: List[str] = []
     due_date: Optional[str] = None
     tags: Optional[List[str]] = None
     description: Optional[str] = None
@@ -97,12 +113,13 @@ class TaskCreate(BaseModel):
 
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
-    status: Optional[str] = None
-    priority: Optional[str] = None
-    assignee: Optional[str] = None
+    status: Optional[TaskStatus] = None
+    priority: Optional[TaskPriority] = None
+    assignees: Optional[List[str]] = None
     due_date: Optional[str] = None
     tags: Optional[List[str]] = None
     description: Optional[str] = None
+    completed_at: Optional[datetime] = None
 
 
 class TaskResponse(BaseModel):
@@ -110,10 +127,11 @@ class TaskResponse(BaseModel):
     title: str
     status: str
     priority: str
-    assignee: str
+    assignees: List[str] = []
     due_date: Optional[str]
     tags: Optional[List[str]]
     description: Optional[str]
+    completed_at: Optional[datetime]
     created_at: str
 
     model_config = {"from_attributes": True}
@@ -191,6 +209,12 @@ class AnalyticsStats(BaseModel):
     completion_rate: float
 
 
+class AnalyticsDailyPoint(BaseModel):
+    date: str
+    created: int
+    completed: int
+
+
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
     bio: Optional[str] = None
@@ -214,6 +238,143 @@ class ChangePasswordRequest(BaseModel):
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
         return v
+
+
+# ── Admin ─────────────────────────────────────────────────────────────────────
+
+class PatchUserRole(BaseModel):
+    role: str
+
+
+class AdminCreateUser(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    role: str = "member"
+    is_admin: bool = False
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Name cannot be empty")
+        return v.strip()
+
+
+# ── Bots ──────────────────────────────────────────────────────────────────────
+
+class BotCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Bot name cannot be empty")
+        if len(v.strip()) > 64:
+            raise ValueError("Bot name max 64 characters")
+        return v.strip()
+
+
+class BotUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class BotResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str]
+    key_prefix: str
+    owner_id: uuid.UUID
+    is_active: bool
+    created_at: datetime
+    last_used_at: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
+
+class BotCreateResponse(BotResponse):
+    """Returned only on creation — includes the full key (shown once)."""
+    api_key: str
+
+
+# ── Webhooks ──────────────────────────────────────────────────────────────────
+
+VALID_WEBHOOK_EVENTS = {
+    "task.created",
+    "task.updated",
+    "task.deleted",
+    "file.uploaded",
+    "message.received",
+}
+
+
+# ── Chat ──────────────────────────────────────────────────────────────────────
+
+class ChatMessageCreate(BaseModel):
+    text: str
+
+
+class ChatMessageResponse(BaseModel):
+    id: uuid.UUID
+    room_id: str
+    sender_id: str
+    sender_name: str
+    sender_type: str
+    text: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChatLastMessage(BaseModel):
+    text: str
+    created_at: datetime
+
+
+class ChatContact(BaseModel):
+    id: str
+    name: str
+    type: str       # "user" | "bot"
+    is_active: bool
+    last_message: Optional[ChatLastMessage] = None
+
+
+# ── Webhooks ──────────────────────────────────────────────────────────────────
+
+class WebhookCreate(BaseModel):
+    url: str
+    events: List[str]
+    secret: Optional[str] = None
+
+    @field_validator("events")
+    @classmethod
+    def validate_events(cls, v: List[str]) -> List[str]:
+        for e in v:
+            if e not in VALID_WEBHOOK_EVENTS:
+                raise ValueError(f"Unknown event '{e}'. Valid: {sorted(VALID_WEBHOOK_EVENTS)}")
+        return v
+
+
+class WebhookResponse(BaseModel):
+    id: uuid.UUID
+    bot_id: uuid.UUID
+    url: str
+    events: List[str]
+    is_active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── Token responses ───────────────────────────────────────────────────────────

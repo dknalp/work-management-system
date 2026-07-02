@@ -83,21 +83,45 @@ function SortableNavItem({ id, children }: { id: string; children: React.ReactNo
 
 const DEFAULT_SIDEBAR_ORDER = ["all", "disk", "drive"]
 
+type QuotaInfo = { total: number; used: number; available: number }
+
+function formatSize(bytes: number): string {
+  if (bytes === 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB", "GB", "TB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+}
+
 function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
   const pathname = usePathname()
   const { pinned, unpin } = usePinnedFolders()
   const [trashOpen, setTrashOpen] = React.useState(false)
   const [driveConnected, setDriveConnected] = React.useState(false)
   const [order, setOrder] = useLocalStorage<string[]>("wms:files:sidebar-order", DEFAULT_SIDEBAR_ORDER)
+  const [quota, setQuota] = React.useState<QuotaInfo | null>(null)
+
+  const fetchQuota = React.useCallback(() => {
+    fetch("/api/files/quota")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setQuota(data) })
+      .catch(() => {})
+  }, [])
 
   React.useEffect(() => {
     import("@/lib/actions/drive").then(({ getDriveConnectionStatus }) => {
       getDriveConnectionStatus().then((s) => setDriveConnected(s.connected))
     })
-  }, [])
+    fetchQuota()
+
+    // Refresh quota after uploads or deletes
+    const handler = () => fetchQuota()
+    window.addEventListener("wms:files:changed", handler)
+    return () => window.removeEventListener("wms:files:changed", handler)
+  }, [fetchQuota])
 
   const driveActive = !!pathname && pathname.startsWith("/files/drive")
-  const diskSubActive = !!pathname && pathname.startsWith("/files/") && !driveActive
+  const diskSubActive = !!pathname && (pathname === "/files" || pathname.startsWith("/files/")) && !driveActive
 
   // Build merged ordered ID list
   const pinnedIds = pinned.map((f) => `p:${f.path}`)
@@ -238,7 +262,25 @@ function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
           </DndContext>
         </div>
 
-        <div className="mt-auto border-t border-border p-4">
+        <div className="mt-auto border-t border-border p-4 space-y-2">
+          {quota && quota.total > 0 && (
+            <div className="px-1 py-1">
+              <div className="mb-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>Depolama</span>
+                <span>{formatSize(quota.used)} / {formatSize(quota.total)}</span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    quota.used / quota.total > 0.9 ? "bg-destructive" :
+                    quota.used / quota.total > 0.7 ? "bg-amber-500" : "bg-primary"
+                  )}
+                  style={{ width: `${Math.min(100, (quota.used / quota.total) * 100).toFixed(1)}%` }}
+                />
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setTrashOpen(true)}

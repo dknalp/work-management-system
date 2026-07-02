@@ -17,9 +17,8 @@ async function ensureRootDir() {
 function getSafePath(relativePath: string): string {
   const rootDir = getStoragePath()
   const fullPath = path.resolve(rootDir, relativePath)
-  // Prevent path traversal — fall back to root if outside storage root
   if (fullPath !== rootDir && !fullPath.startsWith(rootDir + path.sep)) {
-    return rootDir
+    throw new Error("Forbidden: path outside storage root")
   }
   return fullPath
 }
@@ -118,8 +117,13 @@ export async function moveToTrash(relativePath: string) {
     const trashName = `${Date.now()}_${fileName}`
     const dest = path.join(trashDir, trashName)
     await fs.rename(fullPath, dest)
+    await fs.writeFile(
+      path.join(trashDir, `${trashName}.meta.json`),
+      JSON.stringify({ originalPath: relativePath }),
+      "utf-8"
+    )
     revalidatePath("/files", "layout")
-    return { success: true as const, trashName, originalName: fileName }
+    return { success: true as const, trashName, originalName: fileName, originalPath: relativePath }
   } catch (error) {
     console.error("Error moving to trash:", error)
     return { success: false as const, error: "Failed to move to trash" }
@@ -134,7 +138,16 @@ export async function renameItem(oldPath: string, newName: string) {
   const dir = path.dirname(oldFullPath)
   const newFullPath = path.join(dir, safe)
 
+  if (oldFullPath === newFullPath) return { success: true }
+
   try {
+    // Check for destination conflict
+    try {
+      await fs.access(newFullPath)
+      return { success: false, error: "A file or folder with that name already exists" }
+    } catch {
+      // destination does not exist — safe to rename
+    }
     await fs.rename(oldFullPath, newFullPath)
     revalidatePath("/files", "layout")
     return { success: true }
@@ -166,8 +179,19 @@ export async function moveItem(sourcePath: string, targetDirPath: string) {
   const safeTargetDirPath = getSafePath(targetDirPath)
   const destinationPath = path.join(safeTargetDirPath, fileName)
 
+  if (safeSourcePath === destinationPath) {
+    return { success: false, error: "Source and destination are the same" }
+  }
+
   try {
     await fs.access(safeSourcePath)
+    // Check for destination conflict before overwriting
+    try {
+      await fs.access(destinationPath)
+      return { success: false, error: "A file or folder with that name already exists at the destination" }
+    } catch {
+      // destination does not exist — safe to move
+    }
     await fs.rename(safeSourcePath, destinationPath)
     revalidatePath("/files", "layout")
     return { success: true }
@@ -184,10 +208,20 @@ export async function copyItem(sourcePath: string, targetDirPath: string) {
   const safeTargetDirPath = getSafePath(targetDirPath)
   let destinationPath = path.join(safeTargetDirPath, fileName)
 
-  if (safeSourcePath === destinationPath) {
-    const ext = path.extname(fileName)
-    const base = path.basename(fileName, ext)
-    destinationPath = path.join(safeTargetDirPath, `${base} (kopya)${ext}`)
+  // Auto-suffix when copying to the same directory or when name already exists
+  const ext = path.extname(fileName)
+  const base = path.basename(fileName, ext)
+  let suffix = 1
+  while (true) {
+    try {
+      await fs.access(destinationPath)
+      // destination exists — try next suffix
+      destinationPath = path.join(safeTargetDirPath, `${base} (kopya${suffix > 1 ? ` ${suffix}` : ""})${ext}`)
+      suffix++
+    } catch {
+      // destination does not exist — safe to copy here
+      break
+    }
   }
 
   try {
@@ -199,42 +233,6 @@ export async function copyItem(sourcePath: string, targetDirPath: string) {
     console.error("Copy error:", error)
     return { success: false, error: "Failed to copy item" }
   }
-}
-
-export async function listFilesRecursive(query: string): Promise<FileItem[]> {
-  await requireAuth()
-  await ensureRootDir()
-  const rootDir = getStoragePath()
-  const results: FileItem[] = []
-
-  async function walk(dir: string) {
-    try {
-      const entries = await fs.readdir(dir, { withFileTypes: true, encoding: "utf8" })
-      await Promise.all(
-        entries.map(async (entry) => {
-          const name = entry.name as string
-          if (name === ".trash") return
-          const entryPath = path.join(dir, name)
-          if (name.toLowerCase().includes(query.toLowerCase())) {
-            const stats = await fs.stat(entryPath)
-            results.push({
-              name,
-              path: path.relative(rootDir, entryPath),
-              isDirectory: entry.isDirectory(),
-              size: stats.size,
-              updatedAt: stats.mtime.toISOString(),
-            })
-          }
-          if (entry.isDirectory()) await walk(entryPath)
-        })
-      )
-    } catch {
-      return
-    }
-  }
-
-  await walk(rootDir)
-  return results
 }
 
 // ─── Advanced Search ──────────────────────────────────────────────────────────
@@ -308,7 +306,6 @@ export async function searchFiles(opts: SearchOptions): Promise<SearchResult[]> 
 
           // Type filter
           if (fileTypes.length > 0 && !fileTypes.includes(ext)) {
-            if (isDir) await walk(entryPath)
             return
           }
 
@@ -369,6 +366,7 @@ export async function searchFiles(opts: SearchOptions): Promise<SearchResult[]> 
 export type TrashItem = {
   trashName: string   // timestamped name on disk
   originalName: string
+  originalPath: string  // relative path from storage root (for restore-to-original-location)
   isDirectory: boolean
   size: number
   deletedAt: string
@@ -383,10 +381,12 @@ async function purgeExpiredTrash(trashDir: string) {
     const entries = await fs.readdir(trashDir, { withFileTypes: true })
     await Promise.all(
       entries.map(async (entry) => {
+        if (entry.name.endsWith(".meta.json")) return
         const underscoreIdx = entry.name.indexOf("_")
         const ts = underscoreIdx >= 0 ? parseInt(entry.name.slice(0, underscoreIdx)) : NaN
         if (!isNaN(ts) && ts < cutoff) {
           await fs.rm(path.join(trashDir, entry.name), { recursive: true, force: true })
+          await fs.unlink(path.join(trashDir, `${entry.name}.meta.json`)).catch(() => {})
         }
       })
     )
@@ -408,21 +408,33 @@ export async function listTrash(): Promise<TrashItem[]> {
   try {
     const entries = await fs.readdir(trashDir, { withFileTypes: true })
     const items = await Promise.all(
-      entries.map(async (entry) => {
-        const stats = await fs.stat(path.join(trashDir, entry.name))
-        const underscoreIdx = entry.name.indexOf("_")
-        const originalName = underscoreIdx >= 0 ? entry.name.slice(underscoreIdx + 1) : entry.name
-        const ts = underscoreIdx >= 0 ? parseInt(entry.name.slice(0, underscoreIdx)) : stats.mtimeMs
-        const expiresAt = new Date(ts + TRASH_TTL_MS).toISOString()
-        return {
-          trashName: entry.name,
-          originalName,
-          isDirectory: entry.isDirectory(),
-          size: stats.size,
-          deletedAt: new Date(ts).toISOString(),
-          expiresAt,
-        }
-      })
+      entries
+        .filter((e) => !e.name.endsWith(".meta.json"))
+        .map(async (entry) => {
+          const stats = await fs.stat(path.join(trashDir, entry.name))
+          const underscoreIdx = entry.name.indexOf("_")
+          const originalName = underscoreIdx >= 0 ? entry.name.slice(underscoreIdx + 1) : entry.name
+          const ts = underscoreIdx >= 0 ? parseInt(entry.name.slice(0, underscoreIdx)) : stats.mtimeMs
+          const expiresAt = new Date(ts + TRASH_TTL_MS).toISOString()
+          let originalPath = originalName
+          try {
+            const meta = JSON.parse(
+              await fs.readFile(path.join(trashDir, `${entry.name}.meta.json`), "utf-8")
+            )
+            if (meta.originalPath) originalPath = meta.originalPath
+          } catch {
+            // no meta file — fall back to originalName
+          }
+          return {
+            trashName: entry.name,
+            originalName,
+            originalPath,
+            isDirectory: entry.isDirectory(),
+            size: stats.size,
+            deletedAt: new Date(ts).toISOString(),
+            expiresAt,
+          }
+        })
     )
     return items.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt))
   } catch (error) {
@@ -449,6 +461,7 @@ export async function restoreFromTrash(trashName: string, restorePath: string) {
     await fs.access(trashFullPath)
     await fs.mkdir(path.dirname(destFullPath), { recursive: true })
     await fs.rename(trashFullPath, destFullPath)
+    await fs.unlink(path.join(trashDir, `${safeName}.meta.json`)).catch(() => {})
     revalidatePath("/files", "layout")
     return { success: true }
   } catch (error) {
@@ -467,6 +480,7 @@ export async function deleteFromTrash(trashName: string) {
   }
   try {
     await fs.rm(fullPath, { recursive: true, force: true })
+    await fs.unlink(path.join(trashDir, `${safeName}.meta.json`)).catch(() => {})
     return { success: true }
   } catch (error) {
     console.error("Error deleting from trash:", error)

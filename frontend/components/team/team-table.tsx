@@ -41,6 +41,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { TeamMember } from "@/contexts/team-context"
+import { usePresence } from "@/contexts/presence-context"
 
 const avatarColors = [
   "bg-violet-500",
@@ -54,29 +55,6 @@ const avatarColors = [
   "bg-teal-500",
 ]
 
-const statusConfig: Record<
-  TeamMember["status"],
-  { label: string; color: string; dot: string }
-> = {
-  active: {
-    label: "Aktif",
-    color:
-      "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    dot: "bg-emerald-500",
-  },
-  away: {
-    label: "Uzakta",
-    color:
-      "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
-    dot: "bg-amber-500",
-  },
-  offline: {
-    label: "Çevrimdışı",
-    color: "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/20",
-    dot: "bg-zinc-400",
-  },
-}
-
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
@@ -87,8 +65,8 @@ function formatDate(iso: string) {
 
 interface TeamTableProps {
   members: TeamMember[]
-  onEdit: (member: TeamMember) => void
-  onDelete: (id: string) => void
+  onEdit?: (member: TeamMember) => void
+  onDelete?: (id: string) => void
 }
 
 export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
@@ -96,6 +74,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = useState({})
+  const { isOnlineByEmail } = usePresence()
 
   const columns: ColumnDef<TeamMember>[] = [
     {
@@ -152,15 +131,17 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
       accessorKey: "status",
       header: "Durum",
       cell: ({ row }) => {
-        const status = row.getValue("status") as TeamMember["status"]
-        const cfg = statusConfig[status]
+        const online = isOnlineByEmail(row.original.email)
+        const displayCfg = online
+          ? { label: "Çevrimiçi", color: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20", dot: "bg-emerald-500" }
+          : { label: "Çevrimdışı", color: "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/20", dot: "bg-zinc-400" }
         return (
           <Badge
             variant="outline"
-            className={cn("gap-1.5 border text-xs font-medium", cfg.color)}
+            className={cn("gap-1.5 border text-xs font-medium", displayCfg.color)}
           >
-            <span className={cn("size-1.5 rounded-full", cfg.dot)} />
-            {cfg.label}
+            <span className={cn("size-1.5 rounded-full", displayCfg.dot)} />
+            {displayCfg.label}
           </Badge>
         )
       },
@@ -189,6 +170,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
       header: "",
       cell: ({ row }) => {
         const member = row.original
+        if (!onEdit && !onDelete) return null
         return (
           <div className="flex justify-end">
             <DropdownMenu>
@@ -198,10 +180,10 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem onClick={() => onEdit(member)}>
+                {onEdit && <DropdownMenuItem onClick={() => onEdit(member)}>
                   <Pencil className="mr-2 size-3.5" />
                   Üyeyi Düzenle
-                </DropdownMenuItem>
+                </DropdownMenuItem>}
                 <DropdownMenuItem
                   onClick={() => {
                     window.open(`mailto:${member.email}`)
@@ -212,7 +194,7 @@ export function TeamTable({ members, onEdit, onDelete }: TeamTableProps) {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onDelete(member.id)}
+                  onClick={() => onDelete?.(member.id)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 size-3.5" />

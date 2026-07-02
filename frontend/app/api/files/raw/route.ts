@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
 
   let stats: fs.Stats
   try {
-    stats = fs.statSync(fullPath)
+    stats = await fs.promises.stat(fullPath)
     if (!stats.isFile()) {
       return new NextResponse("Path is not a file", { status: 400 })
     }
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
   const contentType = getContentType(ext)
   const fileSize = stats.size
   const mtime = stats.mtime.toUTCString()
-  const etag = `"${crypto.createHash("md5").update(`${stats.mtimeMs}-${fileSize}`).digest("hex")}"`
+  const etag = `"${crypto.createHash("md5").update(`${fullPath}-${stats.mtimeMs}-${fileSize}`).digest("hex")}"`
 
   // 304 Not Modified checks
   const ifNoneMatch = request.headers.get("if-none-match")
@@ -97,23 +97,49 @@ export async function GET(request: NextRequest) {
   const commonHeaders: Record<string, string> = {
     "Content-Type": forceDownload ? "application/octet-stream" : contentType,
     "Content-Disposition": forceDownload
-      ? `attachment; filename="${encodeURIComponent(fileName)}"`
-      : `inline; filename="${encodeURIComponent(fileName)}"`,
+      ? `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`
+      : `inline; filename*=UTF-8''${encodeURIComponent(fileName)}`,
     "Accept-Ranges": "bytes",
     "ETag": etag,
     "Last-Modified": mtime,
-    "Cache-Control": "private, max-age=3600",
+    "Cache-Control": "private, no-cache",
     "X-Content-Type-Options": "nosniff",
   }
 
   // Range request (video seek, resume download)
   const rangeHeader = request.headers.get("range")
   if (rangeHeader) {
-    const match = rangeHeader.match(/bytes=(\d*)-(\d*)/)
+    // RFC 7233: bytes=<start>-<end> or bytes=-<suffix>
+    const suffixMatch = rangeHeader.match(/^bytes=-(\d+)$/)
+    if (suffixMatch) {
+      const suffixLen = parseInt(suffixMatch[1])
+      const start = Math.max(0, fileSize - suffixLen)
+      const end = fileSize - 1
+      const chunkSize = end - start + 1
+      const nodeStream = fs.createReadStream(fullPath, { start, end })
+      const webStream = new ReadableStream({
+        start(controller) {
+          nodeStream.on("data", (chunk) => controller.enqueue(chunk))
+          nodeStream.on("end", () => controller.close())
+          nodeStream.on("error", (err) => controller.error(err))
+        },
+        cancel() { nodeStream.destroy() },
+      })
+      return new NextResponse(webStream, {
+        status: 206,
+        headers: {
+          ...commonHeaders,
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Content-Length": chunkSize.toString(),
+        },
+      })
+    }
+
+    const match = rangeHeader.match(/^bytes=(\d+)-(\d*)$/)
     if (!match) {
       return new NextResponse("Invalid Range", { status: 416 })
     }
-    const start = match[1] ? parseInt(match[1]) : 0
+    const start = parseInt(match[1])
     const end = match[2] ? parseInt(match[2]) : fileSize - 1
     const clampedEnd = Math.min(end, fileSize - 1)
 

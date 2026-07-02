@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { usePermission } from "@/hooks/use-permission";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,25 +29,28 @@ interface QuickAddTaskProps {
 }
 
 export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
+  const canCreate = usePermission("tasks:create")
+  const canAssign = usePermission("tasks:assign")
   const { members } = useTeam();
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [status, setStatus] = useState<TaskStatus>(TASK_STATUSES[0].value);
   const [priority, setPriority] = useState<TaskPriority>("medium");
-  const [assignee, setAssignee] = useState("");
+  const [assignees, setAssignees] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [pendingSubTasks, setPendingSubTasks] = useState<SubTask[]>([]);
   const [subTaskInput, setSubTaskInput] = useState("");
   const [description, setDescription] = useState("");
 
-  const teamNames = members.map((m) => m.name);
+  if (!canCreate) return null;
 
-  const filteredNames = assignee.trim()
-    ? teamNames.filter((n) => n.toLowerCase().includes(assignee.toLowerCase()))
-    : [];
+  function toggleAssignee(name: string) {
+    setAssignees((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
+    );
+  }
 
   function handleSubmit() {
     if (!title.trim()) return;
@@ -55,7 +59,7 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
       title: title.trim(),
       status,
       priority,
-      assignee: assignee.trim(),
+      assignees,
       dueDate,
       tags: [],
       subTasks: pendingSubTasks,
@@ -65,7 +69,7 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
     setTitle("");
     setStatus(TASK_STATUSES[0].value);
     setPriority("medium");
-    setAssignee("");
+    setAssignees([]);
     setDueDate("");
     setPendingSubTasks([]);
     setSubTaskInput("");
@@ -81,26 +85,6 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
       setIsExpanded(false);
       setTitle("");
       titleRef.current?.blur();
-    }
-  }
-
-  function handleAssigneeKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActiveIndex((prev) => Math.min(prev + 1, filteredNames.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActiveIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === "Enter") {
-      if (activeIndex >= 0) {
-        e.preventDefault();
-        setAssignee(filteredNames[activeIndex]);
-        setShowDropdown(false);
-        setActiveIndex(-1);
-      }
-    } else if (e.key === "Escape") {
-      setShowDropdown(false);
-      setActiveIndex(-1);
     }
   }
 
@@ -155,39 +139,51 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
                 ))}
               </SelectContent>
             </Select>
-            <div className="relative">
-              <Input
-                placeholder="Sorumlu"
-                value={assignee}
-                onChange={(e) => {
-                  setAssignee(e.target.value);
-                  setShowDropdown(true);
-                  setActiveIndex(-1);
-                }}
-                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                onKeyDown={handleAssigneeKeyDown}
-                className="h-7 w-32 text-sm"
-              />
-              {showDropdown && assignee.trim() && filteredNames.length > 0 && (
-                <div className="absolute top-full left-0 z-50 mt-1 w-48 rounded-md border border-border bg-card shadow-md">
-                  {filteredNames.map((name, i) => (
-                    <button
-                      key={name}
-                      onMouseDown={() => {
-                        setAssignee(name);
-                        setShowDropdown(false);
-                      }}
-                      className={cn(
-                        "w-full px-3 py-1.5 text-left text-sm hover:bg-accent",
-                        i === activeIndex && "bg-accent"
-                      )}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {canAssign && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowAssigneeDropdown((v) => !v)}
+                  onBlur={() => setTimeout(() => setShowAssigneeDropdown(false), 150)}
+                  className={cn(
+                    "h-7 min-w-[96px] rounded-md border border-input bg-muted/30 px-2.5 text-left text-sm text-muted-foreground hover:bg-muted",
+                    assignees.length > 0 && "text-foreground"
+                  )}
+                >
+                  {assignees.length === 0
+                    ? "Sorumlu"
+                    : assignees.length === 1
+                    ? assignees[0].split(" ")[0]
+                    : `${assignees.length} kişi`}
+                </button>
+                {showAssigneeDropdown && (
+                  <div className="absolute top-full left-0 z-50 mt-1 w-48 rounded-md border border-border bg-card shadow-md">
+                    {members.map((member) => (
+                      <button
+                        key={member.id}
+                        onMouseDown={() => toggleAssignee(member.name)}
+                        className={cn(
+                          "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent",
+                          assignees.includes(member.name) && "bg-accent/60"
+                        )}
+                      >
+                        <span className={cn(
+                          "size-3.5 rounded-sm border border-input flex items-center justify-center shrink-0",
+                          assignees.includes(member.name) && "bg-primary border-primary"
+                        )}>
+                          {assignees.includes(member.name) && (
+                            <svg viewBox="0 0 10 10" className="size-2.5 fill-primary-foreground">
+                              <path d="M2 5l2.5 2.5 3.5-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                            </svg>
+                          )}
+                        </span>
+                        {member.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <Input
               type="date"
               value={dueDate}

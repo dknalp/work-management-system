@@ -64,7 +64,7 @@ export function KanbanBoard({ onAddColumn }: KanbanBoardProps) {
         title,
         status: columnId as TaskStatus,
         priority: "medium",
-        assignee: "",
+        assignees: [],
         dueDate: "",
         tags: [],
         createdAt: new Date().toISOString().slice(0, 10),

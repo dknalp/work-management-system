@@ -54,10 +54,11 @@ function toApiTask(task: Task) {
     title: task.title,
     status: task.status,
     priority: task.priority,
-    assignee: task.assignee,
+    assignees: task.assignees ?? [],
     due_date: task.dueDate || null,
     tags: task.tags,
     description: task.description,
+    completed_at: task.completedAt ?? null,
     created_at: task.createdAt,
   }
 }
@@ -67,10 +68,11 @@ type ApiTask = {
   title: string
   status: string
   priority: string
-  assignee: string
+  assignees?: string[] | null
   due_date?: string | null
   tags?: string[] | null
   description?: string | null
+  completed_at?: string | null
   created_at: string
 }
 
@@ -80,10 +82,11 @@ function fromApiTask(t: ApiTask): Task {
     title: t.title,
     status: t.status as Task["status"],
     priority: t.priority as Task["priority"],
-    assignee: t.assignee,
+    assignees: t.assignees ?? [],
     dueDate: t.due_date ?? "",
     tags: t.tags ?? [],
     description: t.description ?? undefined,
+    completedAt: t.completed_at ?? undefined,
     createdAt: t.created_at,
   }
 }
@@ -193,7 +196,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
       if (updates.title !== undefined) apiUpdates.title = updates.title
       if (updates.status !== undefined) apiUpdates.status = updates.status
       if (updates.priority !== undefined) apiUpdates.priority = updates.priority
-      if (updates.assignee !== undefined) apiUpdates.assignee = updates.assignee
+      if (updates.assignees !== undefined) apiUpdates.assignees = updates.assignees
       if (updates.dueDate !== undefined) apiUpdates.due_date = updates.dueDate || null
       if (updates.tags !== undefined) apiUpdates.tags = updates.tags
       if (updates.description !== undefined) apiUpdates.description = updates.description

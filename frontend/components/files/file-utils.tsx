@@ -76,6 +76,33 @@ export function isTextFile(name: string) {
   return /\.(txt|md|json|js|ts|css|html)$/i.test(name)
 }
 
+export function getFileOpenUrl(item: FileItem): string {
+  if (item.source === "drive" && item.driveFileId) {
+    return `https://drive.google.com/file/d/${item.driveFileId}/view`
+  }
+  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
+}
+
+export function getFileDownloadUrl(item: FileItem): string {
+  if (item.source === "drive" && item.driveFileId) {
+    return `https://drive.google.com/uc?export=download&id=${item.driveFileId}`
+  }
+  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
+}
+
+export function downloadFile(item: FileItem) {
+  if (item.source === "drive" && item.driveFileId) {
+    window.open(getFileDownloadUrl(item), "_blank")
+    return
+  }
+  const a = document.createElement("a")
+  a.href = getFileDownloadUrl(item)
+  a.download = item.name
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 export function formatSize(bytes: number) {
   if (bytes === 0) return "0 B"
   const k = 1024

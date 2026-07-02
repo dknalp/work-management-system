@@ -26,21 +26,19 @@ function TextPreview({ url }: { url: string }) {
   const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
-    let cancelled = false
-    fetch(url)
+    const controller = new AbortController()
+    fetch(url, { signal: controller.signal })
       .then((res) => res.text())
       .then((text) => {
-        if (cancelled) return
         setContent(text.length > 10240 ? text.slice(0, 10240) + "\n\n… (truncated)" : text)
         setLoading(false)
       })
-      .catch(() => {
-        if (!cancelled) {
-          setContent("Önizleme yüklenemedi.")
-          setLoading(false)
-        }
+      .catch((err) => {
+        if (err.name === "AbortError") return
+        setContent("Önizleme yüklenemedi.")
+        setLoading(false)
       })
-    return () => { cancelled = true }
+    return () => { controller.abort() }
   }, [url])
 
   if (loading) {
@@ -75,8 +73,9 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
   const previewUrl = isDrive
     ? `https://drive.google.com/file/d/${item.driveFileId}/preview`
     : `/api/files/raw?path=${encodeURIComponent(item.path)}`
+  // Drive thumbnails require auth; route them through our proxy to avoid 403 on private files
   const imageUrl = isDrive
-    ? `https://drive.google.com/thumbnail?id=${item.driveFileId}&sz=w400`
+    ? `/api/files/drive-raw?id=${item.driveFileId}`
     : `/api/files/raw?path=${encodeURIComponent(item.path)}`
   const downloadUrl = isDrive
     ? `https://drive.google.com/uc?export=download&id=${item.driveFileId}`
@@ -130,7 +129,13 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
           <div>
             <h4 className="mb-1 truncate text-sm font-bold">{item.name}</h4>
             <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-              {item.isDirectory ? "Klasör" : item.name.split(".").pop() + " File"}
+              {item.isDirectory
+                ? "Klasör"
+                : (() => {
+                    const parts = item.name.split(".")
+                    const ext = parts.length > 1 ? parts.pop()!.toUpperCase() : null
+                    return ext ? `${ext} Dosyası` : "Dosya"
+                  })()}
             </p>
           </div>
 

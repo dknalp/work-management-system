@@ -1,6 +1,6 @@
 "use client"
 
-import { ColumnDef, Column } from "@tanstack/react-table"
+import { ColumnDef, Column, Row } from "@tanstack/react-table"
 import {
   ArrowUpDownIcon,
   Trash2Icon,
@@ -9,14 +9,19 @@ import {
   CircleIcon,
 } from "lucide-react"
 import { usePermission } from "@/hooks/use-permission"
+import { useAuth } from "@/contexts/auth-context"
 
 type DeleteCellProps = {
+  task: Task
   onDelete: () => void
 }
 
-function DeleteCell({ onDelete }: DeleteCellProps) {
-  const canDelete = usePermission("tasks:delete_any")
-  if (!canDelete) return null
+function DeleteCell({ task, onDelete }: DeleteCellProps) {
+  const canDeleteAny = usePermission("tasks:delete_any")
+  const canDeleteOwn = usePermission("tasks:delete_own")
+  const { user } = useAuth()
+  const isOwn = task.assignees?.includes(user?.name ?? "")
+  if (!canDeleteAny && !(canDeleteOwn && isOwn)) return null
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onDelete() }}
@@ -59,6 +64,62 @@ function SortableHeader({
       {label}
       <ArrowUpDownIcon className="size-3.5 opacity-50" />
     </Button>
+  )
+}
+
+type StatusCellProps = {
+  row: Row<Task>
+  onStatusChange?: (id: string, status: TaskStatus) => void
+}
+
+function StatusCell({ row, onStatusChange }: StatusCellProps) {
+  const canEditAny = usePermission("tasks:edit_any")
+  const canEditOwn = usePermission("tasks:edit_own")
+  const { user } = useAuth()
+  const isOwn = row.original.assignees?.includes(user?.name ?? "")
+  const canEdit = canEditAny || (canEditOwn && isOwn)
+  const status = row.original.status
+  const cfg = statusConfig[status]
+
+  if (!onStatusChange || !canEdit) {
+    return (
+      <Badge
+        variant="outline"
+        className={cn("h-6 gap-1.5 px-2 text-xs font-medium", cfg.className)}
+      >
+        {cfg.icon}
+        {cfg.label}
+      </Badge>
+    )
+  }
+  return (
+    <Select
+      value={status}
+      onValueChange={(val) => onStatusChange(row.original.id, val as TaskStatus)}
+    >
+      <SelectTrigger
+        className={cn(
+          "h-7 w-auto gap-1 border px-2 py-0 text-xs font-medium focus:ring-0 focus:ring-offset-0",
+          cfg.className
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        {TASK_STATUSES.map((s) => {
+          const c = statusConfig[s.value]
+          return (
+            <SelectItem key={s.value} value={s.value} className="text-xs">
+              <span className="flex items-center gap-1.5">
+                {c.icon}
+                {c.label}
+              </span>
+            </SelectItem>
+          )
+        })}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -162,50 +223,7 @@ export function createColumns(
     {
       accessorKey: "status",
       header: ({ column }) => <SortableHeader column={column} label="Durum" />,
-      cell: ({ row }) => {
-        const status = row.original.status
-        const cfg = statusConfig[status]
-        if (!onStatusChange) {
-          return (
-            <Badge
-              variant="outline"
-              className={cn("h-6 gap-1.5 px-2 text-xs font-medium", cfg.className)}
-            >
-              {cfg.icon}
-              {cfg.label}
-            </Badge>
-          )
-        }
-        return (
-          <Select
-            value={status}
-            onValueChange={(val) => onStatusChange(row.original.id, val as TaskStatus)}
-          >
-            <SelectTrigger
-              className={cn(
-                "h-7 w-auto gap-1 border px-2 py-0 text-xs font-medium focus:ring-0 focus:ring-offset-0",
-                cfg.className
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent onClick={(e) => e.stopPropagation()}>
-              {TASK_STATUSES.map((s) => {
-                const c = statusConfig[s.value]
-                return (
-                  <SelectItem key={s.value} value={s.value} className="text-xs">
-                    <span className="flex items-center gap-1.5">
-                      {c.icon}
-                      {c.label}
-                    </span>
-                  </SelectItem>
-                )
-              })}
-            </SelectContent>
-          </Select>
-        )
-      },
+      cell: ({ row }) => <StatusCell row={row} onStatusChange={onStatusChange} />,
       filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     },
     {
@@ -239,24 +257,46 @@ export function createColumns(
       },
     },
     {
-      accessorKey: "assignee",
+      accessorKey: "assignees",
       header: ({ column }) => (
-        <SortableHeader column={column} label="Sorumlu" />
+        <SortableHeader column={column} label="Sorumlular" />
       ),
       cell: ({ row }) => {
-        const name = row.original.assignee
-        const initials = name
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase()
+        const assignees = row.original.assignees ?? []
+        if (assignees.length === 0) {
+          return <span className="text-sm text-muted-foreground">—</span>
+        }
+        const visible = assignees.slice(0, 3)
+        const overflow = assignees.length - 3
         return (
-          <div className="flex items-center gap-2">
-            <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-              {initials}
+          <div className="flex items-center">
+            <div className="flex -space-x-2">
+              {visible.map((name) => {
+                const initials = name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()
+                return (
+                  <div
+                    key={name}
+                    title={name}
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-[10px] font-bold text-primary"
+                  >
+                    {initials}
+                  </div>
+                )
+              })}
+              {overflow > 0 && (
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-bold text-muted-foreground">
+                  +{overflow}
+                </div>
+              )}
             </div>
-            <span className="text-sm whitespace-nowrap">{name}</span>
+            {assignees.length === 1 && (
+              <span className="ml-2 text-sm whitespace-nowrap">{assignees[0]}</span>
+            )}
           </div>
         )
       },
@@ -336,7 +376,7 @@ export function createColumns(
     {
       id: "actions",
       enableHiding: false,
-      cell: ({ row }) => <DeleteCell onDelete={() => onDelete(row.original.id)} />,
+      cell: ({ row }) => <DeleteCell task={row.original} onDelete={() => onDelete(row.original.id)} />,
     },
   ]
 }

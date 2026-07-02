@@ -39,11 +39,13 @@ export function TeamWorkloadChart() {
   const data = useMemo(() => {
     const assigneeMap: Record<string, { todo: number; inProgress: number; done: number }> = {}
     tasks.forEach((t) => {
-      const name = t.assignee || "Unassigned"
-      if (!assigneeMap[name]) assigneeMap[name] = { todo: 0, inProgress: 0, done: 0 }
-      if (t.status === "todo") assigneeMap[name].todo++
-      else if (t.status === "in-progress") assigneeMap[name].inProgress++
-      else if (t.status === "done") assigneeMap[name].done++
+      const assigneeList = (t.assignees ?? []).length > 0 ? t.assignees : ["Unassigned"]
+      assigneeList.forEach((name) => {
+        if (!assigneeMap[name]) assigneeMap[name] = { todo: 0, inProgress: 0, done: 0 }
+        if (t.status === "todo") assigneeMap[name].todo++
+        else if (t.status === "in-progress") assigneeMap[name].inProgress++
+        else if (t.status === "done") assigneeMap[name].done++
+      })
     })
     return Object.entries(assigneeMap)
       .map(([name, counts]) => ({

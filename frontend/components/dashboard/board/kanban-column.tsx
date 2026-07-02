@@ -10,6 +10,7 @@ import { KanbanCard, Task } from "./kanban-card"
 import { Button } from "@/components/ui/button"
 import { MoreHorizontalIcon, PlusIcon, XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { usePermission } from "@/hooks/use-permission"
 
 export type ColumnId = string
 
@@ -36,6 +37,7 @@ export function KanbanColumn({
   onDeleteCard,
   onUpdateCard,
 }: KanbanColumnProps) {
+  const canEdit = usePermission("board:edit")
   const taskIds = useMemo(() => tasks.map((t) => t.id), [tasks])
   const [isAddingCard, setIsAddingCard] = useState(false)
   const [newCardTitle, setNewCardTitle] = useState("")
@@ -106,14 +108,16 @@ export function KanbanColumn({
           </span>
         </div>
         <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover/header:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            onClick={startAddingCard}
-          >
-            <PlusIcon className="size-3.5" />
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={startAddingCard}
+            >
+              <PlusIcon className="size-3.5" />
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="size-7">
             <MoreHorizontalIcon className="size-3.5" />
           </Button>
@@ -178,7 +182,7 @@ export function KanbanColumn({
       </div>
 
       {/* Footer add button */}
-      {!isAddingCard && (
+      {!isAddingCard && canEdit && (
         <Button
           variant="ghost"
           className="mt-3 h-9 w-full justify-start gap-2 text-xs font-medium text-muted-foreground hover:text-foreground"

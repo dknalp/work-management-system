@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import {
+  Share2Icon,
   FolderIcon,
   MoreVerticalIcon,
   PencilIcon,
@@ -40,6 +41,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import {
@@ -68,13 +72,15 @@ import { FileGrid } from "./file-grid"
 import { FilePreviewPanel } from "./file-preview-panel"
 import { SelectionLasso } from "./selection-lasso"
 import { SearchResultsView } from "./search-results-view"
-import { getFileIcon, formatSize } from "./file-utils"
+import { getFileIcon, formatSize, getFileOpenUrl, getFileDownloadUrl, downloadFile } from "./file-utils"
 import { usePinnedFolders } from "@/hooks/use-pinned-folders"
 import { toast } from "sonner"
+import { usePermission } from "@/hooks/use-permission"
 
 interface FileExplorerProps {
   items: FileItem[]
   currentPath: string
+  sourceFilter?: "all" | "disk" | "drive"
   viewMode: "grid" | "list"
   showPreview: boolean
   onTogglePreview: () => void
@@ -86,36 +92,10 @@ interface FileExplorerProps {
 
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
 
-function getFileOpenUrl(item: FileItem): string {
-  if (item.source === "drive" && item.driveFileId) {
-    return `https://drive.google.com/file/d/${item.driveFileId}/view`
-  }
-  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
-}
-
-function getFileDownloadUrl(item: FileItem): string {
-  if (item.source === "drive" && item.driveFileId) {
-    return `https://drive.google.com/uc?export=download&id=${item.driveFileId}`
-  }
-  return `/api/files/raw?path=${encodeURIComponent(item.path)}`
-}
-
-function downloadFile(item: FileItem) {
-  if (item.source === "drive" && item.driveFileId) {
-    window.open(getFileDownloadUrl(item), "_blank")
-    return
-  }
-  const a = document.createElement("a")
-  a.href = getFileDownloadUrl(item)
-  a.download = item.name
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-}
-
 export function FileExplorer({
   items,
   currentPath,
+  sourceFilter = "all",
   viewMode,
   showPreview,
   searchQuery,
@@ -123,6 +103,9 @@ export function FileExplorer({
   isSearching,
 }: FileExplorerProps) {
   const router = useRouter()
+  const canRename = usePermission("files:rename")
+  const canDelete = usePermission("files:delete")
+  const canMove = canDelete
   const containerRef = React.useRef<HTMLDivElement>(null)
   const { pin, isPinned } = usePinnedFolders()
   const [selectedPaths, setSelectedPaths] = React.useState<Set<string>>(new Set())
@@ -154,11 +137,39 @@ export function FileExplorer({
 
   const handleItemDoubleClick = (item: FileItem) => {
     if (item.isDirectory) {
-      router.push(`/files/${item.path}`)
+      const qs = sourceFilter !== "all" ? `?source=${sourceFilter}` : ""
+      router.push(`/files/${item.path}${qs}`)
     } else {
       window.open(getFileOpenUrl(item), "_blank")
     }
   }
+
+  const handleSingleItemDownload = React.useCallback(async (item: FileItem) => {
+    if (!item.isDirectory) {
+      downloadFile(item)
+      return
+    }
+    // Folder: download as ZIP via backend
+    try {
+      const res = await fetch("/api/files/zip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths: [item.path] }),
+      })
+      if (!res.ok) { toast.error("ZIP indirme başarısız"); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${item.name}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error("ZIP indirme başarısız")
+    }
+  }, [])
 
   const handleRename = (item: FileItem) => {
     setRenameTarget(item)
@@ -191,6 +202,7 @@ export function FileExplorer({
 
     if (succeeded.length > 0) {
       router.refresh()
+      window.dispatchEvent(new Event("wms:files:changed"))
       setSelectedPaths(new Set())
       setActiveItem(null)
 
@@ -207,7 +219,7 @@ export function FileExplorer({
                 succeeded.map((r) =>
                   r.success
                     ? import("@/lib/actions/files").then(({ restoreFromTrash }) =>
-                        restoreFromTrash(r.trashName, r.originalName)
+                        restoreFromTrash(r.trashName, r.originalPath || r.originalName)
                       )
                     : Promise.resolve({ success: false })
                 )
@@ -248,10 +260,39 @@ export function FileExplorer({
     }
   }
 
-  const handleBulkDownload = () => {
-    items
-      .filter((i) => selectedPaths.has(i.path) && !i.isDirectory)
-      .forEach((item) => downloadFile(item))
+  const handleBulkDownload = async () => {
+    const selected = items.filter((i) => selectedPaths.has(i.path))
+    const driveFiles = selected.filter((i) => i.source === "drive" && !i.isDirectory)
+    const diskItems = selected.filter((i) => i.source !== "drive")
+
+    // Drive files: individual download (directories not supported on Drive side)
+    driveFiles.forEach((item) => downloadFile(item))
+
+    if (diskItems.length === 1) {
+      handleSingleItemDownload(diskItems[0])
+    } else if (diskItems.length > 1) {
+      // Include both files and folders in ZIP
+      const diskFiles = diskItems
+      try {
+        const res = await fetch("/api/files/zip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paths: diskFiles.map((i) => i.path) }),
+        })
+        if (!res.ok) { toast.error("ZIP indirme başarısız"); return }
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = "download.zip"
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch {
+        toast.error("ZIP indirme başarısız")
+      }
+    }
   }
 
   const handleSort = (key: "name" | "size" | "updatedAt") => {
@@ -397,10 +438,13 @@ export function FileExplorer({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (renameOpen || deleteOpen) return
 
-      if (e.key === "Delete" && selectedPaths.size > 0) {
-        handleDeleteConfirm(Array.from(selectedPaths))
+      if (e.key === "Delete" && selectedPaths.size > 0 && canDelete) {
+        const diskPaths = Array.from(selectedPaths).filter(
+          (p) => items.find((i) => i.path === p)?.source !== "drive"
+        )
+        if (diskPaths.length > 0) handleDeleteConfirm(diskPaths)
       }
-      if (e.key === "F2" && selectedPaths.size === 1 && activeItem && activeItem.name !== "..") {
+      if (e.key === "F2" && selectedPaths.size === 1 && activeItem && activeItem.name !== ".." && canRename && activeItem.source !== "drive") {
         handleRename(activeItem)
       }
       if ((e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey)) {
@@ -408,15 +452,18 @@ export function FileExplorer({
         setSelectedPaths(new Set(items.map((i) => i.path)))
         if (items.length > 0) setActiveItem(items[0])
       }
-      if ((e.key === "c" || e.key === "C") && (e.ctrlKey || e.metaKey) && selectedPaths.size > 0) {
+      if (canMove && (e.key === "c" || e.key === "C") && (e.ctrlKey || e.metaKey) && selectedPaths.size > 0) {
         e.preventDefault()
         handleCopy(Array.from(selectedPaths))
       }
-      if ((e.key === "x" || e.key === "X") && (e.ctrlKey || e.metaKey) && selectedPaths.size > 0) {
+      if (canMove && (e.key === "x" || e.key === "X") && (e.ctrlKey || e.metaKey) && selectedPaths.size > 0) {
         e.preventDefault()
-        handleCut(Array.from(selectedPaths))
+        const diskPaths = Array.from(selectedPaths).filter(
+          (p) => items.find((i) => i.path === p)?.source !== "drive"
+        )
+        if (diskPaths.length > 0) handleCut(diskPaths)
       }
-      if ((e.key === "v" || e.key === "V") && (e.ctrlKey || e.metaKey) && clipboard) {
+      if (canMove && (e.key === "v" || e.key === "V") && (e.ctrlKey || e.metaKey) && clipboard) {
         e.preventDefault()
         handlePaste()
       }
@@ -432,10 +479,10 @@ export function FileExplorer({
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [selectedPaths, activeItem, items, renameOpen, deleteOpen, clipboard, handleCopy, handleCut, handlePaste])
+  }, [selectedPaths, activeItem, items, renameOpen, deleteOpen, clipboard, handleCopy, handleCut, handlePaste, canRename, canDelete])
 
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
-    if (item.name === "..") {
+    if (item.name === ".." || item.source === "drive") {
       e.preventDefault()
       return
     }
@@ -453,7 +500,7 @@ export function FileExplorer({
 
   const handleDrop = async (e: React.DragEvent, targetItem: FileItem) => {
     e.preventDefault()
-    if (!targetItem.isDirectory) return
+    if (!targetItem.isDirectory || targetItem.source === "drive") return
     const sourcePath = e.dataTransfer.getData("application/workos-file")
     if (!sourcePath || sourcePath === targetItem.path) return
     const itemsToMove = selectedPaths.has(sourcePath) ? Array.from(selectedPaths) : [sourcePath]
@@ -556,12 +603,14 @@ export function FileExplorer({
                     const isParentDir = item.name === ".."
                     const isCut = !isParentDir && isCutItem(item.path)
 
+                    const isDrive = item.source === "drive"
+
                     const tableRow = (
                       <TableRow
                         key={item.path + item.name}
                         data-file-path={item.path}
                         data-drag-handle={!isParentDir ? "true" : undefined}
-                        draggable={!isParentDir}
+                        draggable={!isParentDir && !isDrive}
                         onDragStart={(e) => handleDragStart(e, item)}
                         onDragOver={(e) => {
                           if (item.isDirectory) e.preventDefault()
@@ -635,10 +684,10 @@ export function FileExplorer({
                                 >
                                   <ExternalLinkIcon className="size-3.5" /> Aç
                                 </DropdownMenuItem>
-                                {!item.isDirectory && (
+                                {!item.source?.includes("drive") && (
                                   <DropdownMenuItem
                                     className="gap-2"
-                                    onClick={() => downloadFile(item)}
+                                    onClick={() => handleSingleItemDownload(item)}
                                   >
                                     <DownloadIcon className="size-3.5" /> İndir
                                   </DropdownMenuItem>
@@ -652,38 +701,52 @@ export function FileExplorer({
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="gap-2"
-                                  onClick={() => handleCopy([item.path])}
-                                >
-                                  <CopyIcon className="size-3.5" /> Kopyala
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="gap-2"
-                                  onClick={() => handleCut([item.path])}
-                                >
-                                  <ScissorsIcon className="size-3.5" /> Kes
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="gap-2"
-                                  onClick={() => handleRename(item)}
-                                >
-                                  <PencilIcon className="size-3.5" /> Yeniden Adlandır
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="gap-2"
-                                  onClick={() => handleMoveToOpen([item.path])}
-                                >
-                                  <MoveIcon className="size-3.5" /> Taşı
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="gap-2 text-destructive focus:text-destructive"
-                                  onClick={() => handleDeleteConfirm(item.path)}
-                                >
-                                  <Trash2Icon className="size-3.5" /> Sil
-                                </DropdownMenuItem>
+                                {canMove && !isDrive && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => handleCopy([item.path])}
+                                  >
+                                    <CopyIcon className="size-3.5" /> Kopyala
+                                  </DropdownMenuItem>
+                                )}
+                                {canMove && !isDrive && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => handleCut([item.path])}
+                                  >
+                                    <ScissorsIcon className="size-3.5" /> Kes
+                                  </DropdownMenuItem>
+                                )}
+                                {canRename && !isDrive && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="gap-2"
+                                      onClick={() => handleRename(item)}
+                                    >
+                                      <PencilIcon className="size-3.5" /> Yeniden Adlandır
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                {canMove && !isDrive && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => handleMoveToOpen([item.path])}
+                                  >
+                                    <MoveIcon className="size-3.5" /> Taşı
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && !isDrive && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="gap-2 text-destructive focus:text-destructive"
+                                      onClick={() => handleDeleteConfirm(item.path)}
+                                    >
+                                      <Trash2Icon className="size-3.5" /> Sil
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           )}
@@ -703,10 +766,23 @@ export function FileExplorer({
                           >
                             <ExternalLinkIcon className="size-4" /> Aç
                           </ContextMenuItem>
-                          {!item.isDirectory && (
+                          <ContextMenuSub>
+                            <ContextMenuSubTrigger className="gap-2">
+                              <Share2Icon className="size-4" /> Birlikte Aç
+                            </ContextMenuSubTrigger>
+                            <ContextMenuSubContent className="w-44">
+                              <ContextMenuItem className="gap-2" onClick={() => {}}>
+                                <ExternalLinkIcon className="size-4" /> Metin Editörü
+                              </ContextMenuItem>
+                              <ContextMenuItem className="gap-2" onClick={() => {}}>
+                                <ExternalLinkIcon className="size-4" /> Web Tarayıcısı
+                              </ContextMenuItem>
+                            </ContextMenuSubContent>
+                          </ContextMenuSub>
+                          {!item.source?.includes("drive") && (
                             <ContextMenuItem
                               className="gap-2"
-                              onClick={() => downloadFile(item)}
+                              onClick={() => handleSingleItemDownload(item)}
                             >
                               <DownloadIcon className="size-4" /> İndir
                             </ContextMenuItem>
@@ -720,38 +796,52 @@ export function FileExplorer({
                             </ContextMenuItem>
                           )}
                           <ContextMenuSeparator />
-                          <ContextMenuItem
-                            className="gap-2"
-                            onClick={() => handleCopy([item.path])}
-                          >
-                            <CopyIcon className="size-4" /> Kopyala
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            className="gap-2"
-                            onClick={() => handleCut([item.path])}
-                          >
-                            <ScissorsIcon className="size-4" /> Kes
-                          </ContextMenuItem>
-                          <ContextMenuSeparator />
-                          <ContextMenuItem
-                            className="gap-2"
-                            onClick={() => handleRename(item)}
-                          >
-                            <PencilIcon className="size-4" /> Yeniden Adlandır
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            className="gap-2"
-                            onClick={() => handleMoveToOpen([item.path])}
-                          >
-                            <MoveIcon className="size-4" /> Taşı
-                          </ContextMenuItem>
-                          <ContextMenuSeparator />
-                          <ContextMenuItem
-                            className="gap-2 text-destructive focus:text-destructive"
-                            onClick={() => handleDeleteConfirm(item.path)}
-                          >
-                            <Trash2Icon className="size-4" /> Sil
-                          </ContextMenuItem>
+                          {canMove && !isDrive && (
+                            <ContextMenuItem
+                              className="gap-2"
+                              onClick={() => handleCopy([item.path])}
+                            >
+                              <CopyIcon className="size-4" /> Kopyala
+                            </ContextMenuItem>
+                          )}
+                          {canMove && !isDrive && (
+                            <ContextMenuItem
+                              className="gap-2"
+                              onClick={() => handleCut([item.path])}
+                            >
+                              <ScissorsIcon className="size-4" /> Kes
+                            </ContextMenuItem>
+                          )}
+                          {canRename && !isDrive && (
+                            <>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem
+                                className="gap-2"
+                                onClick={() => handleRename(item)}
+                              >
+                                <PencilIcon className="size-4" /> Yeniden Adlandır
+                              </ContextMenuItem>
+                            </>
+                          )}
+                          {canMove && !isDrive && (
+                            <ContextMenuItem
+                              className="gap-2"
+                              onClick={() => handleMoveToOpen([item.path])}
+                            >
+                              <MoveIcon className="size-4" /> Taşı
+                            </ContextMenuItem>
+                          )}
+                          {canDelete && !isDrive && (
+                            <>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem
+                                className="gap-2 text-destructive focus:text-destructive"
+                                onClick={() => handleDeleteConfirm(item.path)}
+                              >
+                                <Trash2Icon className="size-4" /> Sil
+                              </ContextMenuItem>
+                            </>
+                          )}
                         </ContextMenuContent>
                       </ContextMenu>
                     )
@@ -764,11 +854,15 @@ export function FileExplorer({
               items={displayItems}
               selectedPaths={selectedPaths}
               onSelect={handleSelect}
-              onNavigate={(p) => router.push(`/files/${p}`)}
+              onNavigate={(p) => {
+                const qs = sourceFilter !== "all" ? `?source=${sourceFilter}` : ""
+                router.push(`/files/${p}${qs}`)
+              }}
               currentPath={currentPath}
               onRename={handleRename}
               onDelete={(path) => handleDeleteConfirm(path)}
               onMoveTo={(paths) => handleMoveToOpen(paths)}
+              onDownload={handleSingleItemDownload}
               clipboard={clipboard}
               onCopy={handleCopy}
               onCut={handleCut}
@@ -794,38 +888,30 @@ export function FileExplorer({
             >
               <DownloadIcon className="size-3.5" /> İndir
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => handleCopy(Array.from(selectedPaths))}
-            >
-              <CopyIcon className="size-3.5" /> Kopyala
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => handleCut(Array.from(selectedPaths))}
-            >
-              <ScissorsIcon className="size-3.5" /> Kes
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => handleMoveToOpen(Array.from(selectedPaths))}
-            >
-              <MoveIcon className="size-3.5" /> Taşı
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => handleDeleteConfirm(Array.from(selectedPaths))}
-            >
-              <Trash2Icon className="size-3.5" /> Sil
-            </Button>
+            {canMove && (() => {
+              const diskPaths = Array.from(selectedPaths).filter(p => items.find(i => i.path === p)?.source !== "drive")
+              return diskPaths.length > 0 ? (
+                <>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleCopy(diskPaths)}>
+                    <CopyIcon className="size-3.5" /> Kopyala
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleCut(diskPaths)}>
+                    <ScissorsIcon className="size-3.5" /> Kes
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleMoveToOpen(diskPaths)}>
+                    <MoveIcon className="size-3.5" /> Taşı
+                  </Button>
+                </>
+              ) : null
+            })()}
+            {canDelete && (() => {
+              const diskPaths = Array.from(selectedPaths).filter(p => items.find(i => i.path === p)?.source !== "drive")
+              return diskPaths.length > 0 ? (
+                <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteConfirm(diskPaths)}>
+                  <Trash2Icon className="size-3.5" /> Sil
+                </Button>
+              ) : null
+            })()}
             <Button
               size="sm"
               variant="ghost"

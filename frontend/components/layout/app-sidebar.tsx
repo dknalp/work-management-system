@@ -14,7 +14,6 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
-  BriefcaseIcon,
   LayoutDashboardIcon,
   KanbanIcon,
   CheckSquareIcon,
@@ -24,12 +23,16 @@ import {
   Settings2Icon,
   ShieldIcon,
   KeyRoundIcon,
+  ExternalLinkIcon,
+  BotIcon,
+  BookOpenIcon,
 } from "lucide-react"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { usePermission } from "@/hooks/use-permission"
+import { getLinksForRole, type CustomNavLink } from "@/lib/custom-nav"
 
 const navMain = [
     {
@@ -75,11 +78,35 @@ const navSecondary = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
   const { user } = useAuth()
+  const [customLinks, setCustomLinks] = React.useState<CustomNavLink[]>([])
+  const canViewTasks = usePermission("tasks:view")
+  const canViewBoard = usePermission("board:view")
+  const canViewCalendar = usePermission("calendar:view")
+  const canViewFiles = usePermission("files:view")
   const canViewTeam = usePermission("team:view")
   const canViewAdmin = usePermission("admin:view")
 
+  React.useEffect(() => {
+    const load = () => {
+      setCustomLinks(getLinksForRole(user?.role ?? "member", user?.is_admin ?? false))
+    }
+    load()
+    window.addEventListener("wms:custom-nav-changed", load)
+    return () => window.removeEventListener("wms:custom-nav-changed", load)
+  }, [user])
+
+  const [botsTabActive, setBotsTabActive] = React.useState(false)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setBotsTabActive(params.get("tab") === "bots")
+  }, [pathname])
+
   const navMainWithActive = navMain
     .filter((item) => {
+      if (item.url === "/tasks") return canViewTasks
+      if (item.url === "/dashboard/board") return canViewBoard
+      if (item.url === "/calendar") return canViewCalendar
+      if (item.url === "/files") return canViewFiles
       if (item.url === "/team") return canViewTeam
       return true
     })
@@ -111,11 +138,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:p-2!"
             >
               <a href="/dashboard" className="flex items-center gap-2.5">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground text-primary-foreground! shadow-sm">
-                  <BriefcaseIcon className="size-4!" />
-                </div>
+                <img src="/kiwimi-office-logo.png" alt="Kiwimi Office" className="size-7 rounded-lg object-contain" />
                 <span className="text-base font-semibold tracking-tight">
-                  WorkOS
+                  Kiwimi Office
                 </span>
               </a>
             </SidebarMenuButton>
@@ -125,6 +150,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <NavMain items={navMainWithActive} />
+        {customLinks.length > 0 && (
+          <SidebarMenu className="px-2">
+            {customLinks.map((link) => (
+              <SidebarMenuItem key={link.id}>
+                <SidebarMenuButton asChild size="sm">
+                  <a href={link.url} target="_blank" rel="noreferrer" className="flex items-center justify-between">
+                    <span>{link.title}</span>
+                    <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        )}
         <div className="mt-auto">
           {canViewAdmin && (
             <SidebarMenu className="px-2 pb-1">
@@ -144,8 +183,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem className="pl-4">
+                <SidebarMenuButton asChild isActive={pathname.startsWith("/admin") && botsTabActive} size="sm">
+                  <Link href="/admin?tab=bots">
+                    <BotIcon />
+                    <span>Bot Hesapları</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           )}
+          <SidebarMenu className="px-2 pb-1">
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === "/docs"} size="sm">
+                <Link href="/docs">
+                  <BookOpenIcon />
+                  <span>API Docs</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
           <NavSecondary items={navSecondaryWithActive} />
         </div>
       </SidebarContent>

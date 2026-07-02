@@ -30,6 +30,7 @@ import {
   Trash2Icon,
 } from "lucide-react"
 import { Task } from "@/types/task"
+import { usePermission } from "@/hooks/use-permission"
 
 export type { Task }
 
@@ -55,6 +56,7 @@ export function KanbanCard({
   onDelete,
   onUpdate,
 }: KanbanCardProps) {
+  const canEdit = usePermission("board:edit")
   const [detailOpen, setDetailOpen] = useState(false)
   const [editTitle, setEditTitle] = useState(task.title)
   const [editPriority, setEditPriority] = useState<Task["priority"]>(
@@ -107,10 +109,11 @@ export function KanbanCard({
     onDelete?.(task.id)
   }
 
-  const assigneeInitials = task.assignee
-    ? task.assignee
+  const firstAssignee = (task.assignees ?? [])[0] ?? null
+  const assigneeInitials = firstAssignee
+    ? firstAssignee
         .split(" ")
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .join("")
         .slice(0, 2)
         .toUpperCase()
@@ -141,6 +144,7 @@ export function KanbanCard({
                 "z-50 scale-105 rotate-1 cursor-grabbing border-primary shadow-xl"
             )}
             onDoubleClick={(e) => {
+              if (!canEdit) return
               e.stopPropagation()
               openDetail()
             }}
@@ -197,18 +201,22 @@ export function KanbanCard({
           </Card>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-40">
-          <ContextMenuItem className="gap-2" onSelect={openDetail}>
-            <PencilIcon className="size-3.5" />
-            Görevi Düzenle
-          </ContextMenuItem>
-          <ContextMenuItem
-            variant="destructive"
-            className="gap-2"
-            onSelect={() => onDelete?.(task.id)}
-          >
-            <Trash2Icon className="size-3.5" />
-            Görevi Sil
-          </ContextMenuItem>
+          {canEdit && (
+            <ContextMenuItem className="gap-2" onSelect={openDetail}>
+              <PencilIcon className="size-3.5" />
+              Görevi Düzenle
+            </ContextMenuItem>
+          )}
+          {canEdit && (
+            <ContextMenuItem
+              variant="destructive"
+              className="gap-2"
+              onSelect={() => onDelete?.(task.id)}
+            >
+              <Trash2Icon className="size-3.5" />
+              Görevi Sil
+            </ContextMenuItem>
+          )}
         </ContextMenuContent>
       </ContextMenu>
 
@@ -283,15 +291,17 @@ export function KanbanCard({
           </div>
 
           <DialogFooter className="flex-row justify-between gap-2 sm:justify-between">
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-1.5"
-              onClick={handleDelete}
-            >
-              <Trash2Icon className="size-3.5" />
-              Sil
-            </Button>
+            {canEdit ? (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleDelete}
+              >
+                <Trash2Icon className="size-3.5" />
+                Sil
+              </Button>
+            ) : <span />}
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -300,13 +310,15 @@ export function KanbanCard({
               >
                 İptal
               </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={!editTitle.trim()}
-              >
-                Değişiklikleri kaydet
-              </Button>
+              {canEdit && (
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={!editTitle.trim()}
+                >
+                  Değişiklikleri kaydet
+                </Button>
+              )}
             </div>
           </DialogFooter>
         </DialogContent>

@@ -1,25 +1,33 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
 from ..database import get_session
-from ..models import TeamMember
+from ..deps import require_permission
+from ..models import TeamMember, User
 from ..schemas import TeamMemberCreate, TeamMemberResponse, TeamMemberUpdate
 
 router = APIRouter(prefix="/team", tags=["team"])
 
 
 @router.get("", response_model=List[TeamMemberResponse])
-def list_team(session: Session = Depends(get_session)):
+def list_team(
+    current_user: User = Depends(require_permission("team:view")),
+    session: Session = Depends(get_session),
+):
     members = session.exec(select(TeamMember).order_by(TeamMember.created_at)).all()
     return members
 
 
 @router.post("", response_model=TeamMemberResponse, status_code=status.HTTP_201_CREATED)
-def create_member(body: TeamMemberCreate, session: Session = Depends(get_session)):
+def create_member(
+    body: TeamMemberCreate,
+    current_user: User = Depends(require_permission("team:manage")),
+    session: Session = Depends(get_session),
+):
     member = TeamMember(
         id=body.id or f"tm-{uuid.uuid4().hex[:8]}",
         name=body.name,
@@ -27,9 +35,9 @@ def create_member(body: TeamMemberCreate, session: Session = Depends(get_session
         role=body.role,
         status=body.status,
         avatar=body.avatar,
-        joined_at=body.joined_at or datetime.utcnow().strftime("%Y-%m-%d"),
+        joined_at=body.joined_at or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         phone=body.phone,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     session.add(member)
     session.commit()
@@ -38,7 +46,12 @@ def create_member(body: TeamMemberCreate, session: Session = Depends(get_session
 
 
 @router.put("/{member_id}", response_model=TeamMemberResponse)
-def update_member(member_id: str, body: TeamMemberUpdate, session: Session = Depends(get_session)):
+def update_member(
+    member_id: str,
+    body: TeamMemberUpdate,
+    current_user: User = Depends(require_permission("team:manage")),
+    session: Session = Depends(get_session),
+):
     member = session.get(TeamMember, member_id)
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
@@ -54,7 +67,11 @@ def update_member(member_id: str, body: TeamMemberUpdate, session: Session = Dep
 
 
 @router.delete("/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_member(member_id: str, session: Session = Depends(get_session)):
+def delete_member(
+    member_id: str,
+    current_user: User = Depends(require_permission("team:manage")),
+    session: Session = Depends(get_session),
+):
     member = session.get(TeamMember, member_id)
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")

@@ -18,11 +18,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { TeamMember } from "@/contexts/team-context"
+import { usePresence } from "@/contexts/presence-context"
 
 interface MemberGridProps {
   members: TeamMember[]
-  onEdit: (member: TeamMember) => void
-  onDelete: (id: string) => void
+  onEdit?: (member: TeamMember) => void
+  onDelete?: (id: string) => void
 }
 
 const avatarColors = [
@@ -37,33 +38,8 @@ const avatarColors = [
   "bg-teal-500",
 ]
 
-const statusConfig: Record<
-  TeamMember["status"],
-  { label: string; color: string; dot: string; ring: string }
-> = {
-  active: {
-    label: "Aktif",
-    color:
-      "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    dot: "bg-emerald-500",
-    ring: "ring-emerald-500",
-  },
-  away: {
-    label: "Uzakta",
-    color:
-      "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
-    dot: "bg-amber-500",
-    ring: "ring-amber-500",
-  },
-  offline: {
-    label: "Çevrimdışı",
-    color: "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/20",
-    dot: "bg-zinc-400",
-    ring: "ring-zinc-400",
-  },
-}
-
 export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
+  const { isOnlineByEmail } = usePresence()
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {members.map((member) => {
@@ -73,7 +49,7 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
           .join("")
           .toUpperCase()
         const colorIndex = member.name.charCodeAt(0) % avatarColors.length
-        const statusCfg = statusConfig[member.status]
+        const online = isOnlineByEmail(member.email)
 
         return (
           <div
@@ -93,7 +69,7 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={() => onEdit(member)}>
+                  <DropdownMenuItem onClick={() => onEdit?.(member)}>
                     <Pencil className="mr-2 size-3.5" />
                     Üyeyi Düzenle
                   </DropdownMenuItem>
@@ -105,7 +81,7 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => onDelete(member.id)}
+                    onClick={() => onDelete?.(member.id)}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="mr-2 size-3.5" />
@@ -126,11 +102,11 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
                 >
                   {initials}
                 </div>
-                {/* Status dot */}
+                {/* Status dot — green = online now, else manual status color */}
                 <span
                   className={cn(
                     "absolute right-0.5 bottom-0.5 size-3.5 rounded-full border-2 border-background",
-                    statusCfg.dot
+                    online ? "bg-emerald-500" : "bg-zinc-400"
                   )}
                 />
               </div>
@@ -148,11 +124,13 @@ export function MemberGrid({ members, onEdit, onDelete }: MemberGridProps) {
                 variant="outline"
                 className={cn(
                   "gap-1.5 border text-xs font-medium",
-                  statusCfg.color
+                  online
+                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                    : "bg-zinc-500/15 text-zinc-500 dark:text-zinc-400 border-zinc-500/20"
                 )}
               >
-                <span className={cn("size-1.5 rounded-full", statusCfg.dot)} />
-                {statusCfg.label}
+                <span className={cn("size-1.5 rounded-full", online ? "bg-emerald-500" : "bg-zinc-400")} />
+                {online ? "Çevrimiçi" : "Çevrimdışı"}
               </Badge>
 
               {/* Email */}

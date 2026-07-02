@@ -3,7 +3,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
 import { MOCK_AUTH, useAuth } from "@/contexts/auth-context"
-import { type Permission, type Role, DEFAULT_ROLE_PERMISSIONS } from "@/lib/permissions"
+import { type Permission, DEFAULT_ROLE_PERMISSIONS, SYSTEM_ROLES } from "@/lib/permissions"
+
+const MOCK_ROLE_PERMISSIONS_KEY = "wms:role_permissions"
 
 type PermissionsContextValue = {
   permissions: Permission[]
@@ -13,10 +15,30 @@ type PermissionsContextValue = {
 
 const PermissionsContext = createContext<PermissionsContextValue | null>(null)
 
+function getMockPermissionsForRole(role: string): Permission[] {
+  if (typeof window === "undefined") {
+    const sysRole = SYSTEM_ROLES.includes(role as (typeof SYSTEM_ROLES)[number])
+      ? (role as (typeof SYSTEM_ROLES)[number])
+      : "member"
+    return DEFAULT_ROLE_PERMISSIONS[sysRole] ?? []
+  }
+  try {
+    const raw = localStorage.getItem(MOCK_ROLE_PERMISSIONS_KEY)
+    if (raw) {
+      const stored: Record<string, string[]> = JSON.parse(raw)
+      if (stored[role]) return stored[role] as Permission[]
+    }
+  } catch { /* ignore */ }
+  const sysRole = SYSTEM_ROLES.includes(role as (typeof SYSTEM_ROLES)[number])
+    ? (role as (typeof SYSTEM_ROLES)[number])
+    : "member"
+  return DEFAULT_ROLE_PERMISSIONS[sysRole] ?? []
+}
+
 export function PermissionsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const [permissions, setPermissions] = useState<Permission[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!MOCK_AUTH)
 
   const fetchPermissions = useCallback(async () => {
     if (!user) {
@@ -26,8 +48,8 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     }
 
     if (MOCK_AUTH) {
-      const role = (user.role ?? "member") as Role
-      setPermissions(DEFAULT_ROLE_PERMISSIONS[role] ?? [])
+      const role = user.role ?? "member"
+      setPermissions(getMockPermissionsForRole(role))
       setLoading(false)
       return
     }
@@ -43,7 +65,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   }, [user])
 
   useEffect(() => {
-    setLoading(true)
+    if (!MOCK_AUTH) setLoading(true)
     fetchPermissions()
   }, [fetchPermissions])
 

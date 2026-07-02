@@ -31,6 +31,8 @@ import { cn } from "@/lib/utils"
 import { useTasks } from "@/contexts/task-context"
 import { Task, TaskPriority } from "@/types/task"
 import { toast } from "sonner"
+import { usePermissions } from "@/contexts/permissions-context"
+import { AccessDenied } from "@/components/auth/access-denied"
 
 type CalendarTask = {
   id: string
@@ -86,6 +88,9 @@ function buildCalendarWeeks(year: number, month: number) {
 const DAY_HEADERS = ["Pz", "Pt", "Sa", "Ça", "Pe", "Cu", "Ct"]
 
 export default function CalendarPage() {
+  const { permissions, loading: permLoading } = usePermissions()
+  const canView = permissions.includes("calendar:view")
+  const canEdit = permissions.includes("calendar:edit")
   const { tasks, addTask, updateTask, deleteTask } = useTasks()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<Date>(new Date())
@@ -145,7 +150,7 @@ export default function CalendarPage() {
       title: newTitle.trim(),
       status: "todo",
       priority: newPriority,
-      assignee: "",
+      assignees: [],
       dueDate: selectedDateStr,
       tags: [],
       createdAt: new Date().toISOString().slice(0, 10),
@@ -187,6 +192,7 @@ export default function CalendarPage() {
       <SidebarInset>
         <SiteHeader />
         <main className="flex flex-1 overflow-hidden bg-background">
+          {permLoading ? null : !canView ? <AccessDenied /> : (
           <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
 
             {/* ── Left: Calendar grid ─────────────────────────────── */}
@@ -302,19 +308,21 @@ export default function CalendarPage() {
                     {format(selectedDay, "MMMM d, yyyy")}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => setShowAddForm((v) => !v)}
-                  variant={showAddForm ? "secondary" : "default"}
-                >
-                  <Plus size={14} className="mr-1" />
-                  Görev Ekle
-                </Button>
+                {canEdit && (
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddForm((v) => !v)}
+                    variant={showAddForm ? "secondary" : "default"}
+                  >
+                    <Plus size={14} className="mr-1" />
+                    Görev Ekle
+                  </Button>
+                )}
               </div>
 
               <div className="flex flex-col flex-1 overflow-y-auto px-6 py-4 gap-3">
                 {/* Add task form */}
-                {showAddForm && (
+                {showAddForm && canEdit && (
                   <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3 shrink-0">
                     <Input
                       autoFocus
@@ -390,8 +398,9 @@ export default function CalendarPage() {
                       )}
                     >
                       <button
-                        onClick={() => handleToggle(task.id)}
-                        className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                        onClick={() => canEdit && handleToggle(task.id)}
+                        disabled={!canEdit}
+                        className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         {task.completed ? (
                           <CheckCircle2 size={18} className="text-emerald-500" />
@@ -422,12 +431,14 @@ export default function CalendarPage() {
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDelete(task.id)}
-                        className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {canEdit && (
+                        <button
+                          onClick={() => handleDelete(task.id)}
+                          className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
@@ -435,6 +446,7 @@ export default function CalendarPage() {
             </div>
 
           </div>
+          )}
         </main>
       </SidebarInset>
     </SidebarProvider>

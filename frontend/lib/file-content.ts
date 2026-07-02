@@ -14,6 +14,10 @@ export async function extractText(fullPath: string, ext: string): Promise<string
     }
 
     if (e === "pdf") {
+      // Cap PDF reads at 32 MB to avoid OOM on large files
+      const MAX_PDF_BYTES = 32 * 1024 * 1024
+      const stat = await fs.stat(fullPath)
+      if (stat.size > MAX_PDF_BYTES) return null
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>
       const buf = await fs.readFile(fullPath)

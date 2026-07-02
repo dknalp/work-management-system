@@ -19,9 +19,10 @@ import {
 interface FileDropZoneProps {
   children: React.ReactNode
   currentPath: string
+  disabled?: boolean
 }
 
-export function FileDropZone({ children, currentPath }: FileDropZoneProps) {
+export function FileDropZone({ children, currentPath, disabled = false }: FileDropZoneProps) {
   const router = useRouter()
   const dragCounter = React.useRef(0)
   const [isDragging, setIsDragging] = React.useState(false)
@@ -31,15 +32,20 @@ export function FileDropZone({ children, currentPath }: FileDropZoneProps) {
   const doUpload = async (files: File[], overwrite = false) => {
     const toastId = toast.loading(`Uploading ${files.length} file(s)…`)
 
-    const results = await Promise.all(
-      files.map((file) => {
+    const CONCURRENCY = 3
+    const queue = [...files]
+    const results: Awaited<ReturnType<typeof uploadFile>>[] = []
+    async function worker() {
+      while (queue.length > 0) {
+        const file = queue.shift()!
         const formData = new FormData()
         formData.append("file", file)
         formData.append("path", currentPath)
         if (overwrite) formData.append("overwrite", "true")
-        return uploadFile(formData)
-      })
-    )
+        results.push(await uploadFile(formData))
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()))
 
     const conflicts = results
       .map((r, i) => (r.conflict ? files[i] : null))
@@ -77,7 +83,7 @@ export function FileDropZone({ children, currentPath }: FileDropZoneProps) {
   const onDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
     const isFile = e.dataTransfer.types.includes("Files")
-    if (!isFile) return
+    if (!isFile || disabled) return
     dragCounter.current++
     if (dragCounter.current === 1) setIsDragging(true)
   }
@@ -101,12 +107,13 @@ export function FileDropZone({ children, currentPath }: FileDropZoneProps) {
     e.preventDefault()
     dragCounter.current = 0
     setIsDragging(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (!disabled && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       await handleUpload(e.dataTransfer.files)
     }
   }
 
   const onPaste = async (e: React.ClipboardEvent) => {
+    if (disabled) return
     const items = e.clipboardData.items
     const files: File[] = []
     for (let i = 0; i < items.length; i++) {

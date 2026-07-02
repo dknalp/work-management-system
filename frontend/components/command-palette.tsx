@@ -89,13 +89,13 @@ export function CommandPalette() {
             return (
               <CommandItem
                 key={task.id}
-                value={`${task.title} ${task.assignee} ${task.status}`}
+                value={`${task.title} ${(task.assignees ?? []).join(" ")} ${task.status}`}
                 onSelect={() => go("/tasks")}
               >
                 <Icon className="mr-2 size-4 text-muted-foreground" />
                 <span className="flex-1 truncate">{task.title}</span>
-                {task.assignee && (
-                  <span className="ml-2 text-xs text-muted-foreground">{task.assignee}</span>
+                {(task.assignees ?? []).length > 0 && (
+                  <span className="ml-2 text-xs text-muted-foreground">{task.assignees.join(", ")}</span>
                 )}
               </CommandItem>
             )

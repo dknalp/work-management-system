@@ -1,15 +1,32 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { CheckCircle2, Clock, AlertCircle, ListTodo } from "lucide-react"
 import { useTasks } from "@/contexts/task-context"
 import { cn } from "@/lib/utils"
 import { isAfter, parseISO, startOfToday } from "date-fns"
+import { apiClient } from "@/lib/api"
+import { MOCK_AUTH } from "@/contexts/auth-context"
+
+type ApiStats = {
+  total: number
+  todo: number
+  in_progress: number
+  done: number
+  overdue: number
+  completion_rate: number
+}
 
 export function StatsCards() {
   const { tasks } = useTasks()
+  const [apiStats, setApiStats] = useState<ApiStats | null>(null)
 
-  const stats = useMemo(() => {
+  useEffect(() => {
+    if (MOCK_AUTH) return
+    apiClient<ApiStats>("/analytics/stats").then(setApiStats).catch(() => {})
+  }, [])
+
+  const mockStats = useMemo(() => {
     const today = startOfToday()
     const total = tasks.length
     const done = tasks.filter((t) => t.status === "done").length
@@ -20,6 +37,16 @@ export function StatsCards() {
     const completionRate = total > 0 ? Math.round((done / total) * 100) : 0
     return { total, done, inProgress, overdue, completionRate }
   }, [tasks])
+
+  const stats = apiStats
+    ? {
+        total: apiStats.total,
+        done: apiStats.done,
+        inProgress: apiStats.in_progress,
+        overdue: apiStats.overdue,
+        completionRate: Math.round(apiStats.completion_rate),
+      }
+    : mockStats
 
   const cards = [
     {
