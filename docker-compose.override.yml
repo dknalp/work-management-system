@@ -1,0 +1,24 @@
+# Local development override — used automatically by `docker compose up`.
+# Dokploy ignores this file and uses docker-compose.yml directly.
+#
+# This file:
+#   1. Replaces the external dokploy-network with an inline network
+#      so the stack starts without Dokploy installed locally.
+#   2. Exposes backend and frontend ports to localhost.
+#
+# Setup:
+#   cp .env.example .env        # then fill in SECRET_KEY and URLs
+#   docker compose up --build
+
+networks:
+  dokploy-network:
+    external: false
+
+services:
+  backend:
+    ports:
+      - "3052:3052"
+
+  frontend:
+    ports:
+      - "3051:3051"
