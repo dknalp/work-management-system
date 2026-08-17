@@ -185,3 +185,38 @@ class CalendarEvent(SQLModel, table=True):
     owner_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", index=True)
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
+
+
+class FileRecord(SQLModel, table=True):
+    """Metadata for files and folders stored in Cloudflare R2.
+
+    Actual bytes live in R2; this table provides fast listing, search,
+    soft-delete (trash), and quota tracking without hitting the object store.
+    """
+    __tablename__ = "file_records"
+    __table_args__ = (
+        UniqueConstraint("owner_id", "path", name="uq_file_record_owner_path"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+
+    # Human-readable display name, e.g. "report.pdf"
+    name: str = Field(max_length=500)
+    # Full virtual path, e.g. "projects/2026/report.pdf" (no leading slash)
+    path: str = Field(index=True, max_length=2048)
+    # Pre-computed parent so listing is a simple equality query, e.g. "projects/2026"
+    # Root items have parent_path=""
+    parent_path: str = Field(default="", index=True, max_length=2048)
+
+    type: str = Field(default="file", max_length=10)  # "file" | "folder"
+    size: Optional[int] = Field(default=None)          # bytes; None for folders
+    mime_type: Optional[str] = Field(default=None, max_length=255)
+    # R2 object key, e.g. "<owner_id>/<file_id>"; None for folders
+    r2_key: Optional[str] = Field(default=None, max_length=1024)
+
+    is_deleted: bool = Field(default=False, index=True)
+    deleted_at: Optional[datetime] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)

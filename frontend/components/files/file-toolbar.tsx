@@ -8,8 +8,6 @@ import {
   RefreshCwIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { createFolder } from "@/lib/actions/files"
-import { uploadFile } from "@/lib/actions/upload"
 import {
   Dialog,
   DialogContent,
@@ -30,6 +28,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { usePermission } from "@/hooks/use-permission"
+import { uploadFile, createFolder } from "@/lib/actions/files"
 
 interface FileToolbarProps {
   currentPath: string
@@ -51,20 +50,35 @@ export function FileToolbar({ currentPath, isDriveView = false }: FileToolbarPro
     const toastId = toast.loading(`${files.length} dosya yükleniyor…`)
     const CONCURRENCY = 3
     const queue = [...files]
-    const results: Awaited<ReturnType<typeof uploadFile>>[] = []
+    let successCount = 0
+    const conflicts: File[] = []
+
+    const results: Array<{ file: File; ok: boolean; conflict: boolean }> = []
     async function worker() {
       while (queue.length > 0) {
         const file = queue.shift()!
-        const fd = new FormData()
-        fd.append("file", file)
-        fd.append("path", currentPath)
-        if (overwrite) fd.append("overwrite", "true")
-        results.push(await uploadFile(fd))
+        try {
+          await uploadFile(file, currentPath, overwrite)
+          results.push({ file, ok: true, conflict: false })
+        } catch (err: unknown) {
+          const status = (err as { status?: number }).status
+          if (status === 409) {
+            results.push({ file, ok: false, conflict: true })
+          } else {
+            results.push({ file, ok: false, conflict: false })
+          }
+        }
       }
     }
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()))
-    const successCount = results.filter((r) => r.success).length
-    const conflicts = results.map((r, i) => (r.conflict ? files[i] : null)).filter(Boolean) as File[]
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()),
+    )
+
+    for (const r of results) {
+      if (r.ok) successCount++
+      else if (r.conflict) conflicts.push(r.file)
+    }
+
     if (successCount > 0) {
       toast.success(`${successCount} dosya yüklendi`, { id: toastId })
       router.refresh()
@@ -72,6 +86,11 @@ export function FileToolbar({ currentPath, isDriveView = false }: FileToolbarPro
     } else {
       toast.dismiss(toastId)
     }
+
+    if (results.filter((r) => !r.ok && !r.conflict).length > 0) {
+      toast.error(`${results.filter((r) => !r.ok && !r.conflict).length} yükleme başarısız`)
+    }
+
     if (conflicts.length > 0) {
       setConflictFiles(conflicts)
       setConflictOpen(true)
@@ -87,16 +106,17 @@ export function FileToolbar({ currentPath, isDriveView = false }: FileToolbarPro
   const handleCreateFolder = async () => {
     if (!folderName.trim()) return
     setCreating(true)
-    const res = await createFolder(currentPath, folderName.trim())
-    if (res.success) {
+    try {
+      await createFolder(currentPath, folderName.trim())
       toast.success(`"${folderName}" klasörü oluşturuldu`)
       setNewFolderOpen(false)
       setFolderName("")
       router.refresh()
-    } else {
-      toast.error(res.error ?? "Klasör oluşturulamadı")
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? "Klasör oluşturulamadı")
+    } finally {
+      setCreating(false)
     }
-    setCreating(false)
   }
 
   if (isDriveView) {

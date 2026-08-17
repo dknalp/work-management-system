@@ -38,19 +38,38 @@ pnpm format     # Prettier (writes in place)
 **Backend** — run from `backend/` with venv active (`source .venv/bin/activate`):
 ```bash
 pip install -r requirements.txt           # Install dependencies
-uvicorn app.main:app --reload             # Dev server (port 8000)
+uvicorn app.main:app --reload --port 3052  # Dev server (port 3052)
 alembic upgrade head                      # Apply DB migrations (alembic/ dir is at backend/alembic/)
 alembic revision --autogenerate -m "..."  # Generate migration from model changes
+```
+
+**Docker** — run from the repo root:
+```bash
+docker-compose up --build   # Build and start all services (frontend :3000, backend :3052, postgres :5433)
 ```
 
 There are no tests in this project.
 
 ## Environment Variables
 
+**Frontend** (`frontend/.env.local`):
 ```bash
 NEXT_PUBLIC_MOCK_AUTH=true       # Bypass real API auth, use localStorage mock user
-NEXT_PUBLIC_API_URL=             # Backend base URL (defaults to http://localhost:8000)
-FILE_STORAGE_PATH=               # Override where uploaded files are stored on disk
+NEXT_PUBLIC_API_URL=             # Backend base URL (defaults to http://localhost:3052)
+```
+
+**Backend** (`backend/.env`):
+```bash
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workos
+SECRET_KEY=...          # JWT signing key
+FRONTEND_URL=http://localhost:3000
+# Cloudflare R2 (optional — if set, files are stored in R2 instead of local disk)
+CLOUDFLARE_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=          # Public base URL for serving R2 files
+FILE_STORAGE_PATH=      # Override where uploaded files are stored on disk (local mode only)
 ```
 
 ## Architecture
@@ -75,12 +94,11 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 - `/admin` — Admin panel (requires `is_admin`; redirects to `/home` otherwise)
 - `/admin/activity` — Full activity log
 - `/admin/roles` — Role permission management
+- `/agent-builder` — Agent/bot builder UI
 - `/(auth)/login`, `/(auth)/register`, `/(auth)/forgot-password`, `/(auth)/reset-password` — Auth pages (no sidebar, own layout)
 
-**API Routes:**
-- `GET /api/files/raw` — Serves raw file bytes for in-browser preview
-- `GET /api/files/quota` — Returns disk usage and quota for the file storage directory
-- `GET /api/files/zip` — Streams a ZIP archive of selected paths
+**API Routes** (all deleted/moved to backend — files are now served via backend v1 API):
+- File operations (list, upload, rename, move, delete, raw preview, zip download) are handled by `backend/app/routers/v1/files.py` via `POST /api/v1/files/...`
 
 **Sidebar layout pattern:** Every app page (not landing/auth) wraps content in:
 ```tsx
@@ -93,11 +111,11 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 </SidebarProvider>
 ```
 
-**File system:** Files are stored locally under `frontend/data/`. `frontend/lib/actions/files.ts` contains Server Actions for list/delete/rename/move/createFolder. `frontend/lib/actions/upload.ts` handles uploads. `frontend/app/api/files/raw/route.ts` serves raw file bytes for preview. Path traversal is prevented via `getSafePath()` in each action. Server Actions `bodySizeLimit` is set to `2gb` in `frontend/next.config.mjs`.
+**File system:** Files are stored locally under `frontend/data/` by default. If Cloudflare R2 env vars are set, `backend/app/r2.py` handles all storage operations (upload/download/delete/list) against R2 instead. `frontend/lib/actions/files.ts` contains Server Actions that call the backend v1 files API. Path traversal is prevented via `getSafePath()` in each action. Server Actions `bodySizeLimit` is set to `2gb` in `frontend/next.config.mjs`.
 
-**State:** No real database. Kanban state is in-memory React state (resets on refresh); hardcoded in `frontend/components/dashboard/board/kanban-board.tsx`. Tasks and activity log are persisted to `localStorage` via `useLocalStorage` (`wms:tasks`, `wms:activity`) — initial seed comes from `MOCK_TASKS` in `frontend/types/task.ts`. Team member seed data is in `frontend/contexts/team-context.tsx`. Dashboard chart data comes from `frontend/app/dashboard/data.json`. File explorer is the only server-rendered page, refreshed via `revalidatePath`.
+**State:** No real database on the frontend. Kanban state is in-memory React state (resets on refresh); hardcoded in `frontend/components/dashboard/board/kanban-board.tsx`. Tasks and activity log are persisted to `localStorage` via `useLocalStorage` (`wms:tasks`, `wms:activity`) — initial seed comes from `MOCK_TASKS` in `frontend/types/task.ts`. Team member seed data is in `frontend/contexts/team-context.tsx`. Dashboard chart data comes from `frontend/app/dashboard/data.json`. File explorer is the only server-rendered page, refreshed via `revalidatePath`.
 
-**Auth:** `frontend/contexts/auth-context.tsx` provides `AuthProvider` / `useAuth()` (exposes `user`, `loading`, `login`, `logout`, `updateUser`). When `NEXT_PUBLIC_MOCK_AUTH=true`, auth bypasses the real API and stores a mock user in `localStorage` (`wms:mock_user`). In real mode, `frontend/lib/auth.ts` stores JWT tokens in `localStorage` (`wos_access_token`, `wos_refresh_token`) and syncs a `has_session` cookie. `frontend/proxy.ts` is the Next.js middleware (named `proxy.ts` instead of the conventional `middleware.ts`): it reads the `has_session`, `is_admin`, and `user_role` cookies to gate all protected routes, redirect away from auth pages when already logged in, and block non-admin users from `/admin`. `frontend/lib/api.ts` is the typed API client (base URL from `NEXT_PUBLIC_API_URL`, defaults to `http://localhost:8000`) with automatic token refresh on 401.
+**Auth:** `frontend/contexts/auth-context.tsx` provides `AuthProvider` / `useAuth()` (exposes `user`, `loading`, `login`, `logout`, `updateUser`). When `NEXT_PUBLIC_MOCK_AUTH=true`, auth bypasses the real API and stores a mock user in `localStorage` (`wms:mock_user`). In real mode, `frontend/lib/auth.ts` stores JWT tokens in `localStorage` (`wos_access_token`, `wos_refresh_token`) and syncs a `has_session` cookie. `frontend/proxy.ts` is the Next.js middleware (named `proxy.ts` instead of the conventional `middleware.ts`): it reads the `has_session`, `is_admin`, and `user_role` cookies to gate all protected routes, redirect away from auth pages when already logged in, and block non-admin users from `/admin`. `frontend/lib/api.ts` is the typed API client (base URL from `NEXT_PUBLIC_API_URL`, defaults to `http://localhost:3052`) with automatic token refresh on 401.
 
 **Contexts:** Four global providers wrap the app in `frontend/app/layout.tsx` (in nesting order): `AuthProvider`, `PermissionsProvider` (`frontend/contexts/permissions-context.tsx` — RBAC checks, use `usePermissions()`), `TaskProvider` (`frontend/contexts/task-context.tsx` — shared task CRUD + activity log, use `useTasks()`), and `TeamProvider` (`frontend/contexts/team-context.tsx`, use `useTeam()`). Always use these hooks instead of prop-drilling. Additional page-scoped contexts in `frontend/contexts/`: `CalendarContext`, `NotificationsContext`, `PipelineContext`, `PresenceContext`, `ProjectContext`.
 
@@ -121,9 +139,9 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 **Path alias:** `@/*` maps to the `frontend/` root (e.g. `@/components/ui/button`).
 
-**Lib:** `frontend/lib/` contains: `api.ts` (typed API client), `auth.ts` (token storage helpers), `permissions.ts` (RBAC helper functions), `utils.ts` (Tailwind `cn()` merge), `server-auth.ts` (server-side auth helpers), `storage-config.ts` (file storage path resolution), `file-content.ts` (file content reading/parsing), `google-oauth.ts` (Google OAuth helpers), `custom-nav.ts` (navigation helpers), and `actions/` (Next.js Server Actions: `files.ts`, `upload.ts`, `bots.ts`, `drive.ts`).
+**Lib:** `frontend/lib/` contains: `api.ts` (typed API client), `auth.ts` (token storage helpers), `permissions.ts` (RBAC helper functions), `utils.ts` (Tailwind `cn()` merge), `server-auth.ts` (server-side auth helpers), `google-oauth.ts` (Google OAuth helpers), `custom-nav.ts` (navigation helpers), and `actions/` (Next.js Server Actions: `files.ts`).
 
-**Types:** Shared TypeScript types live in `frontend/types/`. Contains `task.ts` (Tasks-page `Task` type + `MOCK_TASKS` seed), `pipeline.ts`, and `project.ts`.
+**Types:** Shared TypeScript types live in `frontend/types/`. Contains `task.ts` (Tasks-page `Task` type + `MOCK_TASKS` seed), `pipeline.ts`, `project.ts`, and `agent.ts` (agent/bot builder types).
 
 **Fonts:** Geist (sans), Instrument Serif, Geist Mono — loaded via `next/font/google` and exposed as CSS variables (`--font-sans`, `--font-instrument-serif`, `--font-mono`) in `frontend/app/layout.tsx`. (Note: the variable is named `--font-sans` even though the font is Geist, not Inter.)
 
@@ -141,16 +159,17 @@ FastAPI + SQLModel application in `backend/app/`. SQLModel combines Pydantic v2 
 - `app/database.py` — engine (`DATABASE_URL` env var, defaults to `postgresql://postgres:postgres@localhost:5432/workos`), `get_session` FastAPI dependency
 - `app/security.py` — JWT creation/decoding (python-jose), password hashing (passlib/bcrypt)
 - `app/deps.py` — `get_current_user` FastAPI dependency
+- `app/r2.py` — Cloudflare R2 storage client (boto3/s3 compatible); used by the v1 files router when R2 env vars are present
 - `app/routers/` — one file per domain: `auth`, `users`, `admin`, `bots`, `tasks`, `activity`, `team`, `analytics`, `permissions`
 - `app/routers/v1/` — versioned public API (`/api/v1`): `me`, `tasks`, `team`, `activity`, `analytics`, `files`, `webhooks`, `chat`, `presence` — accepts both JWT and API key auth
+
+**File storage routing:** `app/routers/v1/files.py` checks for R2 env vars at request time. If `CLOUDFLARE_ACCOUNT_ID` / `R2_BUCKET_NAME` are set it delegates to `app/r2.py`; otherwise it reads/writes from `FILE_STORAGE_PATH` (defaults to `frontend/data/` relative to the repo root).
 
 **Auth:** JWT access + refresh tokens. `POST /auth/register`, `POST /auth/login` return both. `POST /auth/refresh` rotates access token. Password reset is mock-email only (prints reset URL to stdout). Google OAuth is wired in the auth router.
 
 **RBAC:** Three roles (`admin`, `manager`, `member`) with per-permission grants stored in `RolePermission` table. Default permissions are seeded at startup in `app/routers/permissions.py`. Admin users: `is_admin=True` OR `role="admin"` — both are checked. Frontend enforces RBAC via `frontend/contexts/permissions-context.tsx` and `frontend/lib/permissions.ts`; `frontend/components/auth/access-denied.tsx` is the blocked-access fallback UI.
 
-**Backend env vars** (see `backend/.env.example`):
-```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workos
-SECRET_KEY=...          # JWT signing key
-FRONTEND_URL=http://localhost:3000
-```
+**Docker topology** (`docker-compose.yml`):
+- `frontend` — Next.js, port 3000, standalone output
+- `backend` — FastAPI via `entrypoint.sh` (runs migrations then uvicorn), port 3052
+- `db` — PostgreSQL 15, port 5433 (host) → 5432 (container), volume `pgdata`

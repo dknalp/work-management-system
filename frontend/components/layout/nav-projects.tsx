@@ -17,7 +17,11 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { usePinnedFolders } from "@/hooks/use-pinned-folders"
+// TODO: yeni storage sistemi bağlandığında pinned-folders burada import edilecek
+type PinnedFolder = { name: string; path: string }
+function usePinnedFolders() {
+  return { pinned: [] as PinnedFolder[], unpin: (_p: string) => {} }
+}
 
 export function NavProjects() {
   const { isMobile } = useSidebar()

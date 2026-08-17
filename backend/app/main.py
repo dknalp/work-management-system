@@ -19,9 +19,10 @@ from .routers import tasks, activity, team, analytics, permissions
 from .routers import projects, pipelines, kanban, calendar
 from .routers.permissions import seed_default_permissions
 from .routers.v1 import tasks as v1_tasks, team as v1_team, activity as v1_activity
-from .routers.v1 import analytics as v1_analytics, files as v1_files, webhooks as v1_webhooks, me as v1_me
+from .routers.v1 import analytics as v1_analytics, webhooks as v1_webhooks, me as v1_me
 from .routers.v1 import chat as v1_chat
 from .routers.v1 import presence as v1_presence
+from .routers.v1 import files as v1_files
 
 SEED_TASKS = [
     {"id": "TASK-001", "title": "Redesign onboarding flow for new users", "status": "in-progress", "priority": "high", "assignees": ["Alex Johnson"], "due_date": "2026-07-10", "tags": ["design", "ux"], "created_at": "2026-04-20"},
@@ -119,7 +120,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="WorkOS API", version="1.0.0", lifespan=lifespan)
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3051")
 
 app.add_middleware(
     CORSMiddleware,
@@ -180,7 +181,7 @@ app.include_router(v1_tasks.router, prefix=_V1)
 app.include_router(v1_team.router, prefix=_V1)
 app.include_router(v1_activity.router, prefix=_V1)
 app.include_router(v1_analytics.router, prefix=_V1)
-app.include_router(v1_files.router, prefix=_V1)
 app.include_router(v1_webhooks.router, prefix=_V1)
 app.include_router(v1_chat.router, prefix=_V1)
 app.include_router(v1_presence.router, prefix=_V1)
+app.include_router(v1_files.router, prefix=_V1)

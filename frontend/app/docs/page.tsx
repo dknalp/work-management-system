@@ -743,7 +743,7 @@ const msg = await fetch(\`${BASE}/api/v1/messages/\${roomId}\`, {
 
 async def chat():
     room_id = "_".join(sorted([my_id, other_id]))
-    url = f"ws://localhost:8000/api/v1/ws/chat/{room_id}?token={api_key}"
+    url = f"ws://localhost:3052/api/v1/ws/chat/{room_id}?token={api_key}"
 
     async with websockets.connect(url) as ws:
         # İlk mesaj: geçmiş
@@ -976,7 +976,7 @@ from flask import Flask, request, abort
 
 # ── Yapılandırma ───────────────────────────────────────────────────────────────
 API_KEY    = os.environ.get("WMS_API_KEY", "")
-BASE_URL   = os.environ.get("WMS_BASE_URL", "http://localhost:8000")
+BASE_URL   = os.environ.get("WMS_BASE_URL", "http://localhost:3052")
 WEBHOOK_SECRET = os.environ.get("WMS_WEBHOOK_SECRET", "my-secret-key")
 
 if not API_KEY:
@@ -1078,7 +1078,7 @@ if __name__ == "__main__":
             <p><strong className="text-foreground">Kurulum:</strong></p>
             <CodeBlock language="bash" code={`pip install httpx flask
 export WMS_API_KEY="wms_live_your_key_here"
-export WMS_BASE_URL="http://localhost:8000"
+export WMS_BASE_URL="http://localhost:3052"
 
 # Ana botu çalıştır:
 python bot.py

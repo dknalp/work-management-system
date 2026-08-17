@@ -10,11 +10,12 @@ import {
   HardDriveIcon,
 } from "lucide-react"
 import { format } from "date-fns"
-import { FileItem } from "@/lib/actions/files"
+import type { FileItem } from "@/components/files/file-utils"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { isImageFile, isTextFile, formatSize } from "./file-utils"
+import { downloadFile } from "./file-utils"
 
 interface FilePreviewPanelProps {
   item: FileItem | null
@@ -26,6 +27,11 @@ function TextPreview({ url }: { url: string }) {
   const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
+    if (!url || url === "#") {
+      setContent("Önizleme yüklenemedi.")
+      setLoading(false)
+      return
+    }
     const controller = new AbortController()
     fetch(url, { signal: controller.signal })
       .then((res) => res.text())
@@ -50,8 +56,7 @@ function TextPreview({ url }: { url: string }) {
   }
 
   let display = content ?? ""
-  // Pretty-print JSON
-  if (url.includes(".json") && content) {
+  if (url.toLowerCase().includes(".json") && content) {
     try {
       display = JSON.stringify(JSON.parse(content), null, 2)
     } catch {
@@ -67,22 +72,29 @@ function TextPreview({ url }: { url: string }) {
 }
 
 export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    setPreviewUrl(null)
+    if (!item || item.type === "folder" || !item.id) return
+
+    import("@/lib/actions/files")
+      .then(({ getPreviewUrl }) => getPreviewUrl(item.id))
+      .then(setPreviewUrl)
+      .catch(() => setPreviewUrl(null))
+  }, [item])
+
   if (!item) return null
 
-  const isDrive = item.source === "drive" && !!item.driveFileId
-  const previewUrl = isDrive
-    ? `https://drive.google.com/file/d/${item.driveFileId}/preview`
-    : `/api/files/raw?path=${encodeURIComponent(item.path)}`
-  // Drive thumbnails require auth; route them through our proxy to avoid 403 on private files
-  const imageUrl = isDrive
-    ? `/api/files/drive-raw?id=${item.driveFileId}`
-    : `/api/files/raw?path=${encodeURIComponent(item.path)}`
-  const downloadUrl = isDrive
-    ? `https://drive.google.com/uc?export=download&id=${item.driveFileId}`
-    : `/api/files/raw?path=${encodeURIComponent(item.path)}`
-  const isImage = isImageFile(item.name)
-  const isText = isTextFile(item.name) && !isDrive
+  const isImage = isImageFile(item)
+  const isText = isTextFile(item)
   const isPDF = /\.pdf$/i.test(item.name)
+  const isFolder = item.type === "folder"
+
+  const ext = (() => {
+    const parts = item.name.split(".")
+    return parts.length > 1 ? parts.pop()!.toUpperCase() : null
+  })()
 
   return (
     <div className="flex w-80 shrink-0 animate-in flex-col border-l border-border bg-card duration-300 slide-in-from-right">
@@ -101,24 +113,28 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
         <div
           className={cn(
             "group relative flex items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/30 shadow-inner",
-            isText || isPDF ? "p-0" : "aspect-square"
+            isText || isPDF ? "p-0" : "aspect-square",
           )}
         >
-          {isImage ? (
+          {isImage && previewUrl ? (
             <img
-              src={imageUrl}
+              src={previewUrl}
               alt={item.name}
               className="max-h-full max-w-full object-contain drop-shadow-md"
             />
-          ) : isText ? (
+          ) : isText && previewUrl ? (
             <TextPreview url={previewUrl} />
-          ) : isPDF || isDrive ? (
+          ) : isPDF && previewUrl ? (
             <iframe
               src={previewUrl}
               className="h-64 w-full rounded-2xl border-0"
               title={item.name}
               allow="autoplay"
             />
+          ) : isFolder ? (
+            <div className="flex size-20 items-center justify-center rounded-2xl bg-primary/10">
+              <span className="text-5xl">📁</span>
+            </div>
           ) : (
             <FileIcon className="size-16 text-muted-foreground/40" />
           )}
@@ -129,13 +145,7 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
           <div>
             <h4 className="mb-1 truncate text-sm font-bold">{item.name}</h4>
             <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-              {item.isDirectory
-                ? "Klasör"
-                : (() => {
-                    const parts = item.name.split(".")
-                    const ext = parts.length > 1 ? parts.pop()!.toUpperCase() : null
-                    return ext ? `${ext} Dosyası` : "Dosya"
-                  })()}
+              {isFolder ? "Klasör" : ext ? `${ext} Dosyası` : "Dosya"}
             </p>
           </div>
 
@@ -145,30 +155,33 @@ export function FilePreviewPanel({ item, onClose }: FilePreviewPanelProps) {
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <HardDriveIcon className="size-3.5" />
-                <span>Size</span>
+                <span>Boyut</span>
               </div>
               <span className="font-medium">
-                {item.isDirectory ? "--" : formatSize(item.size)}
+                {isFolder ? "--" : formatSize(item.size)}
               </span>
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <CalendarIcon className="size-3.5" />
-                <span>Değiştirilme</span>
+            {item.lastModified && (
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CalendarIcon className="size-3.5" />
+                  <span>Değiştirilme</span>
+                </div>
+                <span className="line-clamp-1 text-right font-medium">
+                  {format(new Date(item.lastModified), "MMM d, yyyy HH:mm")}
+                </span>
               </div>
-              <span className="line-clamp-1 text-right font-medium">
-                {format(new Date(item.updatedAt), "MMM d, yyyy HH:mm")}
-              </span>
-            </div>
+            )}
           </div>
         </div>
 
-        {!item.isDirectory && (
-          <Button className="w-full gap-2 shadow-sm" asChild>
-            <a href={downloadUrl} download={item.name}>
-              <DownloadIcon className="size-4" />
-              Dosyayı İndir
-            </a>
+        {!isFolder && item.id && (
+          <Button
+            className="w-full gap-2 shadow-sm"
+            onClick={() => downloadFile(item)}
+          >
+            <DownloadIcon className="size-4" />
+            Dosyayı İndir
           </Button>
         )}
       </div>

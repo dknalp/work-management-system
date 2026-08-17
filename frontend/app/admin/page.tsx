@@ -52,8 +52,13 @@ import {
   RefreshCwIcon,
 } from "lucide-react"
 import { useSearchParams } from "next/navigation"
-import { getStorageConfig, updateStoragePath } from "@/lib/actions/files"
-import { getDriveConnectionStatus, getConnectDriveUrl, disconnectDrive, type DriveConnectionStatus } from "@/lib/actions/drive"
+// TODO: yeni storage sistemi bağlandığında action'lar burada import edilecek
+async function getStorageConfig(): Promise<{path: string; source: "env" | "config" | "default"}> { return {path: "/tmp/files", source: "default"} }
+async function updateStoragePath(_path: string): Promise<{success: boolean; path?: string; error?: string}> { return {success: false, error: "not implemented"} }
+type DriveConnectionStatus = { connected: boolean; email?: string; connectedAt?: string }
+async function getDriveConnectionStatus(): Promise<DriveConnectionStatus> { return {connected: false} }
+async function getConnectDriveUrl(): Promise<{url: string}> { throw new Error("not implemented") }
+async function disconnectDrive(): Promise<{success: boolean}> { return {success: false} }
 import { Input } from "@/components/ui/input"
 import {
   getCustomNavLinks,
@@ -61,7 +66,12 @@ import {
   removeCustomNavLink,
   type CustomNavLink,
 } from "@/lib/custom-nav"
-import { listBots, createBot, updateBot, deleteBot, regenerateBotKey, type Bot } from "@/lib/actions/bots"
+type Bot = { id: string; name: string; description?: string; key_prefix: string; is_active: boolean; last_used_at?: string; api_key?: string }
+async function listBots(): Promise<Bot[]> { return [] }
+async function createBot(_name: string, _desc?: string): Promise<Bot> { throw new Error("not implemented") }
+async function updateBot(_id: string, _data: Partial<Bot>): Promise<Bot> { throw new Error("not implemented") }
+async function deleteBot(_id: string): Promise<void> {}
+async function regenerateBotKey(_id: string): Promise<{api_key: string}> { throw new Error("not implemented") }
 import { CreateBotDialog } from "@/components/admin/create-bot-dialog"
 import { ApiKeyRevealDialog } from "@/components/admin/api-key-reveal-dialog"
 
@@ -702,7 +712,7 @@ function BotsSection() {
       setBots((prev) => [result, ...prev])
       setCreateOpen(false)
       setRevealBotName(result.name)
-      setRevealKey(result.api_key)
+      setRevealKey(result.api_key ?? null)
       toast.success(`"${result.name}" botu oluşturuldu.`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Bot oluşturulamadı.")

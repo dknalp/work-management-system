@@ -28,7 +28,7 @@ from ..security import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3051")
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -107,11 +107,11 @@ def forgot_password(body: ForgotPasswordRequest, session: Session = Depends(get_
     session.commit()
 
     reset_url = f"{FRONTEND_URL}/reset-password?token={token}"
-    print(f"\n{'='*60}")
-    print(f"[MOCK MAIL] Password reset for: {user.email}")
-    print(f"Reset link: {reset_url}")
-    print(f"Expires in: 1 hour")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*60}", flush=True)
+    print(f"[MOCK MAIL] Password reset for: {user.email}", flush=True)
+    print(f"Reset link: {reset_url}", flush=True)
+    print(f"Expires in: 1 hour", flush=True)
+    print(f"{'='*60}\n", flush=True)
 
     return {"message": "If that email is registered, a reset link has been sent."}
 

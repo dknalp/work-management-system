@@ -20,7 +20,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { Badge } from "@/components/ui/badge"
-import { SearchResult } from "@/lib/actions/files"
+import type { SearchResult } from "@/components/files/file-utils"
 import { getFileIcon, formatSize } from "./file-utils"
 import { cn } from "@/lib/utils"
 
@@ -145,7 +145,7 @@ export function SearchResultsView({
                   <span>·</span>
                   <span>{formatSize(item.size)}</span>
                   <span>·</span>
-                  <span>{format(new Date(item.updatedAt), "MMM d, yyyy")}</span>
+                  <span>{item.lastModified ? format(new Date(item.lastModified), "MMM d, yyyy") : "—"}</span>
                 </div>
               </div>
             </div>
@@ -158,7 +158,7 @@ export function SearchResultsView({
                 <ContextMenuItem className="gap-2" onClick={() => onOpen(item)}>
                   <ExternalLinkIcon className="size-4" /> Open
                 </ContextMenuItem>
-                {!item.isDirectory && (
+                {item.type !== "folder" && (
                   <ContextMenuItem
                     className="gap-2"
                     onClick={() => onDownload(item)}

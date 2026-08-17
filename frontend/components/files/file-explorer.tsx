@@ -65,17 +65,33 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { FileItem, SearchResult, moveToTrash, moveItem, renameItem, copyItem } from "@/lib/actions/files"
 import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileGrid } from "./file-grid"
 import { FilePreviewPanel } from "./file-preview-panel"
 import { SelectionLasso } from "./selection-lasso"
 import { SearchResultsView } from "./search-results-view"
-import { getFileIcon, formatSize, getFileOpenUrl, getFileDownloadUrl, downloadFile } from "./file-utils"
-import { usePinnedFolders } from "@/hooks/use-pinned-folders"
+import { getFileIcon, formatSize, getFileOpenUrl, downloadFile } from "./file-utils"
+import type { FileItem, SearchResult } from "./file-utils"
 import { toast } from "sonner"
 import { usePermission } from "@/hooks/use-permission"
+import {
+  trashFile,
+  moveFile,
+  renameFile,
+  copyFile,
+} from "@/lib/actions/files"
+
+function usePinnedFolders() {
+  const [pinned, setPinned] = React.useState<Array<{ name: string; path: string }>>([])
+  return {
+    pin: (f: { name: string; path: string }) =>
+      setPinned((prev) => prev.some((p) => p.path === f.path) ? prev : [...prev, f]),
+    isPinned: (p: string) => pinned.some((f) => f.path === p),
+    pinned,
+    unpin: (p: string) => setPinned((prev) => prev.filter((f) => f.path !== p)),
+  }
+}
 
 interface FileExplorerProps {
   items: FileItem[]
@@ -93,7 +109,7 @@ interface FileExplorerProps {
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
 
 export function FileExplorer({
-  items,
+  items: itemsProp,
   currentPath,
   sourceFilter = "all",
   viewMode,
@@ -102,6 +118,8 @@ export function FileExplorer({
   searchResults,
   isSearching,
 }: FileExplorerProps) {
+  // Normalize items to always be an array (guard against undefined passed from server)
+  const items = itemsProp ?? []
   const router = useRouter()
   const canRename = usePermission("files:rename")
   const canDelete = usePermission("files:delete")
@@ -111,24 +129,19 @@ export function FileExplorer({
   const [selectedPaths, setSelectedPaths] = React.useState<Set<string>>(new Set())
   const [activeItem, setActiveItem] = React.useState<FileItem | null>(null)
 
-  // Clipboard state (in-app copy/cut)
   const [clipboard, setClipboard] = React.useState<Clipboard>(null)
 
-  // Rename modal
   const [renameOpen, setRenameOpen] = React.useState(false)
   const [renameTarget, setRenameTarget] = React.useState<FileItem | null>(null)
   const [renameValue, setRenameValue] = React.useState("")
 
-  // Delete dialog
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deletePaths, setDeletePaths] = React.useState<string[]>([])
 
-  // Move-to dialog
   const [moveToOpen, setMoveToOpen] = React.useState(false)
   const [moveSourcePaths, setMoveSourcePaths] = React.useState<string[]>([])
   const [moveToTarget, setMoveToTarget] = React.useState("")
 
-  // Sort (persisted to localStorage)
   const [sortKey, setSortKey] = useLocalStorage<"name" | "size" | "updatedAt">(
     "wms:files:sortKey",
     "name"
@@ -136,7 +149,7 @@ export function FileExplorer({
   const [sortDir, setSortDir] = useLocalStorage<"asc" | "desc">("wms:files:sortDir", "asc")
 
   const handleItemDoubleClick = (item: FileItem) => {
-    if (item.isDirectory) {
+    if (item.type === "folder") {
       const qs = sourceFilter !== "all" ? `?source=${sourceFilter}` : ""
       router.push(`/files/${item.path}${qs}`)
     } else {
@@ -145,29 +158,16 @@ export function FileExplorer({
   }
 
   const handleSingleItemDownload = React.useCallback(async (item: FileItem) => {
-    if (!item.isDirectory) {
+    if (item.type !== "folder") {
       downloadFile(item)
       return
     }
-    // Folder: download as ZIP via backend
+    // Folder download: request ZIP from backend
     try {
-      const res = await fetch("/api/files/zip", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paths: [item.path] }),
-      })
-      if (!res.ok) { toast.error("ZIP indirme başarısız"); return }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${item.name}.zip`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      const { downloadZip } = await import("@/lib/actions/files")
+      await downloadZip([item.id], `${item.name}.zip`)
     } catch {
-      toast.error("ZIP indirme başarısız")
+      toast.error("ZIP indirme başarısız oldu")
     }
   }, [])
 
@@ -179,13 +179,13 @@ export function FileExplorer({
 
   const doRename = async () => {
     if (!renameTarget || !renameValue.trim()) return
-    const res = await renameItem(renameTarget.path, renameValue.trim())
-    if (res.success) {
-      toast.success("Renamed successfully")
+    try {
+      await renameFile(renameTarget.id, renameValue.trim())
+      toast.success("Yeniden adlandırıldı")
       setRenameOpen(false)
       router.refresh()
-    } else {
-      toast.error("Rename failed")
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? "Yeniden adlandırma başarısız")
     }
   }
 
@@ -196,8 +196,9 @@ export function FileExplorer({
 
   const doDelete = async () => {
     setDeleteOpen(false)
-    const results = await Promise.all(deletePaths.map((p) => moveToTrash(p)))
-    const succeeded = results.filter((r) => r.success)
+    // deletePaths holds file IDs in the new system
+    const results = await Promise.allSettled(deletePaths.map((id) => trashFile(id)))
+    const succeeded = results.filter((r) => r.status === "fulfilled")
     const failCount = results.length - succeeded.length
 
     if (succeeded.length > 0) {
@@ -208,27 +209,22 @@ export function FileExplorer({
 
       toast.success(
         succeeded.length === 1
-          ? `"${succeeded[0].originalName}" çöp kutusuna taşındı`
+          ? `Öğe çöp kutusuna taşındı`
           : `${succeeded.length} öğe çöp kutusuna taşındı`,
         {
           duration: 6000,
           action: {
             label: "Geri Al",
             onClick: async () => {
-              const undoResults = await Promise.all(
-                succeeded.map((r) =>
-                  r.success
-                    ? import("@/lib/actions/files").then(({ restoreFromTrash }) =>
-                        restoreFromTrash(r.trashName, r.originalPath || r.originalName)
-                      )
-                    : Promise.resolve({ success: false })
-                )
+              // Restore all succeeded items using their IDs
+              const { restoreFile } = await import("@/lib/actions/files")
+              await Promise.allSettled(
+                results
+                  .filter((r) => r.status === "fulfilled")
+                  .map((r) => restoreFile((r as PromiseFulfilledResult<{ id: string }>).value.id))
               )
-              const undone = undoResults.filter((r) => r.success).length
-              if (undone > 0) {
-                toast.success(`${undone} öğe geri yüklendi`)
-                router.refresh()
-              }
+              router.refresh()
+              toast.success("Geri alındı")
             },
           },
         }
@@ -246,52 +242,30 @@ export function FileExplorer({
   }
 
   const doMoveTo = async () => {
-    const results = await Promise.all(
-      moveSourcePaths.map((p) => moveItem(p, moveToTarget))
+    // moveSourcePaths holds file IDs
+    const results = await Promise.allSettled(
+      moveSourcePaths.map((id) => moveFile(id, moveToTarget))
     )
-    const ok = results.filter((r) => r.success).length
+    const ok = results.filter((r) => r.status === "fulfilled").length
     if (ok > 0) {
-      toast.success(`${ok} item(s) moved`)
+      toast.success(`${ok} öğe taşındı`)
       setMoveToOpen(false)
       setSelectedPaths(new Set())
       router.refresh()
     } else {
-      toast.error("Move failed")
+      toast.error("Taşıma başarısız")
     }
   }
 
   const handleBulkDownload = async () => {
     const selected = items.filter((i) => selectedPaths.has(i.path))
-    const driveFiles = selected.filter((i) => i.source === "drive" && !i.isDirectory)
-    const diskItems = selected.filter((i) => i.source !== "drive")
-
-    // Drive files: individual download (directories not supported on Drive side)
-    driveFiles.forEach((item) => downloadFile(item))
-
-    if (diskItems.length === 1) {
-      handleSingleItemDownload(diskItems[0])
-    } else if (diskItems.length > 1) {
-      // Include both files and folders in ZIP
-      const diskFiles = diskItems
-      try {
-        const res = await fetch("/api/files/zip", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paths: diskFiles.map((i) => i.path) }),
-        })
-        if (!res.ok) { toast.error("ZIP indirme başarısız"); return }
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = "download.zip"
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      } catch {
-        toast.error("ZIP indirme başarısız")
-      }
+    const ids = selected.map((i) => i.id).filter(Boolean)
+    if (ids.length === 0) return
+    try {
+      const { downloadZip } = await import("@/lib/actions/files")
+      await downloadZip(ids, "secili-dosyalar.zip")
+    } catch {
+      toast.error("ZIP indirme başarısız oldu")
     }
   }
 
@@ -304,7 +278,6 @@ export function FileExplorer({
     }
   }
 
-  // Clipboard operations
   const handleCopy = React.useCallback((paths: string[]) => {
     setClipboard({ paths, mode: "copy" })
     toast.success(
@@ -323,20 +296,17 @@ export function FileExplorer({
 
   const handlePaste = React.useCallback(async () => {
     if (!clipboard) return
-    const results = await Promise.all(
-      clipboard.paths.map((p) =>
+    // clipboard.paths holds file IDs
+    const results = await Promise.allSettled(
+      clipboard.paths.map((id) =>
         clipboard.mode === "copy"
-          ? copyItem(p, currentPath)
-          : moveItem(p, currentPath)
+          ? copyFile(id, currentPath)
+          : moveFile(id, currentPath)
       )
     )
-    const ok = results.filter((r) => r.success).length
+    const ok = results.filter((r) => r.status === "fulfilled").length
     if (ok > 0) {
-      toast.success(
-        clipboard.mode === "copy"
-          ? `${ok} öğe yapıştırıldı`
-          : `${ok} öğe taşındı`
-      )
+      toast.success(clipboard.mode === "copy" ? `${ok} öğe yapıştırıldı` : `${ok} öğe taşındı`)
       if (clipboard.mode === "cut") setClipboard(null)
       router.refresh()
     } else {
@@ -393,12 +363,12 @@ export function FileExplorer({
       : [...items]
 
     filtered.sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1
-      if (!a.isDirectory && b.isDirectory) return 1
+      if (a.type === "folder" && b.type !== "folder") return -1
+      if (a.type !== "folder" && b.type === "folder") return 1
       let cmp = 0
       if (sortKey === "name") cmp = a.name.localeCompare(b.name)
-      else if (sortKey === "size") cmp = a.size - b.size
-      else cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()
+      else if (sortKey === "size") cmp = (a.size ?? 0) - (b.size ?? 0)
+      else cmp = new Date(a.lastModified ?? 0).getTime() - new Date(b.lastModified ?? 0).getTime()
       return sortDir === "asc" ? cmp : -cmp
     })
 
@@ -409,11 +379,13 @@ export function FileExplorer({
       : ""
     return [
       {
+        id: "",
         name: "..",
         path: parentPath,
-        isDirectory: true,
+        parent_path: "",
+        type: "folder" as const,
         size: 0,
-        updatedAt: new Date().toISOString(),
+        lastModified: new Date().toISOString(),
       },
       ...filtered,
     ]
@@ -432,7 +404,6 @@ export function FileExplorer({
     setActiveItem(item)
   }
 
-  // Keyboard shortcuts
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -440,11 +411,11 @@ export function FileExplorer({
 
       if (e.key === "Delete" && selectedPaths.size > 0 && canDelete) {
         const diskPaths = Array.from(selectedPaths).filter(
-          (p) => items.find((i) => i.path === p)?.source !== "drive"
+          (p) => !items.find((i) => i.path === p)?.isDriveFile
         )
         if (diskPaths.length > 0) handleDeleteConfirm(diskPaths)
       }
-      if (e.key === "F2" && selectedPaths.size === 1 && activeItem && activeItem.name !== ".." && canRename && activeItem.source !== "drive") {
+      if (e.key === "F2" && selectedPaths.size === 1 && activeItem && activeItem.name !== ".." && canRename && !activeItem.isDriveFile) {
         handleRename(activeItem)
       }
       if ((e.key === "a" || e.key === "A") && (e.ctrlKey || e.metaKey)) {
@@ -459,7 +430,7 @@ export function FileExplorer({
       if (canMove && (e.key === "x" || e.key === "X") && (e.ctrlKey || e.metaKey) && selectedPaths.size > 0) {
         e.preventDefault()
         const diskPaths = Array.from(selectedPaths).filter(
-          (p) => items.find((i) => i.path === p)?.source !== "drive"
+          (p) => !items.find((i) => i.path === p)?.isDriveFile
         )
         if (diskPaths.length > 0) handleCut(diskPaths)
       }
@@ -479,10 +450,11 @@ export function FileExplorer({
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPaths, activeItem, items, renameOpen, deleteOpen, clipboard, handleCopy, handleCut, handlePaste, canRename, canDelete])
 
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
-    if (item.name === ".." || item.source === "drive") {
+    if (item.name === ".." || item.isDriveFile) {
       e.preventDefault()
       return
     }
@@ -500,12 +472,18 @@ export function FileExplorer({
 
   const handleDrop = async (e: React.DragEvent, targetItem: FileItem) => {
     e.preventDefault()
-    if (!targetItem.isDirectory || targetItem.source === "drive") return
+    if (targetItem.type !== "folder" || targetItem.isDriveFile) return
     const sourcePath = e.dataTransfer.getData("application/workos-file")
     if (!sourcePath || sourcePath === targetItem.path) return
     const itemsToMove = selectedPaths.has(sourcePath) ? Array.from(selectedPaths) : [sourcePath]
-    const results = await Promise.all(itemsToMove.map((path) => moveItem(path, targetItem.path)))
-    const successCount = results.filter((r) => r.success).length
+    const results = await Promise.allSettled(
+      itemsToMove.map((p) => {
+        const fileItem = displayItems.find((i) => i.path === p)
+        if (!fileItem) return Promise.reject(new Error("not found"))
+        return moveFile(fileItem.id, targetItem.path)
+      })
+    )
+    const successCount = results.filter((r) => r.status === "fulfilled").length
     if (successCount > 0) {
       toast.success(
         `${successCount} item(s) moved to ${targetItem.name === ".." ? "parent directory" : targetItem.name}`
@@ -524,7 +502,7 @@ export function FileExplorer({
     )
 
   const folderChoices = displayItems.filter(
-    (i) => i.isDirectory && i.name !== ".." && !moveSourcePaths.includes(i.path)
+    (i) => i.type === "folder" && i.name !== ".." && !moveSourcePaths.includes(i.path)
   )
 
   const isCutItem = (path: string) =>
@@ -602,8 +580,7 @@ export function FileExplorer({
                     const isSelected = selectedPaths.has(item.path)
                     const isParentDir = item.name === ".."
                     const isCut = !isParentDir && isCutItem(item.path)
-
-                    const isDrive = item.source === "drive"
+                    const isDrive = item.isDriveFile
 
                     const tableRow = (
                       <TableRow
@@ -613,10 +590,10 @@ export function FileExplorer({
                         draggable={!isParentDir && !isDrive}
                         onDragStart={(e) => handleDragStart(e, item)}
                         onDragOver={(e) => {
-                          if (item.isDirectory) e.preventDefault()
+                          if (item.type === "folder") e.preventDefault()
                         }}
                         onDragEnter={(e) => {
-                          if (item.isDirectory) {
+                          if (item.type === "folder") {
                             e.preventDefault()
                             e.currentTarget.setAttribute("data-drop-target", "true")
                           }
@@ -653,14 +630,10 @@ export function FileExplorer({
                           </div>
                         </TableCell>
                         <TableCell className="font-sans text-xs text-muted-foreground">
-                          {item.isDirectory
-                            ? item.childCount !== undefined
-                              ? `${item.childCount} items`
-                              : "--"
-                            : formatSize(item.size)}
+                          {item.type === "folder" ? "--" : formatSize(item.size)}
                         </TableCell>
                         <TableCell className="font-sans text-xs text-muted-foreground">
-                          {isParentDir ? "--" : format(new Date(item.updatedAt), "MMM d, yyyy")}
+                          {isParentDir || !item.lastModified ? "--" : format(new Date(item.lastModified), "MMM d, yyyy")}
                         </TableCell>
                         <TableCell
                           onClick={(e) => e.stopPropagation()}
@@ -684,7 +657,7 @@ export function FileExplorer({
                                 >
                                   <ExternalLinkIcon className="size-3.5" /> Aç
                                 </DropdownMenuItem>
-                                {!item.source?.includes("drive") && (
+                                {!item.isDriveFile && (
                                   <DropdownMenuItem
                                     className="gap-2"
                                     onClick={() => handleSingleItemDownload(item)}
@@ -692,7 +665,7 @@ export function FileExplorer({
                                     <DownloadIcon className="size-3.5" /> İndir
                                   </DropdownMenuItem>
                                 )}
-                                {item.isDirectory && !isPinned(item.path) && (
+                                {item.type === "folder" && !isPinned(item.path) && (
                                   <DropdownMenuItem
                                     className="gap-2"
                                     onClick={() => pin({ name: item.name, path: item.path })}
@@ -779,7 +752,7 @@ export function FileExplorer({
                               </ContextMenuItem>
                             </ContextMenuSubContent>
                           </ContextMenuSub>
-                          {!item.source?.includes("drive") && (
+                          {!item.isDriveFile && (
                             <ContextMenuItem
                               className="gap-2"
                               onClick={() => handleSingleItemDownload(item)}
@@ -787,7 +760,7 @@ export function FileExplorer({
                               <DownloadIcon className="size-4" /> İndir
                             </ContextMenuItem>
                           )}
-                          {item.isDirectory && !isPinned(item.path) && (
+                          {item.type === "folder" && !isPinned(item.path) && (
                             <ContextMenuItem
                               className="gap-2"
                               onClick={() => pin({ name: item.name, path: item.path })}
@@ -799,7 +772,7 @@ export function FileExplorer({
                           {canMove && !isDrive && (
                             <ContextMenuItem
                               className="gap-2"
-                              onClick={() => handleCopy([item.path])}
+                              onClick={() => handleCopy([item.id])}
                             >
                               <CopyIcon className="size-4" /> Kopyala
                             </ContextMenuItem>
@@ -807,7 +780,7 @@ export function FileExplorer({
                           {canMove && !isDrive && (
                             <ContextMenuItem
                               className="gap-2"
-                              onClick={() => handleCut([item.path])}
+                              onClick={() => handleCut([item.id])}
                             >
                               <ScissorsIcon className="size-4" /> Kes
                             </ContextMenuItem>
@@ -826,7 +799,7 @@ export function FileExplorer({
                           {canMove && !isDrive && (
                             <ContextMenuItem
                               className="gap-2"
-                              onClick={() => handleMoveToOpen([item.path])}
+                              onClick={() => handleMoveToOpen([item.id])}
                             >
                               <MoveIcon className="size-4" /> Taşı
                             </ContextMenuItem>
@@ -836,7 +809,7 @@ export function FileExplorer({
                               <ContextMenuSeparator />
                               <ContextMenuItem
                                 className="gap-2 text-destructive focus:text-destructive"
-                                onClick={() => handleDeleteConfirm(item.path)}
+                                onClick={() => handleDeleteConfirm(item.id)}
                               >
                                 <Trash2Icon className="size-4" /> Sil
                               </ContextMenuItem>
@@ -874,7 +847,6 @@ export function FileExplorer({
           <FilePreviewPanel item={activeItem} onClose={() => setActiveItem(null)} />
         )}
 
-        {/* Bulk action bar — appears when 2+ items are selected */}
         {selectedPaths.size >= 2 && (
           <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
             <span className="mr-2 text-sm font-semibold tabular-nums">
@@ -889,25 +861,32 @@ export function FileExplorer({
               <DownloadIcon className="size-3.5" /> İndir
             </Button>
             {canMove && (() => {
-              const diskPaths = Array.from(selectedPaths).filter(p => items.find(i => i.path === p)?.source !== "drive")
-              return diskPaths.length > 0 ? (
+              const diskItems = Array.from(selectedPaths)
+                .map(p => items.find(i => i.path === p))
+                .filter((i): i is typeof items[number] => !!i && !i.isDriveFile)
+              const diskIds = diskItems.map(i => i.id).filter(Boolean)
+              return diskIds.length > 0 ? (
                 <>
-                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleCopy(diskPaths)}>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleCopy(diskIds)}>
                     <CopyIcon className="size-3.5" /> Kopyala
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleCut(diskPaths)}>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleCut(diskIds)}>
                     <ScissorsIcon className="size-3.5" /> Kes
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleMoveToOpen(diskPaths)}>
+                  <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => handleMoveToOpen(diskIds)}>
                     <MoveIcon className="size-3.5" /> Taşı
                   </Button>
                 </>
               ) : null
             })()}
             {canDelete && (() => {
-              const diskPaths = Array.from(selectedPaths).filter(p => items.find(i => i.path === p)?.source !== "drive")
-              return diskPaths.length > 0 ? (
-                <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteConfirm(diskPaths)}>
+              const diskIds = Array.from(selectedPaths)
+                .map(p => items.find(i => i.path === p))
+                .filter((i): i is typeof items[number] => !!i && !i.isDriveFile)
+                .map(i => i.id)
+                .filter(Boolean)
+              return diskIds.length > 0 ? (
+                <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteConfirm(diskIds)}>
                   <Trash2Icon className="size-3.5" /> Sil
                 </Button>
               ) : null
@@ -926,7 +905,6 @@ export function FileExplorer({
           </div>
         )}
 
-        {/* Paste hint bar — shown when clipboard is active and no bulk selection */}
         {clipboard && selectedPaths.size < 2 && (
           <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-primary/30 bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
             <ClipboardPasteIcon className="size-3.5 text-primary" />
@@ -954,7 +932,6 @@ export function FileExplorer({
         )}
       </div>
 
-      {/* Rename Dialog */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
@@ -981,7 +958,6 @@ export function FileExplorer({
         </DialogContent>
       </Dialog>
 
-      {/* Delete AlertDialog */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1002,7 +978,6 @@ export function FileExplorer({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Move-to Dialog */}
       <Dialog open={moveToOpen} onOpenChange={setMoveToOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Trash2Icon, RotateCcwIcon, Trash, XIcon } from "lucide-react"
+import { Trash2Icon, RotateCcwIcon, Trash, XIcon, FolderIcon, FileIcon } from "lucide-react"
 import { formatDistanceToNow, differenceInDays } from "date-fns"
 import { tr } from "date-fns/locale"
 import {
@@ -22,18 +22,25 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { TrashItem, listTrash, restoreFromTrash, deleteFromTrash, emptyTrash } from "@/lib/actions/files"
-import { formatSize } from "./file-utils"
 import { toast } from "sonner"
-import { FolderIcon, FileIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatSize } from "./file-utils"
+import type { TrashItem } from "@/components/files/file-utils"
+import {
+  listFiles,
+  restoreFile,
+  deleteFilePermanent,
+  emptyTrash,
+} from "@/lib/actions/files"
+import { fileRecordToTrashItem } from "./file-utils"
 
 interface TrashDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-function expiryLabel(expiresAt: string): { text: string; urgent: boolean } {
+function expiryLabel(expiresAt?: string): { text: string; urgent: boolean } {
+  if (!expiresAt) return { text: "", urgent: false }
   const days = differenceInDays(new Date(expiresAt), new Date())
   if (days <= 0) return { text: "Bugün silinecek", urgent: true }
   if (days === 1) return { text: "Yarın silinecek", urgent: true }
@@ -51,8 +58,10 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const result = await listTrash()
-      setItems(result)
+      const records = await listFiles("", true /* showTrash */)
+      setItems(records.map(fileRecordToTrashItem))
+    } catch {
+      setItems([])
     } finally {
       setLoading(false)
     }
@@ -63,36 +72,36 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
   }, [open, load])
 
   const handleRestore = async (item: TrashItem) => {
-    const res = await restoreFromTrash(item.trashName, item.originalPath || item.originalName)
-    if (res.success) {
+    try {
+      await restoreFile(item.id)
       toast.success(`"${item.originalName}" geri yüklendi`)
       router.refresh()
       load()
-    } else {
-      toast.error(res.error ?? "Geri yükleme başarısız")
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? "Geri yükleme başarısız")
     }
   }
 
   const handlePermanentDelete = async (item: TrashItem) => {
     setPermanentDeleteTarget(null)
-    const res = await deleteFromTrash(item.trashName)
-    if (res.success) {
+    try {
+      await deleteFilePermanent(item.id)
       toast.success(`"${item.originalName}" kalıcı olarak silindi`)
       load()
-    } else {
-      toast.error(res.error ?? "Silme başarısız")
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? "Silme başarısız")
     }
   }
 
   const handleEmptyTrash = async () => {
     setEmptyConfirmOpen(false)
-    const res = await emptyTrash()
-    if (res.success) {
-      toast.success("Çöp kutusu boşaltıldı")
+    try {
+      const res = await emptyTrash()
+      toast.success(`Çöp kutusu boşaltıldı (${res.deleted_count} öğe)`)
       setItems([])
       router.refresh()
-    } else {
-      toast.error(res.error ?? "Boşaltma başarısız")
+    } catch (err: unknown) {
+      toast.error((err as Error).message ?? "Boşaltma başarısız")
     }
   }
 
@@ -124,17 +133,17 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
           ) : (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Öğeler 7 gün sonra otomatik olarak kalıcı şekilde silinir.
+                Öğeler 30 gün sonra otomatik olarak kalıcı şekilde silinir.
               </p>
               <div className="max-h-80 overflow-y-auto rounded-lg border border-border">
                 {items.map((item) => {
                   const expiry = expiryLabel(item.expiresAt)
                   return (
                     <div
-                      key={item.trashName}
+                      key={item.id}
                       className="group flex items-center gap-3 border-b border-border/50 px-4 py-2.5 last:border-0 hover:bg-muted/30"
                     >
-                      {item.isDirectory ? (
+                      {item.type === "folder" ? (
                         <FolderIcon className="size-4 shrink-0 fill-blue-500/20 text-blue-500" />
                       ) : (
                         <FileIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -142,12 +151,18 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-mono text-sm">{item.originalName}</p>
                         <p className="text-[10px] text-muted-foreground">
-                          {formatDistanceToNow(new Date(item.deletedAt), { addSuffix: true, locale: tr })} silindi
-                          {!item.isDirectory && ` · ${formatSize(item.size)}`}
-                          {" · "}
-                          <span className={cn(expiry.urgent ? "text-amber-500" : "text-muted-foreground")}>
-                            {expiry.text}
-                          </span>
+                          {item.deletedAt
+                            ? formatDistanceToNow(new Date(item.deletedAt), { addSuffix: true, locale: tr }) + " silindi"
+                            : "silindi"}
+                          {item.type !== "folder" && item.size ? ` · ${formatSize(item.size)}` : ""}
+                          {expiry.text && (
+                            <>
+                              {" · "}
+                              <span className={cn(expiry.urgent ? "text-amber-500" : "text-muted-foreground")}>
+                                {expiry.text}
+                              </span>
+                            </>
+                          )}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">

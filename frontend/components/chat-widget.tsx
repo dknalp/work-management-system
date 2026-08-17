@@ -8,7 +8,7 @@ import { usePresence } from "@/contexts/presence-context"
 import { useNotifications } from "@/contexts/notifications-context"
 import { tokenStorage } from "@/lib/auth"
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "")
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3052").replace(/\/$/, "")
 const WS_BASE = API_BASE.replace(/^https/, "wss").replace(/^http/, "ws")
 
 type ChatMessage = {

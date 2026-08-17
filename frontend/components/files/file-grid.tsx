@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  Share2Icon,
   ImageIcon,
   ExternalLinkIcon,
   PencilIcon,
@@ -13,24 +12,20 @@ import {
   CopyIcon,
   ScissorsIcon,
 } from "lucide-react"
-import { FileItem } from "@/lib/actions/files"
+import type { FileItem } from "@/components/files/file-utils"
 import { cn } from "@/lib/utils"
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { getFileIcon, isImageFile, getFileOpenUrl, getFileDownloadUrl, downloadFile } from "./file-utils"
-import { moveItem } from "@/lib/actions/files"
-import { usePinnedFolders } from "@/hooks/use-pinned-folders"
+import { getFileIcon, isImageFile, getFileOpenUrl, downloadFile } from "./file-utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { moveFile } from "@/lib/actions/files"
 
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
 
@@ -41,20 +36,30 @@ interface FileGridProps {
   onSelect: (item: FileItem, isMulti?: boolean) => void
   onNavigate: (path: string) => void
   onRename: (item: FileItem) => void
-  onDelete: (path: string) => void
-  onMoveTo: (paths: string[]) => void
+  onDelete: (id: string) => void
+  onMoveTo: (ids: string[]) => void
   onDownload?: (item: FileItem) => void
   clipboard?: Clipboard
-  onCopy?: (paths: string[]) => void
-  onCut?: (paths: string[]) => void
+  onCopy?: (ids: string[]) => void
+  onCut?: (ids: string[]) => void
+  onPin?: (f: { name: string; path: string }) => void
+  isPinned?: (path: string) => boolean
 }
 
 function ImageThumbnail({ item }: { item: FileItem }) {
+  const [src, setSrc] = React.useState<string | null>(null)
   const [error, setError] = React.useState(false)
-  if (error) return <ImageIcon className="size-12 text-orange-500" />
-  const src = item.source === "drive" && item.driveFileId
-    ? `/api/files/drive-raw?id=${encodeURIComponent(item.driveFileId)}`
-    : `/api/files/raw?path=${encodeURIComponent(item.path)}`
+
+  React.useEffect(() => {
+    if (!isImageFile(item) || !item.id) return
+    import("@/lib/actions/files")
+      .then(({ getPreviewUrl }) => getPreviewUrl(item.id))
+      .then(setSrc)
+      .catch(() => setError(true))
+  }, [item])
+
+  if (error || !src) return <ImageIcon className="size-12 text-orange-500" />
+
   return (
     <div className="size-14 overflow-hidden rounded-lg border border-border/50 bg-muted/30">
       <img
@@ -79,22 +84,24 @@ export function FileGrid({
   clipboard,
   onCopy,
   onCut,
+  onPin,
+  isPinned,
 }: FileGridProps) {
   const router = useRouter()
-  const { pin, isPinned } = usePinnedFolders()
 
   const isCutItem = (path: string) =>
     clipboard?.mode === "cut" && clipboard.paths.includes(path)
 
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
-    if (item.source === "drive") { e.preventDefault(); return }
-    e.dataTransfer.setData("application/workos-file", item.path)
+    if (item.isDriveFile) { e.preventDefault(); return }
+    e.dataTransfer.setData("application/workos-file-id", item.id)
+    e.dataTransfer.setData("application/workos-file-path", item.path)
     e.dataTransfer.effectAllowed = "move"
     const ghost = document.createElement("div")
     ghost.className =
       "bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold shadow-xl border border-white/20"
     ghost.innerText =
-      selectedPaths.size > 1 ? `Moving ${selectedPaths.size} items` : `${item.name} taşınıyor`
+      selectedPaths.size > 1 ? `${selectedPaths.size} öğe taşınıyor` : `${item.name} taşınıyor`
     document.body.appendChild(ghost)
     e.dataTransfer.setDragImage(ghost, 0, 0)
     setTimeout(() => document.body.removeChild(ghost), 0)
@@ -102,15 +109,15 @@ export function FileGrid({
 
   const handleDrop = async (e: React.DragEvent, targetItem: FileItem) => {
     e.preventDefault()
-    if (!targetItem.isDirectory || targetItem.source === "drive") return
-    const sourcePath = e.dataTransfer.getData("application/workos-file")
-    if (!sourcePath || sourcePath === targetItem.path) return
-    const itemsToMove = selectedPaths.has(sourcePath) ? Array.from(selectedPaths) : [sourcePath]
-    const results = await Promise.all(itemsToMove.map((path) => moveItem(path, targetItem.path)))
-    const successCount = results.filter((r) => r.success).length
-    if (successCount > 0) {
-      toast.success(`${successCount} item(s) moved to ${targetItem.name}`)
+    if (targetItem.type !== "folder" || targetItem.isDriveFile) return
+    const sourceId = e.dataTransfer.getData("application/workos-file-id")
+    if (!sourceId || sourceId === targetItem.id) return
+    try {
+      await moveFile(sourceId, targetItem.path)
+      toast.success(`${targetItem.name} klasörüne taşındı`)
       router.refresh()
+    } catch {
+      toast.error("Taşıma başarısız")
     }
   }
 
@@ -120,17 +127,19 @@ export function FileGrid({
         const isSelected = selectedPaths.has(item.path)
         const isParentDir = item.name === ".."
         const isCut = !isParentDir && isCutItem(item.path)
+        const iconName = getFileIcon(item)
+        const pinned = isPinned?.(item.path) ?? false
 
         const gridItem = (
           <div
             key={item.path + item.name}
             data-file-path={item.path}
             data-drag-handle={!isParentDir ? "true" : undefined}
-            draggable={!isParentDir && item.source !== "drive"}
+            draggable={!isParentDir && !item.isDriveFile}
             onDragStart={(e) => handleDragStart(e, item)}
-            onDragOver={(e) => { if (item.isDirectory) e.preventDefault() }}
+            onDragOver={(e) => { if (item.type === "folder") e.preventDefault() }}
             onDragEnter={(e) => {
-              if (item.isDirectory) {
+              if (item.type === "folder") {
                 e.preventDefault()
                 e.currentTarget.setAttribute("data-drop-target", "true")
               }
@@ -140,94 +149,62 @@ export function FileGrid({
               e.currentTarget.removeAttribute("data-drop-target")
               handleDrop(e, item)
             }}
-            className={cn(
-              "group flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-transparent p-3 transition-all select-none",
-              isSelected ? "border-primary/20 bg-primary/10" : "hover:bg-muted/50",
-              "data-[drop-target=true]:border-primary/50 data-[drop-target=true]:bg-primary/20",
-              isParentDir && "opacity-60",
-              isCut && "opacity-40"
-            )}
             onClick={(e) => {
-              e.stopPropagation()
-              onSelect(item, e.shiftKey || e.metaKey || e.ctrlKey)
+              if (isParentDir) { onNavigate(item.path); return }
+              onSelect(item, e.metaKey || e.ctrlKey || e.shiftKey)
             }}
-            onDoubleClick={(e) => {
-              e.stopPropagation()
-              if (item.isDirectory) {
-                onNavigate(item.path)
-              } else {
-                window.open(getFileOpenUrl(item), "_blank")
-              }
+            onDoubleClick={() => {
+              if (item.type === "folder") onNavigate(item.path)
+              else window.open(getFileOpenUrl(item), "_blank")
             }}
+            className={cn(
+              "group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl p-3 transition-colors",
+              "hover:bg-accent/60",
+              isSelected && "bg-primary/10 ring-2 ring-primary/30",
+              isCut && "opacity-50",
+              "[&[data-drop-target=true]]:bg-primary/10 [&[data-drop-target=true]]:ring-2 [&[data-drop-target=true]]:ring-primary",
+            )}
           >
-            <div className="relative">
-              {!isParentDir && isImageFile(item.name) ? (
+            <div className="flex size-14 items-center justify-center">
+              {isImageFile(item) && item.id ? (
                 <ImageThumbnail item={item} />
               ) : (
-                getFileIcon(item, "size-12")
-              )}
-              {!isParentDir && item.source && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className={`absolute -right-1 -top-1 inline-flex size-2.5 rounded-sm ${
-                        item.source === "drive" ? "bg-blue-500" : "bg-slate-400"
-                      }`}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    {item.source === "drive" ? "Stored in Google Drive" : "Stored on Server"}
-                  </TooltipContent>
-                </Tooltip>
+                <div className={cn(
+                  "flex size-14 items-center justify-center rounded-xl",
+                  item.type === "folder"
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted/50 text-muted-foreground",
+                )}>
+                  <span className="text-3xl">{iconName === "folder" ? "📁" : "📄"}</span>
+                </div>
               )}
             </div>
-            <span
-              className={cn(
-                "w-full truncate px-1 text-center text-xs font-medium",
-                isSelected ? "text-primary" : "text-foreground/80",
-                isParentDir && "font-mono"
-              )}
-            >
-              {item.name}
-            </span>
-            {item.isDirectory && item.childCount !== undefined && (
-              <span className="text-[10px] text-muted-foreground/60">
-                {item.childCount} öğe
-              </span>
-            )}
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="max-w-full truncate text-center text-xs font-medium leading-tight">
+                  {item.name}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p className="max-w-xs break-all text-xs">{item.name}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )
 
         if (isParentDir) return gridItem
 
         return (
-          <ContextMenu key={item.path}>
+          <ContextMenu key={item.path + item.name}>
             <ContextMenuTrigger asChild>{gridItem}</ContextMenuTrigger>
-            <ContextMenuContent className="w-48">
-              <ContextMenuItem
-                className="gap-2"
-                onClick={() =>
-                  item.isDirectory
-                    ? onNavigate(item.path)
-                    : window.open(getFileOpenUrl(item), "_blank")
-                }
-              >
-                <ExternalLinkIcon className="size-4" /> Aç
-              </ContextMenuItem>
-              <ContextMenuSub>
-                <ContextMenuSubTrigger className="gap-2">
-                  <Share2Icon className="size-4" /> Birlikte Aç
-                </ContextMenuSubTrigger>
-                <ContextMenuSubContent className="w-44">
-                  <ContextMenuItem className="gap-2" onClick={() => {}}>
-                    <ExternalLinkIcon className="size-4" /> Metin Editörü
-                  </ContextMenuItem>
-                  <ContextMenuItem className="gap-2" onClick={() => {}}>
-                    <ExternalLinkIcon className="size-4" /> Web Tarayıcısı
-                  </ContextMenuItem>
-                </ContextMenuSubContent>
-              </ContextMenuSub>
-              {item.source !== "drive" && (
+            <ContextMenuContent className="w-52">
+              {item.type === "folder" && (
+                <ContextMenuItem className="gap-2" onClick={() => onNavigate(item.path)}>
+                  <ExternalLinkIcon className="size-4" /> Aç
+                </ContextMenuItem>
+              )}
+              {item.type !== "folder" && (
                 <ContextMenuItem
                   className="gap-2"
                   onClick={() => onDownload ? onDownload(item) : downloadFile(item)}
@@ -235,44 +212,44 @@ export function FileGrid({
                   <DownloadIcon className="size-4" /> İndir
                 </ContextMenuItem>
               )}
-              {item.isDirectory && !isPinned(item.path) && (
+              {item.type === "folder" && onPin && !pinned && (
                 <ContextMenuItem
                   className="gap-2"
-                  onClick={() => pin({ name: item.name, path: item.path })}
+                  onClick={() => onPin({ name: item.name, path: item.path })}
                 >
                   <PinIcon className="size-4" /> Sabitle
                 </ContextMenuItem>
               )}
               <ContextMenuSeparator />
-              {onCopy && item.source !== "drive" && (
+              {onCopy && !item.isDriveFile && (
                 <ContextMenuItem
                   className="gap-2"
-                  onClick={() => onCopy([item.path])}
+                  onClick={() => onCopy([item.id])}
                 >
                   <CopyIcon className="size-4" /> Kopyala
                 </ContextMenuItem>
               )}
-              {onCut && item.source !== "drive" && (
+              {onCut && !item.isDriveFile && (
                 <ContextMenuItem
                   className="gap-2"
-                  onClick={() => onCut([item.path])}
+                  onClick={() => onCut([item.id])}
                 >
                   <ScissorsIcon className="size-4" /> Kes
                 </ContextMenuItem>
               )}
-              {item.source !== "drive" && (
+              {!item.isDriveFile && (
                 <>
                   <ContextMenuSeparator />
                   <ContextMenuItem className="gap-2" onClick={() => onRename(item)}>
                     <PencilIcon className="size-4" /> Yeniden Adlandır
                   </ContextMenuItem>
-                  <ContextMenuItem className="gap-2" onClick={() => onMoveTo([item.path])}>
+                  <ContextMenuItem className="gap-2" onClick={() => onMoveTo([item.id])}>
                     <MoveIcon className="size-4" /> Taşı
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     className="gap-2 text-destructive focus:text-destructive"
-                    onClick={() => onDelete(item.path)}
+                    onClick={() => onDelete(item.id)}
                   >
                     <Trash2Icon className="size-4" /> Çöp Kutusuna Taşı
                   </ContextMenuItem>

@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { uploadFile } from "@/lib/actions/upload"
 import { toast } from "sonner"
 import { UploadIcon } from "lucide-react"
 import {
@@ -15,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { uploadFile } from "@/lib/actions/files"
 
 interface FileDropZoneProps {
   children: React.ReactNode
@@ -30,38 +30,52 @@ export function FileDropZone({ children, currentPath, disabled = false }: FileDr
   const [conflictOpen, setConflictOpen] = React.useState(false)
 
   const doUpload = async (files: File[], overwrite = false) => {
-    const toastId = toast.loading(`Uploading ${files.length} file(s)…`)
+    const toastId = toast.loading(`${files.length} dosya yükleniyor…`)
 
     const CONCURRENCY = 3
     const queue = [...files]
-    const results: Awaited<ReturnType<typeof uploadFile>>[] = []
+    let successCount = 0
+    const conflicts: File[] = []
+    const errors: string[] = []
+
+    const results: Array<{ file: File; ok: boolean; conflict: boolean }> = []
     async function worker() {
       while (queue.length > 0) {
         const file = queue.shift()!
-        const formData = new FormData()
-        formData.append("file", file)
-        formData.append("path", currentPath)
-        if (overwrite) formData.append("overwrite", "true")
-        results.push(await uploadFile(formData))
+        try {
+          await uploadFile(file, currentPath, overwrite)
+          results.push({ file, ok: true, conflict: false })
+        } catch (err: unknown) {
+          const status = (err as { status?: number }).status
+          if (status === 409) {
+            results.push({ file, ok: false, conflict: true })
+          } else {
+            results.push({ file, ok: false, conflict: false })
+            errors.push((err as Error).message ?? file.name)
+          }
+        }
       }
     }
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()))
 
-    const conflicts = results
-      .map((r, i) => (r.conflict ? files[i] : null))
-      .filter(Boolean) as File[]
-    const successCount = results.filter((r) => r.success).length
-    const failCount = results.filter((r) => !r.success && !r.conflict).length
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => worker()),
+    )
+
+    for (const r of results) {
+      if (r.ok) successCount++
+      else if (r.conflict) conflicts.push(r.file)
+    }
 
     if (successCount > 0) {
-      toast.success(`${successCount} file(s) uploaded`, { id: toastId })
+      toast.success(`${successCount} dosya yüklendi`, { id: toastId })
       router.refresh()
+      window.dispatchEvent(new Event("wms:files:changed"))
     } else {
       toast.dismiss(toastId)
     }
 
-    if (failCount > 0) {
-      toast.error(`${failCount} upload(s) failed`)
+    if (errors.length > 0) {
+      toast.error(`${errors.length} yükleme başarısız oldu`)
     }
 
     if (conflicts.length > 0) {
@@ -112,6 +126,7 @@ export function FileDropZone({ children, currentPath, disabled = false }: FileDr
     }
   }
 
+  // Ctrl+V — paste files from OS clipboard into the current folder
   const onPaste = async (e: React.ClipboardEvent) => {
     if (disabled) return
     const items = e.clipboardData.items

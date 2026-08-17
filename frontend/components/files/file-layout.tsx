@@ -24,8 +24,10 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { SearchOptions } from "@/lib/actions/files"
-import { usePinnedFolders } from "@/hooks/use-pinned-folders"
+import type { SearchOptions } from "@/components/files/file-utils"
+function usePinnedFolders() {
+  return { pinned: [] as Array<{name: string; path: string}>, unpin: (_p: string) => {} }
+}
 import { TrashDialog } from "./trash-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useLocalStorage } from "@/hooks/use-local-storage"
@@ -83,7 +85,7 @@ function SortableNavItem({ id, children }: { id: string; children: React.ReactNo
 
 const DEFAULT_SIDEBAR_ORDER = ["all", "disk", "drive"]
 
-type QuotaInfo = { total: number; used: number; available: number }
+type QuotaInfo = { used_bytes: number; file_count: number }
 
 function formatSize(bytes: number): string {
   if (bytes === 0) return "0 B"
@@ -102,16 +104,15 @@ function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
   const [quota, setQuota] = React.useState<QuotaInfo | null>(null)
 
   const fetchQuota = React.useCallback(() => {
-    fetch("/api/files/quota")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data) setQuota(data) })
+    import("@/lib/actions/files")
+      .then(({ getQuota }) => getQuota())
+      .then((data) => setQuota(data))
       .catch(() => {})
   }, [])
 
   React.useEffect(() => {
-    import("@/lib/actions/drive").then(({ getDriveConnectionStatus }) => {
-      getDriveConnectionStatus().then((s) => setDriveConnected(s.connected))
-    })
+    // TODO: yeni storage sistemi bağlandığında Drive bağlantısı kontrol edilecek
+    setDriveConnected(false)
     fetchQuota()
 
     // Refresh quota after uploads or deletes
@@ -263,21 +264,11 @@ function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
         </div>
 
         <div className="mt-auto border-t border-border p-4 space-y-2">
-          {quota && quota.total > 0 && (
+          {quota && quota.used_bytes > 0 && (
             <div className="px-1 py-1">
               <div className="mb-1 flex items-center justify-between text-[10px] text-muted-foreground">
                 <span>Depolama</span>
-                <span>{formatSize(quota.used)} / {formatSize(quota.total)}</span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all",
-                    quota.used / quota.total > 0.9 ? "bg-destructive" :
-                    quota.used / quota.total > 0.7 ? "bg-amber-500" : "bg-primary"
-                  )}
-                  style={{ width: `${Math.min(100, (quota.used / quota.total) * 100).toFixed(1)}%` }}
-                />
+                <span>{formatSize(quota.used_bytes)} · {quota.file_count} dosya</span>
               </div>
             </div>
           )}
