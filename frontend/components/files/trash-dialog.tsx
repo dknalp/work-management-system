@@ -96,8 +96,8 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
   const handleEmptyTrash = async () => {
     setEmptyConfirmOpen(false)
     try {
-      const res = await emptyTrash()
-      toast.success(`Çöp kutusu boşaltıldı (${res.deleted_count} öğe)`)
+      await emptyTrash()
+      toast.success("Çöp kutusu boşaltıldı")
       setItems([])
       router.refresh()
     } catch (err: unknown) {
