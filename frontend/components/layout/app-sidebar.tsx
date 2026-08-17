@@ -19,7 +19,9 @@ import {
   KanbanIcon,
   CheckSquareIcon,
   CalendarIcon,
+  ClockIcon,
   FolderIcon,
+  StarIcon,
   UsersIcon,
   Settings2Icon,
   ShieldIcon,
@@ -68,6 +70,16 @@ const navMain = [
     icon: <FolderIcon />,
   },
   {
+    title: "Yıldızlılar",
+    url: "/files?view=starred",
+    icon: <StarIcon />,
+  },
+  {
+    title: "Son Görüntülenenler",
+    url: "/files?view=recent",
+    icon: <ClockIcon />,
+  },
+  {
     title: "Ekip",
     url: "/team",
     icon: <UsersIcon />,
@@ -105,6 +117,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [botsTabActive, setBotsTabActive] = React.useState(false)
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBotsTabActive(params.get("tab") === "bots")
   }, [pathname])
 
@@ -114,12 +127,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       if (item.url === "/pipelines") return canViewBoard
       if (item.url === "/calendar") return canViewCalendar
       if (item.url === "/files") return canViewFiles
+      if (item.url === "/files?view=starred") return canViewFiles
+      if (item.url === "/files?view=recent") return canViewFiles
       if (item.url === "/team") return canViewTeam
       return true
     })
     .map((item) => ({
       ...item,
-      isActive: pathname === item.url,
+      isActive: item.url.startsWith("/files?view=")
+        ? typeof window !== "undefined" && window.location.pathname + window.location.search === item.url
+        : pathname === item.url,
     }))
 
   const navSecondaryWithActive = navSecondary.map((item) => ({

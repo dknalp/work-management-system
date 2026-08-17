@@ -218,5 +218,36 @@ class FileRecord(SQLModel, table=True):
     is_deleted: bool = Field(default=False, index=True)
     deleted_at: Optional[datetime] = Field(default=None)
 
+    is_starred: bool = Field(default=False, index=True)
+    color: Optional[str] = Field(default=None, max_length=32)
+    icon_emoji: Optional[str] = Field(default=None, max_length=8)
+
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
+
+
+class FileAccessLog(SQLModel, table=True):
+    """Records every view/download access to a FileRecord for the 'Recent' feature."""
+
+    __tablename__ = "file_access_logs"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    file_id: uuid.UUID = Field(foreign_key="file_records.id", index=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    action: str = Field(max_length=20)  # "view" | "download"
+    accessed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FileShare(SQLModel, table=True):
+    """Tracks per-file sharing grants (user-to-user or public token links)."""
+
+    __tablename__ = "file_shares"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    file_id: uuid.UUID = Field(foreign_key="file_records.id", index=True)
+    owner_id: uuid.UUID = Field(foreign_key="users.id")
+    shared_with_user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id")
+    share_token: Optional[str] = Field(default=None, index=True, max_length=64)  # public link token
+    permission_level: str = Field(default="view", max_length=10)  # "view" | "edit" | "owner"
+    expires_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

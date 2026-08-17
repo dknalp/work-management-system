@@ -15,6 +15,9 @@ export type FileItem = {
   size?: number
   lastModified?: string     // ISO string (maps to updated_at)
   mimeType?: string
+  color?: string | null
+  icon_emoji?: string | null
+  is_starred?: boolean
   // Drive-specific — kept for backward compat, not used in new storage flow
   isDriveFile?: boolean
   driveId?: string
@@ -65,6 +68,9 @@ export function fileRecordToItem(record: FileRecord): FileItem {
     lastModified: record.updated_at,
     trashed: record.is_deleted,
     trashedAt: record.deleted_at,
+    color: record.color,
+    icon_emoji: record.icon_emoji,
+    is_starred: record.is_starred ?? false,
   }
 }
 

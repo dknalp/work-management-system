@@ -22,10 +22,10 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
 import { getFileIcon, isImageFile, getFileOpenUrl, downloadFile } from "./file-utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { moveFile } from "@/lib/actions/files"
+import { useDraggable, useDroppable } from "@dnd-kit/core"
+import { CSS } from "@dnd-kit/utilities"
 
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
 
@@ -72,6 +72,66 @@ function ImageThumbnail({ item }: { item: FileItem }) {
   )
 }
 
+
+function DndGridCard({
+  item,
+  selected,
+  isCut,
+  onClick,
+  onDoubleClick,
+  children,
+}: {
+  item: import("@/components/files/file-utils").FileItem
+  selected: boolean
+  isCut: boolean
+  onClick: (e: React.MouseEvent) => void
+  onDoubleClick: (e: React.MouseEvent) => void
+  children: React.ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+    transform,
+  } = useDraggable({
+    id: `drag-${item.id}`,
+    data: { item },
+    disabled: Boolean(item.isDriveFile),
+  })
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `dnd-folder-${item.id}`,
+    data: { item },
+    disabled: item.type !== "folder",
+  })
+
+  const setRef = (el: HTMLDivElement | null) => {
+    setDragRef(el as unknown as HTMLElement)
+    if (item.type === "folder") setDropRef(el as unknown as HTMLElement)
+  }
+
+  return (
+    <div
+      ref={setRef}
+      {...(item.isDriveFile ? {} : { ...listeners, ...attributes })}
+      style={{ transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : isCut ? 0.4 : 1 }}
+      className={cn(
+        "group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-3 transition-all",
+        selected
+          ? "border-primary/50 bg-primary/5 ring-2 ring-primary/20"
+          : "border-border bg-card hover:border-primary/30 hover:bg-muted/30",
+        item.type === "folder" && isOver && "border-primary bg-primary/10 ring-2 ring-primary/40",
+        isDragging && "z-50 shadow-xl"
+      )}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+    >
+      {children}
+    </div>
+  )
+}
+
 export function FileGrid({
   items,
   selectedPaths,
@@ -87,7 +147,6 @@ export function FileGrid({
   onPin,
   isPinned,
 }: FileGridProps) {
-  const router = useRouter()
 
   const isCutItem = (path: string) =>
     clipboard?.mode === "cut" && clipboard.paths.includes(path)
@@ -107,19 +166,6 @@ export function FileGrid({
     setTimeout(() => document.body.removeChild(ghost), 0)
   }
 
-  const handleDrop = async (e: React.DragEvent, targetItem: FileItem) => {
-    e.preventDefault()
-    if (targetItem.type !== "folder" || targetItem.isDriveFile) return
-    const sourceId = e.dataTransfer.getData("application/workos-file-id")
-    if (!sourceId || sourceId === targetItem.id) return
-    try {
-      await moveFile(sourceId, targetItem.path)
-      toast.success(`${targetItem.name} klasörüne taşındı`)
-      router.refresh()
-    } catch {
-      toast.error("Taşıma başarısız")
-    }
-  }
 
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
@@ -131,39 +177,20 @@ export function FileGrid({
         const pinned = isPinned?.(item.path) ?? false
 
         const gridItem = (
-          <div
-            key={item.path + item.name}
-            data-file-path={item.path}
-            data-drag-handle={!isParentDir ? "true" : undefined}
-            draggable={!isParentDir && !item.isDriveFile}
-            onDragStart={(e) => handleDragStart(e, item)}
-            onDragOver={(e) => { if (item.type === "folder") e.preventDefault() }}
-            onDragEnter={(e) => {
-              if (item.type === "folder") {
-                e.preventDefault()
-                e.currentTarget.setAttribute("data-drop-target", "true")
-              }
-            }}
-            onDragLeave={(e) => e.currentTarget.removeAttribute("data-drop-target")}
-            onDrop={(e) => {
-              e.currentTarget.removeAttribute("data-drop-target")
-              handleDrop(e, item)
-            }}
+          <DndGridCard
+            item={item}
+            selected={isSelected}
+            isCut={isCut}
             onClick={(e) => {
+              e.stopPropagation()
               if (isParentDir) { onNavigate(item.path); return }
               onSelect(item, e.metaKey || e.ctrlKey || e.shiftKey)
             }}
-            onDoubleClick={() => {
+            onDoubleClick={(e) => {
+              e.stopPropagation()
               if (item.type === "folder") onNavigate(item.path)
               else window.open(getFileOpenUrl(item), "_blank")
             }}
-            className={cn(
-              "group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl p-3 transition-colors",
-              "hover:bg-accent/60",
-              isSelected && "bg-primary/10 ring-2 ring-primary/30",
-              isCut && "opacity-50",
-              "[&[data-drop-target=true]]:bg-primary/10 [&[data-drop-target=true]]:ring-2 [&[data-drop-target=true]]:ring-primary",
-            )}
           >
             <div className="flex size-14 items-center justify-center">
               {isImageFile(item) && item.id ? (
@@ -190,7 +217,7 @@ export function FileGrid({
                 <p className="max-w-xs break-all text-xs">{item.name}</p>
               </TooltipContent>
             </Tooltip>
-          </div>
+          </DndGridCard>
         )
 
         if (isParentDir) return gridItem

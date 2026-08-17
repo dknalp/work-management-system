@@ -8,6 +8,7 @@ import {
   MoreVerticalIcon,
   PencilIcon,
   PinIcon,
+  StarIcon,
   Trash2Icon,
   ExternalLinkIcon,
   ChevronUpIcon,
@@ -19,6 +20,12 @@ import {
   CopyIcon,
   ScissorsIcon,
   ClipboardPasteIcon,
+  SlidersHorizontalIcon,
+  PaletteIcon,
+  SearchIcon,
+  CheckIcon,
+  CheckSquare2Icon,
+  FileIcon,
 } from "lucide-react"
 import { format } from "date-fns"
 import {
@@ -65,6 +72,11 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { SearchFilterPanel } from "@/components/files/search-filter-panel"
+import { FolderCustomizeDialog } from "@/components/files/folder-customize-dialog"
+import { searchFiles, customizeFile, type SearchFilters } from "@/lib/actions/files"
 import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileGrid } from "./file-grid"
@@ -78,12 +90,26 @@ import type { FileItem, SearchResult } from "./file-utils"
 import { toast } from "sonner"
 import { usePermission } from "@/hooks/use-permission"
 import { usePinnedFolders } from "@/hooks/use-pinned-folders"
+import { UploadQueueProvider } from "@/components/files/upload-queue"
 import {
   trashFile,
   moveFile,
   renameFile,
   copyFile,
+  starFile,
 } from "@/lib/actions/files"
+import { ShareDialog } from "./share-dialog"
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core"
+import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core"
+import { CSS } from "@dnd-kit/utilities"
 
 interface FileExplorerProps {
   items: FileItem[]
@@ -100,6 +126,63 @@ interface FileExplorerProps {
 
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
 
+// ── DndTableRow ─────────────────────────────────────────────────────────────
+function DndTableRow({
+  item,
+  children,
+  className,
+  onClick,
+  onDoubleClick,
+}: {
+  item: FileItem
+  children: React.ReactNode
+  className?: string
+  onClick?: (e: React.MouseEvent<HTMLTableRowElement>) => void
+  onDoubleClick?: (e: React.MouseEvent<HTMLTableRowElement>) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+    transform,
+  } = useDraggable({
+    id: `drag-${item.id}`,
+    data: { item },
+    disabled: item.name === ".." || Boolean(item.isDriveFile),
+  })
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `drop-${item.id}`,
+    data: { path: item.path },
+    disabled: item.type !== "folder" || item.name === "..",
+  })
+
+  const setRef = (el: HTMLTableRowElement | null) => {
+    setDragRef(el as unknown as HTMLElement)
+    if (item.type === "folder" && item.name !== "..") setDropRef(el as unknown as HTMLElement)
+  }
+
+  return (
+    <TableRow
+      ref={setRef}
+      {...(item.name !== ".." && !item.isDriveFile ? { ...listeners, ...attributes } : {})}
+      style={{ transform: CSS.Transform.toString(transform), opacity: isDragging ? 0.4 : 1 }}
+      className={cn(
+        className,
+        item.type === "folder" && isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
+        isDragging && "z-50 shadow-lg"
+      )}
+      data-file-path={item.path}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+    >
+      {children}
+    </TableRow>
+  )
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 export function FileExplorer({
   items: itemsProp,
   currentPath,
@@ -110,8 +193,6 @@ export function FileExplorer({
   searchResults,
   isSearching,
 }: FileExplorerProps) {
-  // Normalize items to always be an array (guard against undefined passed from server)
-  const items = itemsProp ?? []
   const router = useRouter()
   const canRename = usePermission("files:rename")
   const canDelete = usePermission("files:delete")
@@ -133,6 +214,26 @@ export function FileExplorer({
   const [moveToOpen, setMoveToOpen] = React.useState(false)
   const [moveSourcePaths, setMoveSourcePaths] = React.useState<string[]>([])
   const [moveToTarget, setMoveToTarget] = React.useState("")
+
+  // Search & filter state (local, self-contained)
+  const [localQuery, setLocalQuery] = React.useState("")
+  const [localSearchResults, setLocalSearchResults] = React.useState<FileItem[] | null>(null)
+  const [localSearching, setLocalSearching] = React.useState(false)
+  const [searchFilters, setSearchFilters] = React.useState<SearchFilters>({})
+
+  // Customize dialog state
+  const [customizeDialogItem, setCustomizeDialogItem] = React.useState<FileItem | null>(null)
+
+  // Share dialog state
+  const [shareTarget, setShareTarget] = React.useState<FileItem | null>(null)
+
+  // Local items state (for star toggle updates)
+  const [localItems, setLocalItems] = React.useState<FileItem[]>(itemsProp ?? [])
+  React.useEffect(() => {
+    setLocalItems(itemsProp ?? [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsProp])
+  const items = localItems
 
   const [sortKey, setSortKey] = useLocalStorage<"name" | "size" | "updatedAt">(
     "wms:files:sortKey",
@@ -350,7 +451,7 @@ export function FileExplorer({
   )
 
   const displayItems = React.useMemo(() => {
-    let filtered = searchQuery
+    const filtered = searchQuery
       ? items.filter((i) => i.name.toLowerCase().includes(searchQuery.toLowerCase()))
       : [...items]
 
@@ -445,6 +546,71 @@ export function FileExplorer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPaths, activeItem, items, renameOpen, deleteOpen, clipboard, handleCopy, handleCut, handlePaste, canRename, canDelete])
 
+  // Debounced local search with filters
+  React.useEffect(() => {
+    const timer = setTimeout(async () => {
+      const q = localQuery.trim()
+      const hasFilters = Object.values(searchFilters).some((v) => v !== undefined && v !== null)
+      if (!q && !hasFilters) {
+        setLocalSearchResults(null)
+        return
+      }
+      setLocalSearching(true)
+      try {
+        const records = await searchFiles(q, currentPath, searchFilters)
+        setLocalSearchResults(records as unknown as FileItem[])
+      } catch {
+        setLocalSearchResults([])
+      } finally {
+        setLocalSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [localQuery, searchFilters, currentPath])
+
+  // ── dnd-kit ──────────────────────────────────────────────────────────────
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  const [dndActiveItem, setDndActiveItem] = React.useState<FileItem | null>(null)
+
+  const handleDndDragStart = React.useCallback((event: DragStartEvent) => {
+    const item = (event.active.data.current as { item?: FileItem })?.item
+    if (item) setDndActiveItem(item)
+  }, [])
+
+  const handleDndDragEnd = React.useCallback(async (event: DragEndEvent) => {
+    setDndActiveItem(null)
+    const { active, over } = event
+    if (!over) return
+    const draggedItem = (active.data.current as { item?: FileItem })?.item
+    const targetPath = (over.data.current as { path?: string })?.path
+    if (!draggedItem || !targetPath) return
+    if (draggedItem.path === targetPath) return
+    const toMove = selectedPaths.has(draggedItem.path)
+      ? Array.from(selectedPaths).map(p => displayItems.find(i => i.path === p)).filter(Boolean) as FileItem[]
+      : [draggedItem]
+    const results = await Promise.allSettled(toMove.map(f => moveFile(f.id, targetPath)))
+    const ok = results.filter(r => r.status === "fulfilled").length
+    if (ok > 0) { toast.success(`${ok} öğe taşındı`); router.refresh() }
+    else toast.error("Taşıma başarısız")
+  }, [selectedPaths, displayItems])
+
+  // ── select-all ────────────────────────────────────────────────────────────
+  const selectableItems = React.useMemo(
+    () => displayItems.filter(i => i.name !== ".."),
+    [displayItems]
+  )
+  const allSelected = selectableItems.length > 0 && selectableItems.every(i => selectedPaths.has(i.path))
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedPaths(new Set())
+      setActiveItem(null)
+    } else {
+      setSelectedPaths(new Set(selectableItems.map(i => i.path)))
+      if (selectableItems[0]) setActiveItem(selectableItems[0])
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
     if (item.name === ".." || item.isDriveFile) {
       e.preventDefault()
@@ -501,8 +667,56 @@ export function FileExplorer({
     clipboard?.mode === "cut" && clipboard.paths.includes(path)
 
   return (
+    <DndContext sensors={sensors} onDragStart={handleDndDragStart} onDragEnd={handleDndDragEnd}>
+    <UploadQueueProvider>
     <>
-      <FileToolbar currentPath={currentPath} />
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/50">
+        <FileToolbar currentPath={currentPath} />
+        {/* Local search input + filter popover */}
+        <div className="flex items-center gap-1.5 flex-1 max-w-xs ml-auto">
+          <div className="relative flex-1">
+            <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              type="search"
+              placeholder="Ara…"
+              value={localQuery}
+              onChange={(e) => setLocalQuery(e.target.value)}
+              className="pl-8 h-7 text-xs"
+            />
+            {localQuery && (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => { setLocalQuery(""); setLocalSearchResults(null) }}
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          {(() => {
+            const activeCount = Object.values(searchFilters).filter((v) => v !== undefined && v !== null).length
+            return (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant={activeCount > 0 ? "default" : "ghost"} size="sm" className="h-7 px-2 shrink-0">
+                    <SlidersHorizontalIcon className="h-3.5 w-3.5" />
+                    {activeCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 h-4 min-w-4 rounded-full px-1 text-[10px]">{activeCount}</Badge>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="p-0 w-auto border-0 shadow-none bg-transparent">
+                  <SearchFilterPanel
+                    filters={searchFilters}
+                    onChange={setSearchFilters}
+                    onClear={() => setSearchFilters({})}
+                  />
+                </PopoverContent>
+              </Popover>
+            )
+          })()}
+        </div>
+      </div>
       <FileDropZone currentPath={currentPath}>
       <div
         ref={containerRef}
@@ -515,15 +729,15 @@ export function FileExplorer({
         <SelectionLasso containerRef={containerRef} onSelectionChange={handleLassoChange} />
 
         <div className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto p-6">
-          {isSearching && searchResults === null ? (
+          {localSearching && localSearchResults === null ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
               <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
-              <p className="text-sm">Searching…</p>
+              <p className="text-sm">Aranıyor…</p>
             </div>
-          ) : searchResults != null ? (
+          ) : localSearchResults != null ? (
             <SearchResultsView
-              results={searchResults}
-              query={searchQuery}
+              results={localSearchResults}
+              query={localQuery}
               onOpen={handleItemDoubleClick}
               onDownload={(item) => downloadFile(item)}
               onRename={handleRename}
@@ -535,6 +749,19 @@ export function FileExplorer({
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow className="border-b border-border hover:bg-transparent">
+                    <TableHead className="w-10 px-4">
+                      <span
+                        className="flex cursor-pointer items-center justify-center"
+                        onClick={(e) => { e.stopPropagation(); handleSelectAll() }}
+                        title={allSelected ? "Seçimi kaldır" : "Tümünü seç"}
+                      >
+                        {allSelected ? (
+                          <CheckSquare2Icon className="size-4 text-primary" />
+                        ) : (
+                          <CheckIcon className="size-4 text-muted-foreground/50" />
+                        )}
+                      </span>
+                    </TableHead>
                     <TableHead
                       className="w-[400px] cursor-pointer px-6 text-[10px] font-bold tracking-wider uppercase select-none"
                       onClick={() => handleSort("name")}
@@ -577,50 +804,59 @@ export function FileExplorer({
                     const isDrive = item.isDriveFile
 
                     const tableRow = (
-                      <TableRow
+                      <DndTableRow
                         key={item.path + item.name}
-                        data-file-path={item.path}
-                        data-drag-handle={!isParentDir ? "true" : undefined}
-                        draggable={!isParentDir && !isDrive}
-                        onDragStart={(e) => handleDragStart(e, item)}
-                        onDragOver={(e) => {
-                          if (item.type === "folder") e.preventDefault()
-                        }}
-                        onDragEnter={(e) => {
-                          if (item.type === "folder") {
-                            e.preventDefault()
-                            e.currentTarget.setAttribute("data-drop-target", "true")
-                          }
-                        }}
-                        onDragLeave={(e) =>
-                          e.currentTarget.removeAttribute("data-drop-target")
-                        }
-                        onDrop={(e) => {
-                          e.currentTarget.removeAttribute("data-drop-target")
-                          handleDrop(e, item)
-                        }}
+                        item={item}
                         className={cn(
                           "group cursor-pointer border-b border-border/50 transition-colors last:border-0",
                           isSelected
                             ? "bg-primary/5 hover:bg-primary/10"
                             : "hover:bg-muted/30",
-                          "data-[drop-target=true]:bg-primary/20",
                           isParentDir && "text-muted-foreground/60",
                           isCut && "opacity-40"
                         )}
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent<HTMLTableRowElement>) => {
                           e.stopPropagation()
                           handleSelect(item, e.shiftKey || e.metaKey || e.ctrlKey)
                         }}
-                        onDoubleClick={(e) => {
+                        onDoubleClick={(e: React.MouseEvent<HTMLTableRowElement>) => {
                           e.stopPropagation()
                           handleItemDoubleClick(item)
                         }}
                       >
+                        <TableCell className="w-10 px-4" onClick={(e) => { e.stopPropagation(); if (!isParentDir) handleSelect(item, false) }} onPointerDown={(e) => e.stopPropagation()}>
+                          {!isParentDir && (
+                            <span className={cn("flex items-center justify-center transition-opacity", isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+                              {isSelected ? <CheckSquare2Icon className="size-4 text-primary" /> : <CheckIcon className="size-4 text-muted-foreground/50" />}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="px-6 py-3 font-medium">
                           <div className="flex items-center gap-3">
                             {getFileIcon(item)}
                             <span className="truncate font-mono text-sm">{item.name}</span>
+                            {!isParentDir && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  try {
+                                    const updated = await starFile(item.id)
+                                    setLocalItems(prev =>
+                                      prev.map(i => i.id === item.id ? { ...i, is_starred: updated.is_starred } : i)
+                                    )
+                                  } catch { /* ignore */ }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0 p-0.5 rounded hover:bg-accent"
+                                onPointerDown={(e) => e.stopPropagation()}
+                              >
+                                <StarIcon
+                                  className={cn(
+                                    "size-3.5",
+                                    item.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
+                                  )}
+                                />
+                              </button>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="font-sans text-xs text-muted-foreground">
@@ -665,6 +901,22 @@ export function FileExplorer({
                                     onClick={() => pin({ name: item.name, path: item.path })}
                                   >
                                     <PinIcon className="size-3.5" /> Sabitle
+                                  </DropdownMenuItem>
+                                )}
+                                {item.type === "folder" && !isDrive && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => setCustomizeDialogItem(item)}
+                                  >
+                                    <PaletteIcon className="size-3.5" /> Özelleştir
+                                  </DropdownMenuItem>
+                                )}
+                                {!isDrive && (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => setShareTarget(item)}
+                                  >
+                                    <Share2Icon className="size-3.5" /> Paylaş
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
@@ -718,7 +970,7 @@ export function FileExplorer({
                             </DropdownMenu>
                           )}
                         </TableCell>
-                      </TableRow>
+                      </DndTableRow>
                     )
 
                     if (isParentDir) return tableRow
@@ -760,6 +1012,22 @@ export function FileExplorer({
                               onClick={() => pin({ name: item.name, path: item.path })}
                             >
                               <PinIcon className="size-4" /> Sabitle
+                            </ContextMenuItem>
+                          )}
+                          {item.type === "folder" && !isDrive && (
+                            <ContextMenuItem
+                              className="gap-2"
+                              onClick={() => setCustomizeDialogItem(item)}
+                            >
+                              <PaletteIcon className="size-4" /> Özelleştir
+                            </ContextMenuItem>
+                          )}
+                          {!isDrive && (
+                            <ContextMenuItem
+                              className="gap-2"
+                              onClick={() => setShareTarget(item)}
+                            >
+                              <Share2Icon className="size-4" /> Paylaş
                             </ContextMenuItem>
                           )}
                           <ContextMenuSeparator />
@@ -838,10 +1106,10 @@ export function FileExplorer({
         </div>
 
         {showPreview && activeItem && (
-          <FilePreviewPanel item={activeItem} onClose={() => setActiveItem(null)} />
+          <FilePreviewPanel file={activeItem} open={showPreview} onClose={() => setActiveItem(null)} />
         )}
 
-        {selectedPaths.size >= 2 && (
+        {selectedPaths.size >= 1 && (
           <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
             <span className="mr-2 text-sm font-semibold tabular-nums">
               {selectedPaths.size} seçili
@@ -1022,5 +1290,26 @@ export function FileExplorer({
       </Dialog>
       </FileDropZone>
     </>
+    </UploadQueueProvider>
+
+      {/* Share Dialog */}
+      {shareTarget && (
+        <ShareDialog
+          file={shareTarget}
+          open={!!shareTarget}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
+
+      {/* dnd-kit drag ghost */}
+      <DragOverlay dropAnimation={null}>
+        {dndActiveItem && (
+          <div className="flex items-center gap-2 rounded-lg border border-white/20 bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-xl">
+            <FileIcon className="size-3.5" />
+            {selectedPaths.size > 1 ? `${selectedPaths.size} öğe taşınıyor` : dndActiveItem.name}
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   )
 }

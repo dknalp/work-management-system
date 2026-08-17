@@ -9,6 +9,7 @@ Storage: file bytes in Cloudflare R2 (when env vars are set) OR local disk
 import io
 import mimetypes
 import os
+import secrets
 import shutil
 import tempfile
 import uuid
@@ -24,7 +25,7 @@ from sqlmodel import Session, col, func, select
 
 from app.database import get_session
 from app.deps import get_current_user
-from app.models import FileRecord, User
+from app.models import FileAccessLog, FileRecord, FileShare, User
 from app.r2 import (
     r2_copy_object,
     r2_delete_object,
@@ -84,6 +85,9 @@ class FileRecordResponse(BaseModel):
     mime_type: Optional[str]
     is_deleted: bool
     deleted_at: Optional[datetime]
+    is_starred: bool
+    color: Optional[str] = None
+    icon_emoji: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -120,6 +124,44 @@ class PresignedUrlResponse(BaseModel):
     url: str
 
 
+class ShareCreateBody(BaseModel):
+    shared_with_user_id: Optional[str] = None
+    permission_level: str = "view"
+    expires_at: Optional[datetime] = None
+
+
+class ShareResponse(BaseModel):
+    id: str
+    file_id: str
+    owner_id: str
+    shared_with_user_id: Optional[str]
+    share_token: Optional[str]
+    permission_level: str
+    expires_at: Optional[datetime]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class BulkMoveBody(BaseModel):
+    ids: list[str]
+    dest_parent: str
+
+
+class BulkCopyBody(BaseModel):
+    ids: list[str]
+    dest_parent: str
+
+
+class BulkTrashBody(BaseModel):
+    ids: list[str]
+
+
+class BulkResult(BaseModel):
+    succeeded: list[str]
+    failed: list[str]
+
+
 # ---------------------------------------------------------------------------
 # Internal utilities
 # ---------------------------------------------------------------------------
@@ -143,8 +185,11 @@ def _to_response(record: FileRecord) -> FileRecordResponse:
         mime_type=record.mime_type,
         is_deleted=record.is_deleted,
         deleted_at=record.deleted_at,
+        is_starred=record.is_starred,
         created_at=record.created_at,
         updated_at=record.updated_at,
+        color=getattr(record, "color", None),
+        icon_emoji=getattr(record, "icon_emoji", None),
     )
 
 
@@ -315,6 +360,10 @@ async def download_file(
     if record.type == "folder" or not record.r2_key:
         raise HTTPException(status_code=400, detail="Cannot download a folder directly; use /zip")
 
+    # Record access log entry
+    session.add(FileAccessLog(file_id=record.id, user_id=current_user.id, action="download"))
+    session.commit()
+
     if _use_r2():
         disposition = "inline" if inline else f'attachment; filename="{record.name}"'
         url = await r2_generate_presigned_url(record.r2_key, expires_in=_DOWNLOAD_TTL, disposition=disposition)
@@ -342,6 +391,10 @@ async def preview_file(
     record = _get_record_or_404(file_id, current_user, session)
     if record.type == "folder" or not record.r2_key:
         raise HTTPException(status_code=400, detail="Not a file")
+
+    # Log access
+    session.add(FileAccessLog(file_id=record.id, user_id=current_user.id, action="view"))
+    session.commit()
 
     if _use_r2():
         url = await r2_generate_presigned_url(record.r2_key, expires_in=_PREVIEW_TTL, disposition="inline")
@@ -776,25 +829,377 @@ async def download_zip(
     )
 
 
+_MIME_CATEGORIES: dict[str, list[str]] = {
+    "image": ["image/"],
+    "video": ["video/"],
+    "audio": ["audio/"],
+    "document": [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml",
+        "text/plain",
+    ],
+    "spreadsheet": [
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml",
+        "text/csv",
+    ],
+    "code": [
+        "text/javascript",
+        "text/typescript",
+        "text/html",
+        "text/css",
+        "application/json",
+        "text/x-python",
+    ],
+    "archive": [
+        "application/zip",
+        "application/x-rar",
+        "application/x-7z",
+        "application/gzip",
+        "application/x-tar",
+    ],
+}
+
+
 @router.get("/search", response_model=list[FileRecordResponse])
 def search_files(
-    q: str = Query(min_length=1),
+    q: str = Query(default=""),
     path: str = Query(default=""),
+    type: Optional[str] = Query(default=None),
+    mime_category: Optional[str] = Query(default=None),
+    min_size: Optional[int] = Query(default=None),
+    max_size: Optional[int] = Query(default=None),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    is_starred: Optional[bool] = Query(default=None),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> list[FileRecordResponse]:
-    """Search files by name (case-insensitive) within an optional path prefix."""
+    """Search files by name (case-insensitive) within an optional path prefix, with optional filters."""
+    from sqlalchemy import or_
+
     stmt = select(FileRecord).where(
         FileRecord.owner_id == current_user.id,
         FileRecord.is_deleted == False,  # noqa: E712
-        col(FileRecord.name).ilike(f"%{q}%"),
     )
+
+    if q:
+        stmt = stmt.where(col(FileRecord.name).ilike(f"%{q}%"))
+
     if path:
         clean_path = path.strip("/")
         stmt = stmt.where(
             col(FileRecord.path).startswith(clean_path + "/")
             | (FileRecord.path == clean_path)
         )
+
+    if type == "file":
+        stmt = stmt.where(FileRecord.type == "file")
+    elif type == "folder":
+        stmt = stmt.where(FileRecord.type == "folder")
+
+    if mime_category and mime_category in _MIME_CATEGORIES:
+        prefixes = _MIME_CATEGORIES[mime_category]
+        mime_conditions = [col(FileRecord.mime_type).startswith(p) for p in prefixes]
+        stmt = stmt.where(or_(*mime_conditions))
+
+    if min_size is not None:
+        stmt = stmt.where(FileRecord.size >= min_size)
+
+    if max_size is not None:
+        stmt = stmt.where(FileRecord.size <= max_size)
+
+    if date_from:
+        try:
+            dt_from = datetime.fromisoformat(date_from.replace("Z", "+00:00"))
+            stmt = stmt.where(FileRecord.created_at >= dt_from)
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            dt_to = datetime.fromisoformat(date_to.replace("Z", "+00:00"))
+            stmt = stmt.where(FileRecord.created_at <= dt_to)
+        except ValueError:
+            pass
+
+    if is_starred is not None:
+        starred_val = getattr(FileRecord, "starred", None)
+        if starred_val is not None:
+            stmt = stmt.where(FileRecord.starred == is_starred)  # type: ignore[attr-defined]
+
     records = session.exec(stmt).all()
     records = sorted(records, key=lambda r: (0 if r.type == "folder" else 1, r.name.lower()))
     return [_to_response(r) for r in records]
+
+
+class CustomizeBody(BaseModel):
+    color: Optional[str] = None
+    icon_emoji: Optional[str] = None
+
+
+@router.patch("/customize/{file_id}", response_model=FileRecordResponse)
+def customize_file(
+    file_id: str,
+    body: CustomizeBody,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> FileRecordResponse:
+    """Set color and/or icon_emoji on any file or folder."""
+    record = _get_record_or_404(file_id, current_user, session)
+    if body.color is not None:
+        record.color = body.color if body.color != "" else None  # type: ignore[assignment]
+    if body.icon_emoji is not None:
+        record.icon_emoji = body.icon_emoji if body.icon_emoji != "" else None  # type: ignore[assignment]
+    record.updated_at = _now()
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return _to_response(record)
+
+# ── Starred ────────────────────────────────────────────────────────────────
+
+@router.post("/star/{file_id}", response_model=FileRecordResponse)
+def toggle_star(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Toggle is_starred on a file or folder."""
+    record = _get_record_or_404(file_id, current_user, session)
+    record.is_starred = not record.is_starred  # type: ignore[assignment]
+    record.updated_at = _now()
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return _to_response(record)
+
+
+@router.get("/starred", response_model=list[FileRecordResponse])
+def list_starred(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Return all starred (non-deleted) files for the current user."""
+    records = session.exec(
+        select(FileRecord).where(
+            FileRecord.owner_id == current_user.id,
+            FileRecord.is_starred == True,  # noqa: E712
+            FileRecord.is_deleted == False,  # noqa: E712
+        )
+    ).all()
+    return [_to_response(r) for r in records]
+
+
+# ── Recent ─────────────────────────────────────────────────────────────────
+
+@router.get("/recent", response_model=list[FileRecordResponse])
+def list_recent(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Return recently accessed files, most recent first."""
+    subq = (
+        select(FileAccessLog.file_id, func.max(FileAccessLog.accessed_at).label("last_access"))
+        .where(FileAccessLog.user_id == current_user.id)
+        .group_by(FileAccessLog.file_id)
+        .subquery()
+    )
+    records = session.exec(
+        select(FileRecord)
+        .join(subq, FileRecord.id == subq.c.file_id)
+        .where(
+            FileRecord.owner_id == current_user.id,
+            FileRecord.is_deleted == False,  # noqa: E712
+        )
+        .order_by(col(subq.c.last_access).desc())
+        .limit(limit)
+    ).all()
+    return [_to_response(r) for r in records]
+
+
+# ── Sharing ────────────────────────────────────────────────────────────────
+
+def _share_to_response(share: FileShare) -> ShareResponse:
+    return ShareResponse(
+        id=str(share.id),
+        file_id=str(share.file_id),
+        owner_id=str(share.owner_id),
+        shared_with_user_id=str(share.shared_with_user_id) if share.shared_with_user_id else None,
+        share_token=share.share_token,
+        permission_level=share.permission_level,
+        expires_at=share.expires_at,
+        created_at=share.created_at,
+    )
+
+
+@router.post("/share/{file_id}", response_model=ShareResponse)
+def create_share(
+    file_id: str,
+    body: ShareCreateBody,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    record = _get_record_or_404(file_id, current_user, session)
+    share = FileShare(
+        file_id=record.id,
+        owner_id=current_user.id,
+        shared_with_user_id=uuid.UUID(body.shared_with_user_id) if body.shared_with_user_id else None,
+        permission_level=body.permission_level,
+        expires_at=body.expires_at,
+    )
+    session.add(share)
+    session.commit()
+    session.refresh(share)
+    return _share_to_response(share)
+
+
+@router.get("/share/{file_id}", response_model=list[ShareResponse])
+def list_shares(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    record = _get_record_or_404(file_id, current_user, session)
+    shares = session.exec(select(FileShare).where(FileShare.file_id == record.id)).all()
+    return [_share_to_response(s) for s in shares]
+
+
+@router.delete("/share/{share_id}", status_code=204)
+def delete_share(
+    share_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    share = session.get(FileShare, uuid.UUID(share_id))
+    if not share or share.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Share not found")
+    session.delete(share)
+    session.commit()
+
+
+@router.post("/share/{file_id}/link", response_model=dict)
+def create_share_link(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    record = _get_record_or_404(file_id, current_user, session)
+    token = secrets.token_urlsafe(32)
+    share = FileShare(
+        file_id=record.id,
+        owner_id=current_user.id,
+        share_token=token,
+        permission_level="view",
+    )
+    session.add(share)
+    session.commit()
+    return {"token": token, "url": f"/files/public/{token}"}
+
+
+@router.get("/public/{token}", response_model=FileRecordResponse)
+def get_public_file(
+    token: str,
+    session: Session = Depends(get_session),
+):
+    share = session.exec(select(FileShare).where(FileShare.share_token == token)).first()
+    if not share:
+        raise HTTPException(status_code=404, detail="Link not found or expired")
+    if share.expires_at and share.expires_at < _now():
+        raise HTTPException(status_code=410, detail="Link expired")
+    record = session.get(FileRecord, share.file_id)
+    if not record or record.is_deleted:
+        raise HTTPException(status_code=404, detail="File not found")
+    return _to_response(record)
+
+
+# ── Bulk Operations ────────────────────────────────────────────────────────
+
+@router.post("/bulk-move", response_model=BulkResult)
+def bulk_move(
+    body: BulkMoveBody,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    succeeded, failed = [], []
+    for fid in body.ids:
+        try:
+            record = _get_record_or_404(fid, current_user, session)
+            new_path = _build_path(body.dest_parent, record.name)
+            record.path = new_path  # type: ignore[assignment]
+            record.parent_path = body.dest_parent  # type: ignore[assignment]
+            record.updated_at = _now()
+            session.add(record)
+            succeeded.append(fid)
+        except Exception:
+            failed.append(fid)
+    session.commit()
+    return BulkResult(succeeded=succeeded, failed=failed)
+
+
+@router.post("/bulk-copy", response_model=BulkResult)
+async def bulk_copy(
+    body: BulkCopyBody,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    succeeded, failed = [], []
+    for fid in body.ids:
+        try:
+            record = _get_record_or_404(fid, current_user, session)
+            new_name = record.name
+            new_path = _build_path(body.dest_parent, new_name)
+            new_id = uuid.uuid4()
+            new_r2_key = f"{current_user.id}/{new_id}"
+            if record.r2_key and record.type == "file":
+                if _use_r2():
+                    await r2_copy_object(record.r2_key, new_r2_key)
+                else:
+                    src = _local_path(record.r2_key)
+                    dst = _local_path(new_r2_key)
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    import shutil as _shutil
+                    _shutil.copy2(src, dst)
+            else:
+                new_r2_key = None
+            new_record = FileRecord(
+                id=new_id,
+                owner_id=current_user.id,
+                name=new_name,
+                path=new_path,
+                parent_path=body.dest_parent,
+                type=record.type,
+                size=record.size,
+                mime_type=record.mime_type,
+                r2_key=new_r2_key,
+            )
+            session.add(new_record)
+            succeeded.append(fid)
+        except Exception:
+            failed.append(fid)
+    session.commit()
+    return BulkResult(succeeded=succeeded, failed=failed)
+
+
+@router.delete("/bulk-trash", response_model=BulkResult)
+def bulk_trash(
+    body: BulkTrashBody,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    succeeded, failed = [], []
+    now = _now()
+    for fid in body.ids:
+        try:
+            record = _get_record_or_404(fid, current_user, session)
+            record.is_deleted = True  # type: ignore[assignment]
+            record.deleted_at = now  # type: ignore[assignment]
+            record.updated_at = now
+            session.add(record)
+            succeeded.append(fid)
+        except Exception:
+            failed.append(fid)
+    session.commit()
+    return BulkResult(succeeded=succeeded, failed=failed)

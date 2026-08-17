@@ -22,6 +22,19 @@ export interface FileRecord {
   deleted_at?: string
   created_at: string
   updated_at: string
+  color?: string | null
+  icon_emoji?: string | null
+  is_starred?: boolean
+}
+
+export interface SearchFilters {
+  type?: "file" | "folder"
+  mimeCategory?: "image" | "video" | "audio" | "document" | "spreadsheet" | "code" | "archive"
+  minSize?: number
+  maxSize?: number
+  dateFrom?: string
+  dateTo?: string
+  isStarred?: boolean
 }
 
 export interface QuotaInfo {
@@ -38,10 +51,27 @@ export async function listFiles(path = "", showTrash = false): Promise<FileRecor
   return apiClient<FileRecord[]>(`/api/v1/files/list?${params}`)
 }
 
-export async function searchFiles(q: string, path = ""): Promise<FileRecord[]> {
+export async function searchFiles(q: string, path = "", filters?: SearchFilters): Promise<FileRecord[]> {
   const params = new URLSearchParams({ q })
   if (path) params.set("path", path)
+  if (filters?.type) params.set("type", filters.type)
+  if (filters?.mimeCategory) params.set("mime_category", filters.mimeCategory)
+  if (filters?.minSize !== undefined) params.set("min_size", String(filters.minSize))
+  if (filters?.maxSize !== undefined) params.set("max_size", String(filters.maxSize))
+  if (filters?.dateFrom) params.set("date_from", filters.dateFrom)
+  if (filters?.dateTo) params.set("date_to", filters.dateTo)
+  if (filters?.isStarred !== undefined) params.set("is_starred", String(filters.isStarred))
   return apiClient<FileRecord[]>(`/api/v1/files/search?${params}`)
+}
+
+export async function customizeFile(
+  id: string,
+  body: { color?: string; icon_emoji?: string }
+): Promise<FileRecord> {
+  return apiClient<FileRecord>(`/api/v1/files/customize/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -234,4 +264,136 @@ export async function downloadZip(ids: string[], filename = "files.zip"): Promis
   a.download = filename
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 5000)
+}
+
+// ── Starred ────────────────────────────────────────────────────────────────
+
+export async function starFile(id: string): Promise<FileRecord> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = {}
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/star/${id}`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new Error("Star failed")
+  return res.json()
+}
+
+export async function listStarred(): Promise<FileRecord[]> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = {}
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/starred`, { headers })
+  if (!res.ok) throw new Error("Failed to load starred")
+  return res.json()
+}
+
+// ── Recent ─────────────────────────────────────────────────────────────────
+
+export async function listRecent(limit = 50): Promise<FileRecord[]> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = {}
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/recent?limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load recent")
+  return res.json()
+}
+
+// ── Share ──────────────────────────────────────────────────────────────────
+
+export interface FileShare {
+  id: string
+  file_id: string
+  owner_id: string
+  shared_with_user_id?: string
+  share_token?: string
+  permission_level: "view" | "edit" | "owner"
+  expires_at?: string
+  created_at: string
+}
+
+export async function createShare(
+  fileId: string,
+  body: { shared_with_user_id?: string; permission_level: "view" | "edit" | "owner"; expires_at?: string }
+): Promise<FileShare> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/share/${fileId}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Share failed")
+  return res.json()
+}
+
+export async function listShares(fileId: string): Promise<FileShare[]> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = {}
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/share/${fileId}`, { headers })
+  if (!res.ok) throw new Error("Failed to load shares")
+  return res.json()
+}
+
+export async function deleteShare(shareId: string): Promise<void> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = {}
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  await fetch(`${API_BASE_URL}/api/v1/files/share/${shareId}`, { method: "DELETE", headers })
+}
+
+export async function createShareLink(fileId: string): Promise<{ token: string; url: string }> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = {}
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/share/${fileId}/link`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new Error("Link creation failed")
+  return res.json()
+}
+
+// ── Bulk ───────────────────────────────────────────────────────────────────
+
+export async function bulkMove(ids: string[], destParent: string): Promise<{ succeeded: string[]; failed: string[] }> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/bulk-move`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ids, dest_parent: destParent }),
+  })
+  if (!res.ok) throw new Error("Bulk move failed")
+  return res.json()
+}
+
+export async function bulkCopy(ids: string[], destParent: string): Promise<{ succeeded: string[]; failed: string[] }> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/bulk-copy`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ids, dest_parent: destParent }),
+  })
+  if (!res.ok) throw new Error("Bulk copy failed")
+  return res.json()
+}
+
+export async function bulkTrash(ids: string[]): Promise<{ succeeded: string[]; failed: string[] }> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/bulk-trash`, {
+    method: "DELETE",
+    headers,
+    body: JSON.stringify({ ids }),
+  })
+  if (!res.ok) throw new Error("Bulk trash failed")
+  return res.json()
 }
