@@ -69,6 +69,8 @@ import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileGrid } from "./file-grid"
 import { FilePreviewPanel } from "./file-preview-panel"
+import { FileToolbar } from "./file-toolbar"
+import { FileDropZone } from "./file-drop-zone"
 import { SelectionLasso } from "./selection-lasso"
 import { SearchResultsView } from "./search-results-view"
 import { getFileIcon, formatSize, getFileOpenUrl, downloadFile } from "./file-utils"
@@ -500,6 +502,8 @@ export function FileExplorer({
 
   return (
     <>
+      <FileToolbar currentPath={currentPath} />
+      <FileDropZone currentPath={currentPath}>
       <div
         ref={containerRef}
         className="relative flex min-h-0 flex-1 overflow-hidden select-none"
@@ -1016,6 +1020,7 @@ export function FileExplorer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </FileDropZone>
     </>
   )
 }
