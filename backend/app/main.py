@@ -41,42 +41,50 @@ SEED_TASKS = [
 
 def seed_data():
     with Session(engine) as session:
-        # Only seed if no users exist at all — i.e. a brand new installation.
-        # This prevents deleted tasks from coming back after every backend restart.
-        is_fresh = not session.exec(select(User)).first()
-
-        if is_fresh:
-            # Seed admin user from environment variables if provided.
-            admin_email = os.getenv("ADMIN_EMAIL", "").strip()
-            admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
-            if admin_email and admin_password:
-                from .security import hash_password
-                admin_user = User(
+        # Always upsert the admin user from env vars if both are provided.
+        # This runs on every startup so the admin can be recovered even when
+        # the DB already has other users (e.g. existing Docker volume).
+        admin_email = os.getenv("ADMIN_EMAIL", "").strip()
+        admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
+        if admin_email and admin_password:
+            from .security import hash_password
+            existing = session.exec(
+                select(User).where(User.email == admin_email)
+            ).first()
+            if existing:
+                existing.hashed_password = hash_password(admin_password)
+                existing.is_admin = True
+                existing.role = "admin"
+                existing.is_active = True
+                session.add(existing)
+                print(f"[seed] Admin user updated: {admin_email}", flush=True)
+            else:
+                session.add(User(
                     name="Admin",
                     email=admin_email,
                     hashed_password=hash_password(admin_password),
                     is_admin=True,
                     role="admin",
                     is_active=True,
-                )
-                session.add(admin_user)
+                ))
                 print(f"[seed] Admin user created: {admin_email}", flush=True)
-            else:
-                print(
-                    "[seed] ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping admin user seed. "
-                    "Create an admin via POST /auth/register after startup.",
-                    flush=True,
-                )
+        else:
+            print(
+                "[seed] ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping admin user seed. "
+                "Create an admin via POST /auth/register after startup.",
+                flush=True,
+            )
 
-            # Seed sample tasks on fresh install.
-            if not session.exec(select(Task)).first():
-                for t in SEED_TASKS:
-                    session.add(Task(
-                        id=t["id"], title=t["title"], status=t["status"],
-                        priority=t["priority"], assignees=t["assignees"],
-                        due_date=t["due_date"], tags=t["tags"],
-                        created_at=t["created_at"], updated_at=datetime.now(timezone.utc),
-                    ))
+        # Seed sample tasks only on a truly fresh install (no tasks yet).
+        # This prevents deleted tasks from coming back after every restart.
+        if not session.exec(select(Task)).first():
+            for t in SEED_TASKS:
+                session.add(Task(
+                    id=t["id"], title=t["title"], status=t["status"],
+                    priority=t["priority"], assignees=t["assignees"],
+                    due_date=t["due_date"], tags=t["tags"],
+                    created_at=t["created_at"], updated_at=datetime.now(timezone.utc),
+                ))
 
         session.commit()
 
