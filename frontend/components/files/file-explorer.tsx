@@ -75,23 +75,13 @@ import { getFileIcon, formatSize, getFileOpenUrl, downloadFile } from "./file-ut
 import type { FileItem, SearchResult } from "./file-utils"
 import { toast } from "sonner"
 import { usePermission } from "@/hooks/use-permission"
+import { usePinnedFolders } from "@/hooks/use-pinned-folders"
 import {
   trashFile,
   moveFile,
   renameFile,
   copyFile,
 } from "@/lib/actions/files"
-
-function usePinnedFolders() {
-  const [pinned, setPinned] = React.useState<Array<{ name: string; path: string }>>([])
-  return {
-    pin: (f: { name: string; path: string }) =>
-      setPinned((prev) => prev.some((p) => p.path === f.path) ? prev : [...prev, f]),
-    isPinned: (p: string) => pinned.some((f) => f.path === p),
-    pinned,
-    unpin: (p: string) => setPinned((prev) => prev.filter((f) => f.path !== p)),
-  }
-}
 
 interface FileExplorerProps {
   items: FileItem[]

@@ -96,14 +96,14 @@ export async function createFolder(parentPath: string, name: string): Promise<Fi
 export async function renameFile(id: string, newName: string): Promise<FileRecord> {
   return apiClient<FileRecord>(`/api/v1/files/rename/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ new_name: newName }),
+    body: JSON.stringify({ name: newName }),
   })
 }
 
 export async function moveFile(id: string, newParent: string): Promise<FileRecord> {
   return apiClient<FileRecord>(`/api/v1/files/move/${id}`, {
     method: "POST",
-    body: JSON.stringify({ new_parent: newParent }),
+    body: JSON.stringify({ dest_parent: newParent }),
   })
 }
 
@@ -127,11 +127,11 @@ export async function restoreFile(id: string): Promise<FileRecord> {
 }
 
 export async function deleteFilePermanent(id: string): Promise<void> {
-  return apiClient<void>(`/api/v1/files/permanent/${id}`, { method: "DELETE" })
+  await apiClient<unknown>(`/api/v1/files/permanent/${id}`, { method: "DELETE" })
 }
 
-export async function emptyTrash(): Promise<{ deleted_count: number }> {
-  return apiClient<{ deleted_count: number }>("/api/v1/files/empty-trash", { method: "DELETE" })
+export async function emptyTrash(): Promise<void> {
+  await apiClient<unknown>("/api/v1/files/empty-trash", { method: "DELETE" })
 }
 
 // ---------------------------------------------------------------------------
@@ -143,55 +143,55 @@ export async function getQuota(): Promise<QuotaInfo> {
 }
 
 // ---------------------------------------------------------------------------
-// Download / Preview — returns presigned URL by following the redirect
-// The backend returns 302; we get the final presigned URL from the Location header
-// via a no-redirect fetch, then hand it to the browser.
+// Preview / Download URL resolution
+//
+// Uses the /preview-url and /download-url JSON endpoints instead of the
+// redirect-based /preview and /download endpoints. This avoids the
+// `redirect: "manual"` opaque-response problem where some environments
+// return null for response.headers.get("Location").
 // ---------------------------------------------------------------------------
 
-async function _getPresignedUrl(path: string): Promise<string> {
-  const token = tokenStorage.getAccess()
-  const headers: Record<string, string> = {}
-  if (token) headers["Authorization"] = `Bearer ${token}`
+async function _getPresignedUrl(endpoint: string): Promise<string | null> {
+  try {
+    const token = tokenStorage.getAccess()
+    const headers: Record<string, string> = {}
+    if (token) headers["Authorization"] = `Bearer ${token}`
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: "GET",
-    headers,
-    redirect: "manual", // Don't follow — we need the Location header
-  })
-
-  // 302 response → Location is the presigned R2 URL
-  const location = res.headers.get("Location") || res.url
-  if (location && location !== `${API_BASE_URL}${path}`) {
-    return location
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, { headers })
+    if (!res.ok) return null
+    const data = (await res.json()) as { url?: string }
+    return data.url ?? null
+  } catch {
+    return null
   }
-  // Fallback: if followed automatically (some environments), use response URL
-  return res.url
 }
 
-export async function getPreviewUrl(id: string): Promise<string> {
-  return _getPresignedUrl(`/api/v1/files/preview/${id}`)
+export async function getPreviewUrl(fileId: string): Promise<string | null> {
+  return _getPresignedUrl(`/api/v1/files/preview-url/${fileId}`)
 }
 
-export async function getDownloadUrl(id: string): Promise<string> {
-  return _getPresignedUrl(`/api/v1/files/download/${id}`)
+export async function getDownloadUrl(fileId: string, inline = false): Promise<string | null> {
+  const qs = inline ? "?inline=true" : ""
+  return _getPresignedUrl(`/api/v1/files/download-url/${fileId}${qs}`)
 }
 
-/** Trigger a browser file download for the given file ID. */
-export function triggerDownload(id: string, filename: string): void {
-  const token = tokenStorage.getAccess()
-  const url = new URL(`${API_BASE_URL}/api/v1/files/download/${id}`)
-  // Open in a new tab so the browser follows the 302 to R2 with the auth header.
-  // For authenticated downloads we add the token as a query param only as last resort;
-  // most R2 presigned URLs don't need it once the redirect is followed.
-  const a = document.createElement("a")
-  a.href = url.toString()
-  a.download = filename
-  // We can't set Authorization on a simple anchor click; use a fetch+blob approach:
-  void (async () => {
+// ---------------------------------------------------------------------------
+// Trigger a file download in the browser
+// ---------------------------------------------------------------------------
+
+export function triggerDownload(fileId: string, filename: string): void {
+  ;(async () => {
+    const url = await getDownloadUrl(fileId)
+    if (!url) {
+      // Fallback: open backend download endpoint directly in a new tab
+      window.open(`${API_BASE_URL}/api/v1/files/download/${fileId}`, "_blank")
+      return
+    }
     try {
+      const token = tokenStorage.getAccess()
       const headers: Record<string, string> = {}
       if (token) headers["Authorization"] = `Bearer ${token}`
-      const res = await fetch(url.toString(), { headers, redirect: "follow" })
+      const res = await fetch(url, { headers, redirect: "follow" })
       if (!res.ok) return
       const blob = await res.blob()
       const blobUrl = URL.createObjectURL(blob)
@@ -202,7 +202,7 @@ export function triggerDownload(id: string, filename: string): void {
       setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
     } catch {
       // Fallback to direct link
-      window.open(url.toString(), "_blank")
+      window.open(url, "_blank")
     }
   })()
 }

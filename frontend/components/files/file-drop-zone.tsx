@@ -172,7 +172,7 @@ export function FileDropZone({ children, currentPath, disabled = false }: FileDr
           <AlertDialogHeader>
             <AlertDialogTitle>
               {conflictFiles.length === 1
-                ? `"${conflictFiles[0]?.name}" already exists`
+                ? `"${conflictFiles[0]?.name}" zaten mevcut`
                 : `${conflictFiles.length} dosya zaten mevcut`}
             </AlertDialogTitle>
             <AlertDialogDescription>

@@ -1,19 +1,24 @@
-"""Cloudflare R2-backed file management API.
+"""File management API.
 
 All routes live under /api/v1/files (prefix set in main.py).
 Auth: every route requires a valid JWT via get_current_user.
-Storage: file bytes in R2, metadata in PostgreSQL (FileRecord).
+Storage: file bytes in Cloudflare R2 (when env vars are set) OR local disk
+  (fallback when R2 is not configured). Metadata always in PostgreSQL (FileRecord).
 """
 
 import io
 import mimetypes
+import os
+import shutil
+import tempfile
 import uuid
 import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlmodel import Session, col, func, select
 
@@ -36,6 +41,36 @@ _DOWNLOAD_TTL = 3600  # 1 h for attachment download
 
 
 # ---------------------------------------------------------------------------
+# Storage helpers — R2 vs local disk
+# ---------------------------------------------------------------------------
+
+def _use_r2() -> bool:
+    """Return True when R2 env vars are fully configured."""
+    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID") or os.environ.get("R2_ACCOUNT_ID", "")
+    bucket = os.environ.get("R2_BUCKET_NAME", "")
+    return bool(account_id and bucket)
+
+
+def _storage_root() -> Path:
+    """Return the local disk storage root (used when R2 is not configured).
+
+    Resolution order:
+    1. FILE_STORAGE_PATH env var (absolute or relative to CWD)
+    2. <repo_root>/frontend/data/ as documented in CLAUDE.md
+    """
+    custom = os.environ.get("FILE_STORAGE_PATH", "").strip()
+    if custom:
+        return Path(custom)
+    # This file is at backend/app/routers/v1/files.py; go up 4 levels to repo root.
+    return Path(__file__).parents[4] / "frontend" / "data"
+
+
+def _local_path(r2_key: str) -> Path:
+    """Convert an r2_key (e.g. '<owner_id>/<uuid>') to an absolute local disk path."""
+    return _storage_root() / r2_key
+
+
+# ---------------------------------------------------------------------------
 # Response schemas
 # ---------------------------------------------------------------------------
 
@@ -55,22 +90,17 @@ class FileRecordResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class QuotaResponse(BaseModel):
-    used_bytes: int
-    file_count: int
-
-
 class FolderCreateBody(BaseModel):
-    parent_path: str = ""
     name: str
+    parent_path: str = ""
 
 
 class RenameBody(BaseModel):
-    new_name: str
+    name: str
 
 
 class MoveBody(BaseModel):
-    new_parent: str
+    dest_parent: str
 
 
 class CopyBody(BaseModel):
@@ -81,8 +111,17 @@ class ZipBody(BaseModel):
     ids: list[str]
 
 
+class QuotaResponse(BaseModel):
+    used_bytes: int
+    file_count: int
+
+
+class PresignedUrlResponse(BaseModel):
+    url: str
+
+
 # ---------------------------------------------------------------------------
-# Helpers
+# Internal utilities
 # ---------------------------------------------------------------------------
 
 def _now() -> datetime:
@@ -90,8 +129,6 @@ def _now() -> datetime:
 
 
 def _build_path(parent: str, name: str) -> str:
-    """Combine parent_path and name into a full virtual path."""
-    parent = parent.strip("/")
     return f"{parent}/{name}" if parent else name
 
 
@@ -111,15 +148,36 @@ def _to_response(record: FileRecord) -> FileRecordResponse:
     )
 
 
-def _get_record_or_404(file_id: str, user: User, session: Session) -> FileRecord:
+def _get_record_or_404(file_id: str, current_user: User, session: Session) -> FileRecord:
     try:
         uid = uuid.UUID(file_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="File not found")
     record = session.get(FileRecord, uid)
-    if not record or record.owner_id != user.id:
+    if not record or record.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="File not found")
     return record
+
+
+def _cascade_rename(
+    session: Session,
+    owner_id: uuid.UUID,
+    old_prefix: str,
+    new_prefix: str,
+) -> None:
+    """Update path / parent_path for all descendants after a rename/move."""
+    children = session.exec(
+        select(FileRecord).where(
+            FileRecord.owner_id == owner_id,
+            col(FileRecord.path).startswith(old_prefix + "/"),
+        )
+    ).all()
+    now = _now()
+    for child in children:
+        child.path = new_prefix + child.path[len(old_prefix):]
+        child.parent_path = child.path.rsplit("/", 1)[0] if "/" in child.path else ""
+        child.updated_at = now
+        session.add(child)
 
 
 # ---------------------------------------------------------------------------
@@ -133,19 +191,14 @@ def list_files(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> list[FileRecordResponse]:
-    """List files/folders at a given virtual path.
-
-    - path="" returns root items
-    - show_trash=true returns only deleted items (trash view)
-    """
-    path = path.strip("/")
+    """List files/folders at the given path (non-recursive)."""
+    parent = path.strip("/")
     stmt = select(FileRecord).where(
         FileRecord.owner_id == current_user.id,
-        FileRecord.parent_path == path,
+        FileRecord.parent_path == parent,
         FileRecord.is_deleted == show_trash,
     )
     records = session.exec(stmt).all()
-    # Sort: folders first, then alphabetical
     records = sorted(records, key=lambda r: (0 if r.type == "folder" else 1, r.name.lower()))
     return [_to_response(r) for r in records]
 
@@ -158,7 +211,7 @@ async def upload_file(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> FileRecordResponse:
-    """Upload a file to R2 and record metadata in the DB.
+    """Upload a file to storage and record metadata in the DB.
 
     - path: destination parent path (e.g. "projects/2026")
     - overwrite: if False and a file with the same name exists, returns 409
@@ -182,19 +235,48 @@ async def upload_file(
     file_id = uuid.uuid4()
     r2_key = f"{current_user.id}/{file_id}"
 
-    # Stream to R2
-    await r2_upload_fileobj(file.file, r2_key, mime)
+    # --- Upload to storage and determine real size ---
+    size: Optional[int] = file.size  # may be None for streams
 
-    # Read size (file.size may be None for streams)
-    size: Optional[int] = file.size
-    if size is None:
-        # Size not provided; we can't re-read the stream, leave as None
-        pass
+    if _use_r2():
+        await r2_upload_fileobj(file.file, r2_key, mime)
+        # If size was not provided by the client, query R2 for the real byte count.
+        if size is None:
+            try:
+                from app.r2 import get_r2_client
+                import asyncio
+                bucket = os.environ.get("R2_BUCKET_NAME", "")
+                def _head() -> int:
+                    client = get_r2_client()
+                    resp = client.head_object(Bucket=bucket, Key=r2_key)
+                    return int(resp["ContentLength"])
+                size = await asyncio.get_event_loop().run_in_executor(None, _head)
+            except Exception:
+                pass  # quota will be slightly off; non-fatal
+    else:
+        # Local disk mode: write the stream and count bytes simultaneously.
+        disk_path = _local_path(r2_key)
+        disk_path.parent.mkdir(parents=True, exist_ok=True)
+        written = 0
+        with disk_path.open("wb") as out_fh:
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1 MiB chunks
+                if not chunk:
+                    break
+                out_fh.write(chunk)
+                written += len(chunk)
+        size = written
 
+    # --- Persist metadata ---
     if existing and overwrite:
-        # Delete old R2 object if key differs
-        if existing.r2_key and existing.r2_key != r2_key:
-            await r2_delete_object(existing.r2_key)
+        if _use_r2():
+            if existing.r2_key and existing.r2_key != r2_key:
+                await r2_delete_object(existing.r2_key)
+        else:
+            if existing.r2_key and existing.r2_key != r2_key:
+                old_disk = _local_path(existing.r2_key)
+                if old_disk.exists():
+                    old_disk.unlink()
         existing.r2_key = r2_key
         existing.mime_type = mime
         existing.size = size
@@ -227,15 +309,27 @@ async def download_file(
     inline: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> RedirectResponse:
-    """Redirect to a presigned R2 URL for downloading a file."""
+):
+    """Download a file: redirect to presigned R2 URL, or stream from local disk."""
     record = _get_record_or_404(file_id, current_user, session)
     if record.type == "folder" or not record.r2_key:
         raise HTTPException(status_code=400, detail="Cannot download a folder directly; use /zip")
 
-    disposition = "inline" if inline else f'attachment; filename="{record.name}"'
-    url = await r2_generate_presigned_url(record.r2_key, expires_in=_DOWNLOAD_TTL, disposition=disposition)
-    return RedirectResponse(url=url, status_code=302)
+    if _use_r2():
+        disposition = "inline" if inline else f'attachment; filename="{record.name}"'
+        url = await r2_generate_presigned_url(record.r2_key, expires_in=_DOWNLOAD_TTL, disposition=disposition)
+        return RedirectResponse(url=url, status_code=302)
+    else:
+        disk_path = _local_path(record.r2_key)
+        if not disk_path.exists():
+            raise HTTPException(status_code=404, detail="File not found on disk")
+        disposition = "inline" if inline else "attachment"
+        return FileResponse(
+            path=str(disk_path),
+            filename=record.name,
+            media_type=record.mime_type or "application/octet-stream",
+            content_disposition_type=disposition,
+        )
 
 
 @router.get("/preview/{file_id}")
@@ -243,14 +337,74 @@ async def preview_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> RedirectResponse:
-    """Redirect to a short-lived presigned URL for in-browser preview."""
+):
+    """Serve file for in-browser preview: redirect to presigned URL or stream from disk."""
     record = _get_record_or_404(file_id, current_user, session)
     if record.type == "folder" or not record.r2_key:
         raise HTTPException(status_code=400, detail="Not a file")
 
-    url = await r2_generate_presigned_url(record.r2_key, expires_in=_PREVIEW_TTL, disposition="inline")
-    return RedirectResponse(url=url, status_code=302)
+    if _use_r2():
+        url = await r2_generate_presigned_url(record.r2_key, expires_in=_PREVIEW_TTL, disposition="inline")
+        return RedirectResponse(url=url, status_code=302)
+    else:
+        disk_path = _local_path(record.r2_key)
+        if not disk_path.exists():
+            raise HTTPException(status_code=404, detail="File not found on disk")
+        return FileResponse(
+            path=str(disk_path),
+            filename=record.name,
+            media_type=record.mime_type or "application/octet-stream",
+            content_disposition_type="inline",
+        )
+
+
+@router.get("/preview-url/{file_id}", response_model=PresignedUrlResponse)
+async def get_preview_url(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> PresignedUrlResponse:
+    """Return a JSON object with the preview URL (presigned R2 or local /preview endpoint).
+
+    Clients that cannot handle opaque redirect responses (e.g. next.js server actions
+    using redirect:'manual') should call this endpoint instead of /preview/{id}.
+    """
+    record = _get_record_or_404(file_id, current_user, session)
+    if record.type == "folder" or not record.r2_key:
+        raise HTTPException(status_code=400, detail="Not a file")
+
+    if _use_r2():
+        url = await r2_generate_presigned_url(record.r2_key, expires_in=_PREVIEW_TTL, disposition="inline")
+    else:
+        # Point the client at the /preview/{id} streaming endpoint.
+        base = os.environ.get("BACKEND_URL", "http://localhost:3052")
+        url = f"{base}/api/v1/files/preview/{file_id}"
+    return PresignedUrlResponse(url=url)
+
+
+@router.get("/download-url/{file_id}", response_model=PresignedUrlResponse)
+async def get_download_url(
+    file_id: str,
+    inline: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> PresignedUrlResponse:
+    """Return a JSON object with the download URL (presigned R2 or local /download endpoint).
+
+    Clients that cannot handle opaque redirect responses should call this endpoint
+    instead of /download/{id}.
+    """
+    record = _get_record_or_404(file_id, current_user, session)
+    if record.type == "folder" or not record.r2_key:
+        raise HTTPException(status_code=400, detail="Cannot download a folder directly; use /zip")
+
+    if _use_r2():
+        disposition = "inline" if inline else f'attachment; filename="{record.name}"'
+        url = await r2_generate_presigned_url(record.r2_key, expires_in=_DOWNLOAD_TTL, disposition=disposition)
+    else:
+        base = os.environ.get("BACKEND_URL", "http://localhost:3052")
+        url = f"{base}/api/v1/files/download/{file_id}{'?inline=true' if inline else ''}"
+    return PresignedUrlResponse(url=url)
 
 
 @router.post("/folder", response_model=FileRecordResponse)
@@ -259,7 +413,7 @@ def create_folder(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> FileRecordResponse:
-    """Create a virtual folder (DB record only — R2 has no folder objects)."""
+    """Create a virtual folder (DB record only — storage has no folder objects)."""
     parent = body.parent_path.strip("/")
     full_path = _build_path(parent, body.name)
 
@@ -292,11 +446,11 @@ def rename_file(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> FileRecordResponse:
-    """Rename a file or folder. Updates path in DB; R2 key is unchanged."""
+    """Rename a file or folder."""
     record = _get_record_or_404(file_id, current_user, session)
-    new_path = _build_path(record.parent_path, body.new_name)
+    old_prefix = record.path
+    new_path = _build_path(record.parent_path, body.name)
 
-    # Conflict check
     conflict = session.exec(
         select(FileRecord).where(
             FileRecord.owner_id == current_user.id,
@@ -305,36 +459,19 @@ def rename_file(
         )
     ).first()
     if conflict:
-        raise HTTPException(status_code=409, detail="Name already taken")
+        raise HTTPException(status_code=409, detail="A file with that name already exists")
 
-    old_path = record.path
-    record.name = body.new_name
+    record.name = body.name
     record.path = new_path
     record.updated_at = _now()
     session.add(record)
 
-    # If renaming a folder, cascade-update all children
     if record.type == "folder":
-        _cascade_rename(session, current_user.id, old_path, new_path)
+        _cascade_rename(session, current_user.id, old_prefix, new_path)
 
     session.commit()
     session.refresh(record)
     return _to_response(record)
-
-
-def _cascade_rename(session: Session, owner_id: uuid.UUID, old_prefix: str, new_prefix: str) -> None:
-    """Update path/parent_path for all descendants after a folder rename."""
-    children = session.exec(
-        select(FileRecord).where(
-            FileRecord.owner_id == owner_id,
-            col(FileRecord.path).startswith(old_prefix + "/"),
-        )
-    ).all()
-    for child in children:
-        child.path = new_prefix + child.path[len(old_prefix):]
-        child.parent_path = new_prefix + child.parent_path[len(old_prefix):]
-        child.updated_at = _now()
-        session.add(child)
 
 
 @router.post("/move/{file_id}", response_model=FileRecordResponse)
@@ -344,10 +481,11 @@ def move_file(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> FileRecordResponse:
-    """Move a file/folder to a new parent path. R2 key is unchanged."""
+    """Move a file or folder to a new parent path."""
     record = _get_record_or_404(file_id, current_user, session)
-    new_parent = body.new_parent.strip("/")
-    new_path = _build_path(new_parent, record.name)
+    old_prefix = record.path
+    dest_parent = body.dest_parent.strip("/")
+    new_path = _build_path(dest_parent, record.name)
 
     conflict = session.exec(
         select(FileRecord).where(
@@ -357,18 +495,25 @@ def move_file(
         )
     ).first()
     if conflict:
-        raise HTTPException(status_code=409, detail="A file with that name already exists at the destination")
+        raise HTTPException(status_code=409, detail="A file with that name already exists in the destination")
 
-    old_path = record.path
-    old_prefix = old_path  # used for folder cascade
-
-    record.parent_path = new_parent
     record.path = new_path
-    record.updated_at = _now()
+    record.parent_path = dest_parent
+    now = _now()
+    record.updated_at = now
     session.add(record)
 
     if record.type == "folder":
         _cascade_rename(session, current_user.id, old_prefix, new_path)
+        children = session.exec(
+            select(FileRecord).where(
+                FileRecord.owner_id == current_user.id,
+                col(FileRecord.path).startswith(new_path + "/"),
+            )
+        ).all()
+        for child in children:
+            child.updated_at = now
+            session.add(child)
 
     session.commit()
     session.refresh(record)
@@ -397,7 +542,6 @@ async def copy_file(
         )
     ).first()
     if conflict:
-        # Append " (copy)" to name
         name_parts = record.name.rsplit(".", 1)
         if len(name_parts) == 2:
             copy_name = f"{name_parts[0]} (copy).{name_parts[1]}"
@@ -408,8 +552,15 @@ async def copy_file(
     new_id = uuid.uuid4()
     new_r2_key = f"{current_user.id}/{new_id}"
 
-    if record.r2_key:
-        await r2_copy_object(record.r2_key, new_r2_key)
+    if _use_r2():
+        if record.r2_key:
+            await r2_copy_object(record.r2_key, new_r2_key)
+    else:
+        if record.r2_key:
+            src = _local_path(record.r2_key)
+            dst = _local_path(new_r2_key)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
 
     new_record = FileRecord(
         id=new_id,
@@ -417,10 +568,10 @@ async def copy_file(
         name=dest_path.rsplit("/", 1)[-1],
         path=dest_path,
         parent_path=dest_parent,
-        type="file",
+        type=record.type,
         size=record.size,
         mime_type=record.mime_type,
-        r2_key=new_r2_key,
+        r2_key=new_r2_key if record.r2_key else None,
     )
     session.add(new_record)
     session.commit()
@@ -434,21 +585,18 @@ def trash_file(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> FileRecordResponse:
-    """Soft-delete: move to trash (is_deleted=True)."""
+    """Soft-delete a file/folder (move to trash)."""
     record = _get_record_or_404(file_id, current_user, session)
     now = _now()
     record.is_deleted = True
     record.deleted_at = now
     record.updated_at = now
-    session.add(record)
 
-    # Also trash all descendants if it's a folder
     if record.type == "folder":
         children = session.exec(
             select(FileRecord).where(
                 FileRecord.owner_id == current_user.id,
                 col(FileRecord.path).startswith(record.path + "/"),
-                FileRecord.is_deleted == False,  # noqa: E712
             )
         ).all()
         for child in children:
@@ -457,6 +605,7 @@ def trash_file(
             child.updated_at = now
             session.add(child)
 
+    session.add(record)
     session.commit()
     session.refresh(record)
     return _to_response(record)
@@ -485,14 +634,16 @@ async def delete_permanent(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> dict:
-    """Permanently delete a file: removes from R2 and DB."""
+    """Permanently delete a file: removes from storage and DB."""
     record = _get_record_or_404(file_id, current_user, session)
 
     r2_keys: list[str] = []
+    disk_paths: list[Path] = []
+
     if record.r2_key:
         r2_keys.append(record.r2_key)
+        disk_paths.append(_local_path(record.r2_key))
 
-    # Gather children if folder
     if record.type == "folder":
         children = session.exec(
             select(FileRecord).where(
@@ -503,13 +654,18 @@ async def delete_permanent(
         for child in children:
             if child.r2_key:
                 r2_keys.append(child.r2_key)
+                disk_paths.append(_local_path(child.r2_key))
             session.delete(child)
 
     session.delete(record)
     session.commit()
 
-    # Delete from R2 after DB commit
-    await r2_delete_objects(r2_keys)
+    if _use_r2():
+        await r2_delete_objects(r2_keys)
+    else:
+        for p in disk_paths:
+            if p.exists():
+                p.unlink()
 
     return {"deleted": True}
 
@@ -528,11 +684,18 @@ async def empty_trash(
     ).all()
 
     r2_keys = [r.r2_key for r in trashed if r.r2_key]
+    disk_paths = [_local_path(k) for k in r2_keys]
+
     for record in trashed:
         session.delete(record)
     session.commit()
 
-    await r2_delete_objects(r2_keys)
+    if _use_r2():
+        await r2_delete_objects(r2_keys)
+    else:
+        for p in disk_paths:
+            if p.exists():
+                p.unlink()
 
     return {"deleted_count": len(trashed)}
 
@@ -563,7 +726,12 @@ async def download_zip(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> StreamingResponse:
-    """Download multiple files as a ZIP archive streamed from R2."""
+    """Download multiple files as a ZIP archive.
+
+    Uses a SpooledTemporaryFile (spills to disk beyond 64 MiB) to avoid
+    holding the entire ZIP in memory at once. Files are added one at a time
+    so peak memory stays close to the size of the largest single file.
+    """
     records: list[FileRecord] = []
     for fid in body.ids:
         try:
@@ -578,15 +746,28 @@ async def download_zip(
         raise HTTPException(status_code=400, detail="No valid files selected")
 
     async def _generate():
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        # SpooledTemporaryFile spills to disk once the in-memory buffer exceeds
+        # max_size, capping RAM usage regardless of the number of selected files.
+        spool = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
+        with zipfile.ZipFile(spool, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
             for record in records:
                 if record.type == "folder" or not record.r2_key:
                     continue
-                data = await r2_get_object_bytes(record.r2_key)
+                if _use_r2():
+                    data = await r2_get_object_bytes(record.r2_key)
+                else:
+                    disk_path = _local_path(record.r2_key)
+                    if not disk_path.exists():
+                        continue
+                    data = disk_path.read_bytes()
                 zf.writestr(record.path, data)
-        buf.seek(0)
-        yield buf.read()
+        spool.seek(0)
+        while True:
+            chunk = spool.read(1024 * 1024)
+            if not chunk:
+                break
+            yield chunk
+        spool.close()
 
     return StreamingResponse(
         _generate(),

@@ -16,7 +16,9 @@ from botocore.config import Config
 
 def get_r2_client() -> Any:
     """Create and return a configured boto3 S3 client pointing at R2."""
-    account_id = os.environ.get("R2_ACCOUNT_ID", "")
+    # Accept both CLOUDFLARE_ACCOUNT_ID (documented in CLAUDE.md / .env.example)
+    # and the legacy R2_ACCOUNT_ID name so neither breaks.
+    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID") or os.environ.get("R2_ACCOUNT_ID", "")
     return boto3.client(
         "s3",
         endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
