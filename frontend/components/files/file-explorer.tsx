@@ -1178,7 +1178,7 @@ export function FileExplorer({
                                 className="gap-2 text-destructive focus:text-destructive"
                                 onClick={() => handleDeleteConfirm(item.id)}
                               >
-                                <Trash2Icon className="size-4" /> Sil
+                                <Trash2Icon className="size-4" /> Çöp Kutusuna Taşı
                               </ContextMenuItem>
                             </>
                           )}
@@ -1259,7 +1259,7 @@ export function FileExplorer({
                 .filter(Boolean)
               return diskIds.length > 0 ? (
                 <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteConfirm(diskIds)}>
-                  <Trash2Icon className="size-3.5" /> Sil
+                  <Trash2Icon className="size-3.5" /> Çöp kutusu
                 </Button>
               ) : null
             })()}
