@@ -6,12 +6,6 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import hljs from "highlight.js"
 import Papa from "papaparse"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -20,6 +14,7 @@ import {
   ExternalLinkIcon,
   MaximizeIcon,
   AlertCircleIcon,
+  XIcon,
 } from "lucide-react"
 import { getPreviewUrl } from "@/lib/actions/files"
 import type { FileItem } from "./file-utils"
@@ -128,7 +123,7 @@ function ImagePreview({ url, name }: { url: string; name: string }) {
       <img
         src={url}
         alt={name}
-        className={`max-w-full max-h-[70vh] rounded-md object-contain transition-opacity ${
+        className={`max-w-full max-h-[70vh] object-contain transition-opacity ${
           loaded ? "opacity-100" : "opacity-0 absolute"
         }`}
         onLoad={() => setLoaded(true)}
@@ -144,7 +139,7 @@ function PdfPreview({ url, name }: { url: string; name: string }) {
       {!loaded && <Skeleton className="absolute inset-0 rounded-md" />}
       <iframe
         src={url}
-        className="w-full h-full rounded-md border-0"
+        className="w-full h-full border-0"
         title={name}
         onLoad={() => setLoaded(true)}
       />
@@ -167,7 +162,7 @@ function VideoPreview({ url }: { url: string }) {
         ref={videoRef}
         src={url}
         controls
-        className="w-full max-h-[70vh] rounded-md bg-black"
+        className="w-full max-h-[70vh] bg-black"
         preload="metadata"
       >
         Tarayıcınız video oynatmayı desteklemiyor.
@@ -260,7 +255,7 @@ function MarkdownPreview({ url }: { url: string }) {
     )
 
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none p-4 overflow-auto max-h-[70vh]">
+    <div className="prose prose-sm dark:prose-invert max-w-none p-6 overflow-auto max-h-[70vh]">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   )
@@ -314,7 +309,7 @@ function CodePreview({ url, fileName }: { url: string; fileName: string }) {
 
   return (
     <div
-      className="overflow-auto max-h-[70vh] rounded-md text-sm [&>pre]:!m-0 [&>pre]:p-4"
+      className="overflow-auto max-h-[70vh] text-sm [&>pre]:!m-0 [&>pre]:p-6"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
@@ -377,7 +372,7 @@ function CsvPreview({ url, fileName }: { url: string; fileName: string }) {
     )
 
   return (
-    <div className="overflow-auto max-h-[70vh] rounded-md border">
+    <div className="overflow-auto max-h-[70vh]">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-muted/60 sticky top-0">
@@ -511,26 +506,72 @@ export function FilePreviewPanel({
     }
   }
 
-  return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent
-        side="right"
-        className="w-full sm:max-w-2xl overflow-y-auto flex flex-col gap-0 p-0"
-      >
-        <SheetHeader className="px-6 py-4 border-b shrink-0">
-          <SheetTitle className="text-base font-medium truncate">
-            {file?.name ?? "Önizleme"}
-          </SheetTitle>
-          {file && (
-            <p className="text-xs text-muted-foreground mt-0.5 capitalize">
-              {previewType !== "unsupported" ? previewType : "desteklenmiyor"}{" "}
-              &middot; {file.mimeType || "bilinmiyor"}
-            </p>
-          )}
-        </SheetHeader>
+  // Escape key closes
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [open, onClose])
 
-        <div className="flex-1 px-6 py-4">{renderContent()}</div>
-      </SheetContent>
-    </Sheet>
+  // Prevent body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => { document.body.style.overflow = "" }
+  }, [open])
+
+  if (!open || !file) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ animation: "fadeIn 0.15s ease" }}
+    >
+      {/* Backdrop — click outside closes */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal card */}
+      <div
+        className="relative z-10 flex flex-col w-full max-w-3xl max-h-[90vh] mx-4 rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+        style={{ animation: "scaleIn 0.15s ease" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-border shrink-0">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate">{file.name}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 capitalize">
+              {previewType !== "unsupported" ? previewType : "desteklenmiyor"}
+              {file.mimeType ? ` · ${file.mimeType}` : ""}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={onClose}
+          >
+            <XIcon className="size-4" />
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {renderContent()}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: scale(1) } }
+      `}</style>
+    </div>
   )
 }

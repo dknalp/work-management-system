@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   Share2Icon,
   FolderIcon,
+  FolderOpenIcon,
   MoreVerticalIcon,
   PencilIcon,
   PinIcon,
@@ -105,17 +106,6 @@ import {
   starFile,
 } from "@/lib/actions/files"
 import { ShareDialog } from "./share-dialog"
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  useDraggable,
-  useDroppable,
-} from "@dnd-kit/core"
-import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core"
-import { CSS } from "@dnd-kit/utilities"
 
 // ---------------------------------------------------------------------------
 // FileThumbnail — resimler için lazy thumbnail, diğerleri için ikon
@@ -157,7 +147,6 @@ function FileThumbnail({ item }: { item: FileItem }) {
   const [thumbUrl, setThumbUrl] = React.useState<string | null>(null)
   const [failed, setFailed] = React.useState(false)
   const isImage = isImageFile(item)
-  const { listeners, attributes, setDragRef } = useDragHandle()
 
   React.useEffect(() => {
     if (!isImage) return
@@ -172,35 +161,21 @@ function FileThumbnail({ item }: { item: FileItem }) {
     return () => { cancelled = true }
   }, [item.id, isImage])
 
-  const dragProps = listeners && attributes && setDragRef
-    ? {
-        ...listeners,
-        ...attributes,
-        ref: setDragRef,
-        "data-drag-handle": "true",
-        style: { touchAction: "none" } as React.CSSProperties,
-      }
-    : {}
-
   if (isImage && thumbUrl && !failed) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={thumbUrl}
         alt={item.name}
-        className="size-8 rounded object-cover shrink-0 border border-border/40 cursor-grab active:cursor-grabbing"
+        className="size-8 rounded object-cover shrink-0 border border-border/40"
         onError={() => setFailed(true)}
-        {...dragProps}
       />
     )
   }
 
   const iconType = getFileIcon(item)
   return (
-    <span
-      className="size-8 flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
-      {...dragProps}
-    >
+    <span className="size-8 flex items-center justify-center shrink-0">
       {TYPE_ICON_MAP[iconType] ?? TYPE_ICON_MAP.file}
     </span>
   )
@@ -239,8 +214,8 @@ function StarredStrip({
   }, [])
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStarred()
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [loadStarred, currentPath])
 
   React.useEffect(() => {
@@ -291,79 +266,8 @@ interface FileExplorerProps {
 
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
 
-// ── DndTableRow ─────────────────────────────────────────────────────────────
-// Drag handle context — lets child cells access the dnd listeners
-type DragHandleCtx = {
-  listeners?: ReturnType<typeof useDraggable>["listeners"]
-  attributes?: ReturnType<typeof useDraggable>["attributes"]
-  setDragRef?: (el: HTMLElement | null) => void
-  isDragging?: boolean
-}
 
-const DragHandleContext = React.createContext<DragHandleCtx>({})
-
-function useDragHandle() {
-  return React.useContext(DragHandleContext)
-}
-
-function DndTableRow({
-  item,
-  children,
-  className,
-  onClick,
-  onDoubleClick,
-}: {
-  item: FileItem
-  children: React.ReactNode
-  className?: string
-  onClick?: (e: React.MouseEvent<HTMLTableRowElement>) => void
-  onDoubleClick?: (e: React.MouseEvent<HTMLTableRowElement>) => void
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef: setDragRef,
-    isDragging,
-    transform,
-  } = useDraggable({
-    id: `drag-${item.id}`,
-    data: { item },
-    disabled: item.name === ".." || Boolean(item.isDriveFile),
-  })
-
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `drop-${item.id}`,
-    data: { path: item.path, item },
-    disabled: item.type !== "folder" || item.name === "..",
-  })
-
-  // Drop ref still on the row (for folder drop targets)
-  const setRef = (el: HTMLTableRowElement | null) => {
-    if (item.type === "folder" && item.name !== "..") setDropRef(el as unknown as HTMLElement)
-  }
-
-  const isDraggable = item.name !== ".." && !item.isDriveFile
-
-  return (
-    <DragHandleContext.Provider value={isDraggable ? { listeners, attributes, setDragRef, isDragging } : {}}>
-      <TableRow
-        ref={setRef}
-        style={{ opacity: isDragging ? 0.4 : 1 }}
-        className={cn(
-          className,
-          item.type === "folder" && isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
-          isDragging && "z-50 shadow-lg"
-        )}
-        data-file-path={item.path}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
-      >
-        {children}
-      </TableRow>
-    </DragHandleContext.Provider>
-  )
-}
-// ────────────────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────────
 
 export function FileExplorer({
   items: itemsProp,
@@ -755,44 +659,7 @@ export function FileExplorer({
   }, [localQuery, searchFilters, currentPath])
 
   // ── dnd-kit ──────────────────────────────────────────────────────────────
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-  const [dndActiveItem, setDndActiveItem] = React.useState<FileItem | null>(null)
-
-  const handleDndDragStart = React.useCallback((event: DragStartEvent) => {
-    const item = (event.active.data.current as { item?: FileItem })?.item
-    if (item) setDndActiveItem(item)
-  }, [])
-
-  const handleDndDragEnd = React.useCallback(async (event: DragEndEvent) => {
-    setDndActiveItem(null)
-    const { active, over } = event
-    if (!over) return
-    const draggedItem = (active.data.current as { item?: FileItem })?.item
-    const overData = over.data.current as { path?: string; item?: FileItem } | undefined
-    // targetItem is the folder we dropped onto
-    const targetItem = overData?.item ?? displayItems.find(i => i.path === overData?.path)
-    if (!draggedItem || !targetItem) return
-    if (targetItem.type !== "folder") return
-    if (draggedItem.path === targetItem.path) return
-    // dest_parent = the folder's own path
-    const destParent = targetItem.path
-    const toMove = selectedPaths.has(draggedItem.path)
-      ? Array.from(selectedPaths).map(p => displayItems.find(i => i.path === p)).filter(Boolean) as FileItem[]
-      : [draggedItem]
-    // Skip if dragging a folder onto itself
-    const filtered = toMove.filter(f => f.path !== destParent)
-    if (!filtered.length) return
-    const results = await Promise.allSettled(filtered.map(f => moveFile(f.id, destParent)))
-    const ok = results.filter(r => r.status === "fulfilled").length
-    if (ok > 0) {
-      toast.success(`${ok} öğe "${targetItem.name}" klasörüne taşındı`)
-      setSelectedPaths(new Set())
-      window.dispatchEvent(new Event("wms:files:changed"))
-    } else {
-      toast.error("Taşıma başarısız")
-    }
-  }, [selectedPaths, displayItems])
-
+  
   // ── select-all ────────────────────────────────────────────────────────────
   const selectableItems = React.useMemo(
     () => displayItems.filter(i => i.name !== ".."),
@@ -818,16 +685,33 @@ export function FileExplorer({
     e.dataTransfer.setData("application/workos-file", item.path)
     e.dataTransfer.effectAllowed = "move"
     const ghost = document.createElement("div")
-    ghost.className =
-      "bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-bold shadow-xl border border-white/20"
+    ghost.style.cssText =
+      "position:fixed;top:-9999px;left:-9999px;background:var(--primary);color:var(--primary-foreground);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.3);"
     ghost.innerText =
-      selectedPaths.size > 1 ? `Moving ${selectedPaths.size} items` : `Moving ${item.name}`
+      selectedPaths.size > 1 ? `${selectedPaths.size} dosya seçildi` : item.name
     document.body.appendChild(ghost)
     e.dataTransfer.setDragImage(ghost, 0, 0)
     setTimeout(() => document.body.removeChild(ghost), 0)
   }
 
+  const [dragOverPath, setDragOverPath] = React.useState<string | null>(null)
+
+  const handleDragOver = (e: React.DragEvent, item: FileItem) => {
+    if (item.type !== "folder" || item.isDriveFile) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverPath(item.path)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if leaving the row entirely (not entering a child element)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverPath(null)
+    }
+  }
+
   const handleDrop = async (e: React.DragEvent, targetItem: FileItem) => {
+    setDragOverPath(null)
     e.preventDefault()
     if (targetItem.type !== "folder" || targetItem.isDriveFile) return
     const sourcePath = e.dataTransfer.getData("application/workos-file")
@@ -867,7 +751,6 @@ export function FileExplorer({
     clipboard?.mode === "cut" && clipboard.paths.includes(path)
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDndDragStart} onDragEnd={handleDndDragEnd}>
     <UploadQueueProvider>
     <>
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/50">
@@ -1004,16 +887,18 @@ export function FileExplorer({
                     const isDrive = item.isDriveFile
 
                     const tableRow = (
-                      <DndTableRow
+                      <TableRow
                         key={item.path + item.name}
-                        item={item}
+                        data-file-path={item.path}
+                        draggable={!isParentDir && !isDrive}
                         className={cn(
                           "group cursor-pointer border-b border-border/50 transition-colors last:border-0",
                           isSelected
                             ? "bg-primary/5 hover:bg-primary/10"
                             : "hover:bg-muted/30",
                           isParentDir && "text-muted-foreground/60",
-                          isCut && "opacity-40"
+                          isCut && "opacity-40",
+                          dragOverPath === item.path && "bg-primary/10 ring-1 ring-inset ring-primary/40"
                         )}
                         onClick={(e: React.MouseEvent<HTMLTableRowElement>) => {
                           e.stopPropagation()
@@ -1023,6 +908,10 @@ export function FileExplorer({
                           e.stopPropagation()
                           handleItemDoubleClick(item)
                         }}
+                        onDragStart={(e: React.DragEvent<HTMLTableRowElement>) => handleDragStart(e, item)}
+                        onDragOver={(e: React.DragEvent<HTMLTableRowElement>) => handleDragOver(e, item)}
+                        onDragLeave={(e: React.DragEvent<HTMLTableRowElement>) => handleDragLeave(e)}
+                        onDrop={(e: React.DragEvent<HTMLTableRowElement>) => handleDrop(e, item)}
                       >
                         <TableCell className="px-6 py-3 font-medium">
                           <div className="flex items-center gap-3">
@@ -1168,7 +1057,7 @@ export function FileExplorer({
                             </DropdownMenu>
                           )}
                         </TableCell>
-                      </DndTableRow>
+                      </TableRow>
                     )
 
                     if (isParentDir) return tableRow
@@ -1177,6 +1066,12 @@ export function FileExplorer({
                       <ContextMenu key={item.path}>
                         <ContextMenuTrigger asChild>{tableRow}</ContextMenuTrigger>
                         <ContextMenuContent className="w-48">
+                          <ContextMenuItem
+                            className="gap-2"
+                            onClick={() => handleItemDoubleClick(item)}
+                          >
+                            <FolderOpenIcon className="size-4" /> Aç
+                          </ContextMenuItem>
                           <ContextMenuItem
                             className="gap-2"
                             onClick={async () => {
@@ -1193,7 +1088,7 @@ export function FileExplorer({
                               }
                             }}
                           >
-                            <ExternalLinkIcon className="size-4" /> Aç
+                            <ExternalLinkIcon className="size-4" /> Yeni Sekmede Aç
                           </ContextMenuItem>
                           <ContextMenuSub>
                             <ContextMenuSubTrigger className="gap-2">
@@ -1504,8 +1399,6 @@ export function FileExplorer({
         </DialogContent>
       </Dialog>
       </FileDropZone>
-    </>
-    </UploadQueueProvider>
 
       {/* Share Dialog */}
       {shareTarget && (
@@ -1515,17 +1408,7 @@ export function FileExplorer({
           onClose={() => setShareTarget(null)}
         />
       )}
-
-      
-      {/* dnd-kit drag ghost */}
-      <DragOverlay dropAnimation={null}>
-        {dndActiveItem && (
-          <div className="flex items-center gap-2 rounded-lg border border-white/20 bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-xl">
-            <FileIcon className="size-3.5" />
-            {selectedPaths.size > 1 ? `${selectedPaths.size} dosya seçildi` : dndActiveItem.name}
-          </div>
-        )}
-      </DragOverlay>
-    </DndContext>
+    </>
+    </UploadQueueProvider>
   )
 }
