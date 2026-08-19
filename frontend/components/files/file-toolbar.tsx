@@ -45,7 +45,7 @@ export function FileToolbar({ currentPath, isDriveView = false }: FileToolbarPro
       toast.success(`"${folderName}" klasörü oluşturuldu`)
       setNewFolderOpen(false)
       setFolderName("")
-      router.refresh()
+      window.dispatchEvent(new Event("wms:files:changed"))
     } catch (err: unknown) {
       toast.error((err as Error).message ?? "Klasör oluşturulamadı")
     } finally {

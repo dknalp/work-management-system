@@ -41,6 +41,9 @@ export function SelectionLasso({
     )
       return
 
+    // Prevent lasso if clicking on a file/folder row — that should be dnd drag
+    if (target.closest("[data-file-path]")) return
+
     const container = containerRef.current
     if (!container) return
 

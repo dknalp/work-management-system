@@ -212,6 +212,7 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
               : i
           )
         )
+        window.dispatchEvent(new Event("wms:files:changed"))
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error"

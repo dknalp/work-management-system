@@ -23,9 +23,15 @@ import {
   SlidersHorizontalIcon,
   PaletteIcon,
   SearchIcon,
-  CheckIcon,
-  CheckSquare2Icon,
   FileIcon,
+  ImageIcon,
+  VideoIcon,
+  Music2Icon,
+  FileTextIcon,
+  FileSpreadsheetIcon,
+  PresentationIcon,
+  ArchiveIcon,
+  CodeIcon,
 } from "lucide-react"
 import { format } from "date-fns"
 import {
@@ -85,7 +91,7 @@ import { FileToolbar } from "./file-toolbar"
 import { FileDropZone } from "./file-drop-zone"
 import { SelectionLasso } from "./selection-lasso"
 import { SearchResultsView } from "./search-results-view"
-import { getFileIcon, formatSize, getFileOpenUrl, downloadFile } from "./file-utils"
+import { getFileIcon, formatSize, getFileOpenUrl, downloadFile, isImageFile } from "./file-utils"
 import type { FileItem, SearchResult } from "./file-utils"
 import { toast } from "sonner"
 import { usePermission } from "@/hooks/use-permission"
@@ -111,6 +117,165 @@ import {
 import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 
+// ---------------------------------------------------------------------------
+// FileThumbnail — resimler için lazy thumbnail, diğerleri için ikon
+// ---------------------------------------------------------------------------
+
+const TYPE_ICON_MAP: Record<string, React.ReactNode> = {
+  folder: <FolderIcon className="size-5 text-amber-400" />,
+  image: <ImageIcon className="size-5 text-blue-400" />,
+  video: <VideoIcon className="size-5 text-purple-400" />,
+  audio: <Music2Icon className="size-5 text-pink-400" />,
+  pdf: <FileTextIcon className="size-5 text-red-400" />,
+  word: <FileTextIcon className="size-5 text-blue-500" />,
+  excel: <FileSpreadsheetIcon className="size-5 text-green-500" />,
+  powerpoint: <PresentationIcon className="size-5 text-orange-400" />,
+  archive: <ArchiveIcon className="size-5 text-yellow-500" />,
+  code: <CodeIcon className="size-5 text-emerald-400" />,
+  markdown: <FileTextIcon className="size-5 text-slate-400" />,
+  text: <FileTextIcon className="size-5 text-muted-foreground" />,
+  file: <FileIcon className="size-5 text-muted-foreground" />,
+}
+
+const TYPE_LABEL_MAP: Record<string, string> = {
+  folder: "Klasör",
+  image: "Görsel",
+  video: "Video",
+  audio: "Ses",
+  pdf: "PDF",
+  word: "Word",
+  excel: "Excel",
+  powerpoint: "PowerPoint",
+  archive: "Arşiv",
+  code: "Kod",
+  markdown: "Markdown",
+  text: "Metin",
+  file: "Dosya",
+}
+
+function FileThumbnail({ item }: { item: FileItem }) {
+  const [thumbUrl, setThumbUrl] = React.useState<string | null>(null)
+  const [failed, setFailed] = React.useState(false)
+  const isImage = isImageFile(item)
+  const { listeners, attributes, setDragRef } = useDragHandle()
+
+  React.useEffect(() => {
+    if (!isImage) return
+    let cancelled = false
+    import("@/lib/actions/files").then(({ getPreviewUrl }) => {
+      getPreviewUrl(item.id).then((url) => {
+        if (!cancelled) setThumbUrl(url)
+      }).catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+    })
+    return () => { cancelled = true }
+  }, [item.id, isImage])
+
+  const dragProps = listeners && attributes && setDragRef
+    ? {
+        ...listeners,
+        ...attributes,
+        ref: setDragRef,
+        "data-drag-handle": "true",
+        style: { touchAction: "none" } as React.CSSProperties,
+      }
+    : {}
+
+  if (isImage && thumbUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={thumbUrl}
+        alt={item.name}
+        className="size-8 rounded object-cover shrink-0 border border-border/40 cursor-grab active:cursor-grabbing"
+        onError={() => setFailed(true)}
+        {...dragProps}
+      />
+    )
+  }
+
+  const iconType = getFileIcon(item)
+  return (
+    <span
+      className="size-8 flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
+      {...dragProps}
+    >
+      {TYPE_ICON_MAP[iconType] ?? TYPE_ICON_MAP.file}
+    </span>
+  )
+}
+
+function FileTypeBadge({ item }: { item: FileItem }) {
+  const iconType = getFileIcon(item)
+  const label = TYPE_LABEL_MAP[iconType] ?? "Dosya"
+  return (
+    <span className="inline-flex items-center rounded-md border border-border/50 bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+      {label}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// StarredStrip — yıldızlı dosyaları yatay şerit olarak gösterir
+// ---------------------------------------------------------------------------
+
+function StarredStrip({
+  currentPath,
+  onOpen,
+}: {
+  currentPath: string
+  onOpen: (item: FileItem) => void
+}) {
+  const [starred, setStarred] = React.useState<FileItem[]>([])
+
+  const loadStarred = React.useCallback(async () => {
+    try {
+      const { listStarred } = await import("@/lib/actions/files")
+      const { fileRecordToItem: toItem } = await import("./file-utils")
+      const records = await listStarred()
+      setStarred(records.map(toItem))
+    } catch { /* ignore */ }
+  }, [])
+
+  React.useEffect(() => {
+    loadStarred()
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [loadStarred, currentPath])
+
+  React.useEffect(() => {
+    window.addEventListener("wms:files:changed", loadStarred)
+    return () => window.removeEventListener("wms:files:changed", loadStarred)
+  }, [loadStarred])
+
+  if (starred.length === 0) return null
+
+  return (
+    <div className="border-b border-border px-6 py-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+        <StarIcon className="size-3 fill-yellow-400 text-yellow-400" />
+        Yıldızlılar
+      </p>
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+        {starred.map((item) => (
+          <button
+            key={item.id}
+            className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs hover:bg-muted/80 transition-colors max-w-[180px]"
+            onDoubleClick={() => onOpen(item)}
+            onClick={() => onOpen(item)}
+            title={item.path}
+          >
+            <span className="shrink-0">{TYPE_ICON_MAP[getFileIcon(item)] ?? TYPE_ICON_MAP.file}</span>
+            <span className="truncate">{item.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
 interface FileExplorerProps {
   items: FileItem[]
   currentPath: string
@@ -127,6 +292,20 @@ interface FileExplorerProps {
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
 
 // ── DndTableRow ─────────────────────────────────────────────────────────────
+// Drag handle context — lets child cells access the dnd listeners
+type DragHandleCtx = {
+  listeners?: ReturnType<typeof useDraggable>["listeners"]
+  attributes?: ReturnType<typeof useDraggable>["attributes"]
+  setDragRef?: (el: HTMLElement | null) => void
+  isDragging?: boolean
+}
+
+const DragHandleContext = React.createContext<DragHandleCtx>({})
+
+function useDragHandle() {
+  return React.useContext(DragHandleContext)
+}
+
 function DndTableRow({
   item,
   children,
@@ -154,31 +333,34 @@ function DndTableRow({
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `drop-${item.id}`,
-    data: { path: item.path },
+    data: { path: item.path, item },
     disabled: item.type !== "folder" || item.name === "..",
   })
 
+  // Drop ref still on the row (for folder drop targets)
   const setRef = (el: HTMLTableRowElement | null) => {
-    setDragRef(el as unknown as HTMLElement)
     if (item.type === "folder" && item.name !== "..") setDropRef(el as unknown as HTMLElement)
   }
 
+  const isDraggable = item.name !== ".." && !item.isDriveFile
+
   return (
-    <TableRow
-      ref={setRef}
-      {...(item.name !== ".." && !item.isDriveFile ? { ...listeners, ...attributes } : {})}
-      style={{ transform: CSS.Transform.toString(transform), opacity: isDragging ? 0.4 : 1 }}
-      className={cn(
-        className,
-        item.type === "folder" && isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
-        isDragging && "z-50 shadow-lg"
-      )}
-      data-file-path={item.path}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-    >
-      {children}
-    </TableRow>
+    <DragHandleContext.Provider value={isDraggable ? { listeners, attributes, setDragRef, isDragging } : {}}>
+      <TableRow
+        ref={setRef}
+        style={{ opacity: isDragging ? 0.4 : 1 }}
+        className={cn(
+          className,
+          item.type === "folder" && isOver && "bg-primary/10 ring-1 ring-inset ring-primary/40",
+          isDragging && "z-50 shadow-lg"
+        )}
+        data-file-path={item.path}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+      >
+        {children}
+      </TableRow>
+    </DragHandleContext.Provider>
   )
 }
 // ────────────────────────────────────────────────────────────────────────────
@@ -188,7 +370,7 @@ export function FileExplorer({
   currentPath,
   sourceFilter = "all",
   viewMode,
-  showPreview,
+  showPreview: _showPreview,
   searchQuery,
   searchResults,
   isSearching,
@@ -230,6 +412,7 @@ export function FileExplorer({
   // Local items state (for star toggle updates)
   const [localItems, setLocalItems] = React.useState<FileItem[]>(itemsProp ?? [])
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalItems(itemsProp ?? [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemsProp])
@@ -241,12 +424,16 @@ export function FileExplorer({
   )
   const [sortDir, setSortDir] = useLocalStorage<"asc" | "desc">("wms:files:sortDir", "asc")
 
+  const [internalPreviewOpen, setInternalPreviewOpen] = React.useState(false)
+  const [internalPreviewFile, setInternalPreviewFile] = React.useState<FileItem | null>(null)
+
   const handleItemDoubleClick = (item: FileItem) => {
     if (item.type === "folder") {
       const qs = sourceFilter !== "all" ? `?source=${sourceFilter}` : ""
       router.push(`/files/${item.path}${qs}`)
     } else {
-      window.open(getFileOpenUrl(item), "_blank")
+      setInternalPreviewFile(item)
+      setInternalPreviewOpen(true)
     }
   }
 
@@ -276,7 +463,7 @@ export function FileExplorer({
       await renameFile(renameTarget.id, renameValue.trim())
       toast.success("Yeniden adlandırıldı")
       setRenameOpen(false)
-      router.refresh()
+      window.dispatchEvent(new Event("wms:files:changed"))
     } catch (err: unknown) {
       toast.error((err as Error).message ?? "Yeniden adlandırma başarısız")
     }
@@ -295,7 +482,6 @@ export function FileExplorer({
     const failCount = results.length - succeeded.length
 
     if (succeeded.length > 0) {
-      router.refresh()
       window.dispatchEvent(new Event("wms:files:changed"))
       setSelectedPaths(new Set())
       setActiveItem(null)
@@ -316,7 +502,7 @@ export function FileExplorer({
                   .filter((r) => r.status === "fulfilled")
                   .map((r) => restoreFile((r as PromiseFulfilledResult<{ id: string }>).value.id))
               )
-              router.refresh()
+              window.dispatchEvent(new Event("wms:files:changed"))
               toast.success("Geri alındı")
             },
           },
@@ -344,7 +530,7 @@ export function FileExplorer({
       toast.success(`${ok} öğe taşındı`)
       setMoveToOpen(false)
       setSelectedPaths(new Set())
-      router.refresh()
+      window.dispatchEvent(new Event("wms:files:changed"))
     } else {
       toast.error("Taşıma başarısız")
     }
@@ -401,7 +587,7 @@ export function FileExplorer({
     if (ok > 0) {
       toast.success(clipboard.mode === "copy" ? `${ok} öğe yapıştırıldı` : `${ok} öğe taşındı`)
       if (clipboard.mode === "cut") setClipboard(null)
-      router.refresh()
+      window.dispatchEvent(new Event("wms:files:changed"))
     } else {
       toast.error("Yapıştırma başarısız")
     }
@@ -582,16 +768,29 @@ export function FileExplorer({
     const { active, over } = event
     if (!over) return
     const draggedItem = (active.data.current as { item?: FileItem })?.item
-    const targetPath = (over.data.current as { path?: string })?.path
-    if (!draggedItem || !targetPath) return
-    if (draggedItem.path === targetPath) return
+    const overData = over.data.current as { path?: string; item?: FileItem } | undefined
+    // targetItem is the folder we dropped onto
+    const targetItem = overData?.item ?? displayItems.find(i => i.path === overData?.path)
+    if (!draggedItem || !targetItem) return
+    if (targetItem.type !== "folder") return
+    if (draggedItem.path === targetItem.path) return
+    // dest_parent = the folder's own path
+    const destParent = targetItem.path
     const toMove = selectedPaths.has(draggedItem.path)
       ? Array.from(selectedPaths).map(p => displayItems.find(i => i.path === p)).filter(Boolean) as FileItem[]
       : [draggedItem]
-    const results = await Promise.allSettled(toMove.map(f => moveFile(f.id, targetPath)))
+    // Skip if dragging a folder onto itself
+    const filtered = toMove.filter(f => f.path !== destParent)
+    if (!filtered.length) return
+    const results = await Promise.allSettled(filtered.map(f => moveFile(f.id, destParent)))
     const ok = results.filter(r => r.status === "fulfilled").length
-    if (ok > 0) { toast.success(`${ok} öğe taşındı`); router.refresh() }
-    else toast.error("Taşıma başarısız")
+    if (ok > 0) {
+      toast.success(`${ok} öğe "${targetItem.name}" klasörüne taşındı`)
+      setSelectedPaths(new Set())
+      window.dispatchEvent(new Event("wms:files:changed"))
+    } else {
+      toast.error("Taşıma başarısız")
+    }
   }, [selectedPaths, displayItems])
 
   // ── select-all ────────────────────────────────────────────────────────────
@@ -644,9 +843,10 @@ export function FileExplorer({
     const successCount = results.filter((r) => r.status === "fulfilled").length
     if (successCount > 0) {
       toast.success(
-        `${successCount} item(s) moved to ${targetItem.name === ".." ? "parent directory" : targetItem.name}`
+        `${successCount} öğe "${targetItem.name === ".." ? "üst klasör" : targetItem.name}"e taşındı`
       )
-      router.refresh()
+      setSelectedPaths(new Set())
+      window.dispatchEvent(new Event("wms:files:changed"))
     }
   }
 
@@ -672,6 +872,15 @@ export function FileExplorer({
     <>
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/50">
         <FileToolbar currentPath={currentPath} />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => router.push("/files?view=trash")}
+        >
+          <Trash2Icon className="size-3.5" />
+          Çöp Kutusu
+        </Button>
         {/* Local search input + filter popover */}
         <div className="flex items-center gap-1.5 flex-1 max-w-xs ml-auto">
           <div className="relative flex-1">
@@ -717,6 +926,7 @@ export function FileExplorer({
           })()}
         </div>
       </div>
+      <StarredStrip currentPath={currentPath} onOpen={handleItemDoubleClick} />
       <FileDropZone currentPath={currentPath}>
       <div
         ref={containerRef}
@@ -728,7 +938,7 @@ export function FileExplorer({
       >
         <SelectionLasso containerRef={containerRef} onSelectionChange={handleLassoChange} />
 
-        <div className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto p-6">
+        <div className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto">
           {localSearching && localSearchResults === null ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
               <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
@@ -745,42 +955,32 @@ export function FileExplorer({
               onMoveTo={(paths) => handleMoveToOpen(paths)}
             />
           ) : viewMode === "list" ? (
-            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-              <Table>
+            <div className="flex h-full flex-col border-t border-border bg-card">
+              <Table className="w-full table-fixed">
                 <TableHeader className="bg-muted/30">
                   <TableRow className="border-b border-border hover:bg-transparent">
-                    <TableHead className="w-10 px-4">
-                      <span
-                        className="flex cursor-pointer items-center justify-center"
-                        onClick={(e) => { e.stopPropagation(); handleSelectAll() }}
-                        title={allSelected ? "Seçimi kaldır" : "Tümünü seç"}
-                      >
-                        {allSelected ? (
-                          <CheckSquare2Icon className="size-4 text-primary" />
-                        ) : (
-                          <CheckIcon className="size-4 text-muted-foreground/50" />
-                        )}
-                      </span>
-                    </TableHead>
-                    <TableHead
-                      className="w-[400px] cursor-pointer px-6 text-[10px] font-bold tracking-wider uppercase select-none"
+                                        <TableHead
+                      className="w-[45%] cursor-pointer px-6 text-[10px] font-bold tracking-wider uppercase select-none"
                       onClick={() => handleSort("name")}
                     >
                       Ad {sortIcon("name")}
                     </TableHead>
+                    <TableHead className="w-[12%] text-[10px] font-bold tracking-wider uppercase select-none">
+                      Tür
+                    </TableHead>
                     <TableHead
-                      className="cursor-pointer text-[10px] font-bold tracking-wider uppercase select-none"
+                      className="w-[13%] cursor-pointer text-[10px] font-bold tracking-wider uppercase select-none"
                       onClick={() => handleSort("size")}
                     >
                       Boyut {sortIcon("size")}
                     </TableHead>
                     <TableHead
-                      className="cursor-pointer text-[10px] font-bold tracking-wider uppercase select-none"
+                      className="w-[25%] cursor-pointer text-[10px] font-bold tracking-wider uppercase select-none"
                       onClick={() => handleSort("updatedAt")}
                     >
                       Değiştirilme {sortIcon("updatedAt")}
                     </TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
+                    <TableHead className="w-[5%]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -824,17 +1024,10 @@ export function FileExplorer({
                           handleItemDoubleClick(item)
                         }}
                       >
-                        <TableCell className="w-10 px-4" onClick={(e) => { e.stopPropagation(); if (!isParentDir) handleSelect(item, false) }} onPointerDown={(e) => e.stopPropagation()}>
-                          {!isParentDir && (
-                            <span className={cn("flex items-center justify-center transition-opacity", isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-                              {isSelected ? <CheckSquare2Icon className="size-4 text-primary" /> : <CheckIcon className="size-4 text-muted-foreground/50" />}
-                            </span>
-                          )}
-                        </TableCell>
                         <TableCell className="px-6 py-3 font-medium">
                           <div className="flex items-center gap-3">
-                            {getFileIcon(item)}
-                            <span className="truncate font-mono text-sm">{item.name}</span>
+                            <FileThumbnail item={item} />
+                            <span className="truncate text-sm">{item.name}</span>
                             {!isParentDir && (
                               <button
                                 onClick={async (e) => {
@@ -858,6 +1051,11 @@ export function FileExplorer({
                               </button>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell className="font-sans text-xs text-muted-foreground">
+                          {!isParentDir && (
+                            <FileTypeBadge item={item} />
+                          )}
                         </TableCell>
                         <TableCell className="font-sans text-xs text-muted-foreground">
                           {item.type === "folder" ? "--" : formatSize(item.size)}
@@ -981,7 +1179,19 @@ export function FileExplorer({
                         <ContextMenuContent className="w-48">
                           <ContextMenuItem
                             className="gap-2"
-                            onClick={() => handleItemDoubleClick(item)}
+                            onClick={async () => {
+                              if (item.type === "folder") {
+                                window.open(`/files/${item.path}`, "_blank")
+                              } else {
+                                try {
+                                  const { getPreviewUrl } = await import("@/lib/actions/files")
+                                  const url = await getPreviewUrl(item.id)
+                                  window.open(url ?? getFileOpenUrl(item), "_blank")
+                                } catch {
+                                  window.open(getFileOpenUrl(item), "_blank")
+                                }
+                              }
+                            }}
                           >
                             <ExternalLinkIcon className="size-4" /> Aç
                           </ContextMenuItem>
@@ -1083,6 +1293,7 @@ export function FileExplorer({
                   })}
                 </TableBody>
               </Table>
+              <div className="flex-1" />
             </div>
           ) : (
             <FileGrid
@@ -1105,8 +1316,12 @@ export function FileExplorer({
           )}
         </div>
 
-        {showPreview && activeItem && (
-          <FilePreviewPanel file={activeItem} open={showPreview} onClose={() => setActiveItem(null)} />
+        {internalPreviewOpen && internalPreviewFile && (
+          <FilePreviewPanel
+            file={internalPreviewFile}
+            open={internalPreviewOpen}
+            onClose={() => { setInternalPreviewOpen(false); setInternalPreviewFile(null) }}
+          />
         )}
 
         {selectedPaths.size >= 1 && (
@@ -1301,12 +1516,13 @@ export function FileExplorer({
         />
       )}
 
+      
       {/* dnd-kit drag ghost */}
       <DragOverlay dropAnimation={null}>
         {dndActiveItem && (
           <div className="flex items-center gap-2 rounded-lg border border-white/20 bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-xl">
             <FileIcon className="size-3.5" />
-            {selectedPaths.size > 1 ? `${selectedPaths.size} öğe taşınıyor` : dndActiveItem.name}
+            {selectedPaths.size > 1 ? `${selectedPaths.size} dosya seçildi` : dndActiveItem.name}
           </div>
         )}
       </DragOverlay>

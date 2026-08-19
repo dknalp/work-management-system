@@ -28,7 +28,6 @@ import type { SearchOptions } from "@/components/files/file-utils"
 function usePinnedFolders() {
   return { pinned: [] as Array<{name: string; path: string}>, unpin: (_p: string) => {} }
 }
-import { TrashDialog } from "./trash-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import {
@@ -98,7 +97,6 @@ function formatSize(bytes: number): string {
 function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
   const pathname = usePathname()
   const { pinned, unpin } = usePinnedFolders()
-  const [trashOpen, setTrashOpen] = React.useState(false)
   const [driveConnected, setDriveConnected] = React.useState(false)
   const [order, setOrder] = useLocalStorage<string[]>("wms:files:sidebar-order", DEFAULT_SIDEBAR_ORDER)
   const [quota, setQuota] = React.useState<QuotaInfo | null>(null)
@@ -272,19 +270,17 @@ function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
               </div>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => setTrashOpen(true)}
+          <Link
+            href="/files?view=trash"
             className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
           >
             <Trash2Icon className="size-4 shrink-0" />
             Çöp Kutusu
-          </button>
+          </Link>
         </div>
       </div>
 
-      <TrashDialog open={trashOpen} onOpenChange={setTrashOpen} />
-    </>
+      </>
   )
 }
 

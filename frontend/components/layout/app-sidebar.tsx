@@ -19,10 +19,8 @@ import {
   KanbanIcon,
   CheckSquareIcon,
   CalendarIcon,
-  ClockIcon,
-  FolderIcon,
-  StarIcon,
-  UsersIcon,
+    FolderIcon,
+    UsersIcon,
   Settings2Icon,
   ShieldIcon,
   KeyRoundIcon,
@@ -68,16 +66,6 @@ const navMain = [
     title: "Dosyalar",
     url: "/files",
     icon: <FolderIcon />,
-  },
-  {
-    title: "Yıldızlılar",
-    url: "/files?view=starred",
-    icon: <StarIcon />,
-  },
-  {
-    title: "Son Görüntülenenler",
-    url: "/files?view=recent",
-    icon: <ClockIcon />,
   },
   {
     title: "Ekip",
@@ -127,8 +115,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       if (item.url === "/pipelines") return canViewBoard
       if (item.url === "/calendar") return canViewCalendar
       if (item.url === "/files") return canViewFiles
-      if (item.url === "/files?view=starred") return canViewFiles
-      if (item.url === "/files?view=recent") return canViewFiles
       if (item.url === "/team") return canViewTeam
       return true
     })
