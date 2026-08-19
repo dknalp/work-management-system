@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { cn } from "@/lib/utils"
 
 interface SelectionLassoProps {
   containerRef: React.RefObject<HTMLElement | null>
@@ -33,7 +32,7 @@ export function SelectionLasso({
     if (e.button !== 0) return
 
     const target = e.target as HTMLElement
-    // Prevent starting lasso if clicking an interactive element or a drag handle
+    // Prevent starting lasso if clicking an interactive element
     if (
       target.closest(
         'button, a, [role="menuitem"], [data-radix-collection-item], [data-drag-handle]'
@@ -41,7 +40,7 @@ export function SelectionLasso({
     )
       return
 
-    // Prevent lasso if clicking on a file/folder row — that should be dnd drag
+    // Prevent lasso if clicking on a file/folder row — that should be drag
     if (target.closest("[data-file-path]")) return
 
     const container = containerRef.current
@@ -73,7 +72,7 @@ export function SelectionLasso({
       const dx = Math.abs(currentPos.x - startPos.x)
       const dy = Math.abs(currentPos.y - startPos.y)
       if (dx > 5 || dy > 5) {
-        // Was dragging - prevent the subsequent click event from clearing the selection
+        // Was dragging — prevent the subsequent click from clearing the selection
         const preventClick = (clickEvent: MouseEvent) => {
           clickEvent.stopPropagation()
           clickEvent.preventDefault()
@@ -92,6 +91,8 @@ export function SelectionLasso({
     onSelectionChange(null)
   }
 
+  // Re-register listeners whenever startPos/currentPos change so handlers
+  // always close over the latest state values.
   React.useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -105,15 +106,16 @@ export function SelectionLasso({
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", handleMouseUp)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [containerRef, startPos, currentPos])
 
+  // Notify parent of current lasso rect
   React.useEffect(() => {
     if (startPos && currentPos) {
       const left = Math.min(startPos.x, currentPos.x)
       const top = Math.min(startPos.y, currentPos.y)
       const width = Math.abs(startPos.x - currentPos.x)
       const height = Math.abs(startPos.y - currentPos.y)
-
       onSelectionChange({ left, top, width, height })
     }
   }, [startPos, currentPos, onSelectionChange])
@@ -128,12 +130,7 @@ export function SelectionLasso({
   return (
     <div
       className="pointer-events-none absolute z-50 rounded-[2px] border border-primary bg-primary/20"
-      style={{
-        left,
-        top,
-        width,
-        height,
-      }}
+      style={{ left, top, width, height }}
     />
   )
 }

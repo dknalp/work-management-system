@@ -262,6 +262,7 @@ interface FileExplorerProps {
   searchResults?: SearchResult[] | null
   isSearching?: boolean
   onClearSearch?: () => void
+  onFilesChanged?: () => void
 }
 
 type Clipboard = { paths: string[]; mode: "copy" | "cut" } | null
@@ -278,6 +279,7 @@ export function FileExplorer({
   searchQuery,
   searchResults,
   isSearching,
+  onFilesChanged,
 }: FileExplorerProps) {
   const router = useRouter()
   const canRename = usePermission("files:rename")
@@ -299,6 +301,7 @@ export function FileExplorer({
 
   const [moveToOpen, setMoveToOpen] = React.useState(false)
   const [moveSourcePaths, setMoveSourcePaths] = React.useState<string[]>([])
+  const [detailItem, setDetailItem] = React.useState<FileItem | null>(null)
   const [moveToTarget, setMoveToTarget] = React.useState("")
 
   // Search & filter state (local, self-contained)
@@ -387,6 +390,7 @@ export function FileExplorer({
 
     if (succeeded.length > 0) {
       window.dispatchEvent(new Event("wms:files:changed"))
+      onFilesChanged?.()
       setSelectedPaths(new Set())
       setActiveItem(null)
 
@@ -628,6 +632,34 @@ export function FileExplorer({
       }
       if (e.key === "Enter" && activeItem) {
         handleItemDoubleClick(activeItem)
+      }
+      if (e.key === "i" && activeItem && !renameOpen) {
+        setDetailItem(activeItem)
+      }
+      // Arrow key navigation
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        const selectable = displayItems.filter(i => i.name !== "..")
+        if (selectable.length === 0) return
+        const currentIdx = activeItem ? selectable.findIndex(i => i.path === activeItem.path) : -1
+        let nextIdx = e.key === "ArrowDown" ? currentIdx + 1 : currentIdx - 1
+        nextIdx = Math.max(0, Math.min(nextIdx, selectable.length - 1))
+        const next = selectable[nextIdx]
+        if (next) {
+          setActiveItem(next)
+          if (!e.shiftKey) {
+            setSelectedPaths(new Set([next.path]))
+          } else {
+            setSelectedPaths(prev => {
+              const set = new Set(prev)
+              set.add(next.path)
+              return set
+            })
+          }
+          // Scroll into view
+          const el = document.querySelector(`[data-file-path="${CSS.escape(next.path)}"]`)
+          el?.scrollIntoView({ block: "nearest" })
+        }
       }
     }
 
@@ -1047,7 +1079,7 @@ export function FileExplorer({
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       className="gap-2 text-destructive focus:text-destructive"
-                                      onClick={() => handleDeleteConfirm(item.path)}
+                                      onClick={() => handleDeleteConfirm(item.id)}
                                     >
                                       <Trash2Icon className="size-3.5" /> Sil
                                     </DropdownMenuItem>
@@ -1182,6 +1214,13 @@ export function FileExplorer({
                               </ContextMenuItem>
                             </>
                           )}
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            className="gap-2"
+                            onClick={() => setDetailItem(item)}
+                          >
+                            <FileIcon className="size-4" /> Bilgi
+                          </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
                     )
@@ -1220,7 +1259,7 @@ export function FileExplorer({
         )}
 
         {selectedPaths.size >= 1 && (
-          <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
+          <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-xl border border-border bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
             <span className="mr-2 text-sm font-semibold tabular-nums">
               {selectedPaths.size} seçili
             </span>
@@ -1278,7 +1317,7 @@ export function FileExplorer({
         )}
 
         {clipboard && selectedPaths.size < 2 && (
-          <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-primary/30 bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
+          <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-primary/30 bg-card/95 px-4 py-2.5 shadow-xl backdrop-blur-md">
             <ClipboardPasteIcon className="size-3.5 text-primary" />
             <span className="text-sm text-muted-foreground">
               {clipboard.paths.length === 1 ? "1 öğe" : `${clipboard.paths.length} öğe`}
@@ -1407,6 +1446,66 @@ export function FileExplorer({
           open={!!shareTarget}
           onClose={() => setShareTarget(null)}
         />
+      )}
+
+      {/* Dosya Detay Paneli */}
+      {detailItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ animation: "fadeIn 0.15s ease" }}
+        >
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDetailItem(null)} />
+          <div
+            className="relative z-10 w-full max-w-sm mx-4 rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <p className="font-semibold text-sm truncate">{detailItem.name}</p>
+              <button className="text-muted-foreground hover:text-foreground" onClick={() => setDetailItem(null)}>
+                <XIcon className="size-4" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Tür</span>
+                <span className="font-medium capitalize">{detailItem.type === "folder" ? "Klasör" : (detailItem.mimeType || "Dosya")}</span>
+              </div>
+              {detailItem.size != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Boyut</span>
+                  <span className="font-medium">{formatSize(detailItem.size)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Konum</span>
+                <span className="font-medium truncate max-w-[180px]">/{detailItem.parent_path || "Dosyalar"}</span>
+              </div>
+              {detailItem.lastModified && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Değiştirilme</span>
+                  <span className="font-medium">{format(new Date(detailItem.lastModified), "d MMM yyyy, HH:mm")}</span>
+                </div>
+              )}
+              {detailItem.is_starred && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Yıldız</span>
+                  <span className="font-medium text-yellow-500">★ Yıldızlı</span>
+                </div>
+              )}
+            </div>
+            <div className="px-5 pb-4 flex gap-2">
+              <Button size="sm" variant="outline" className="flex-1" onClick={() => { downloadFile(detailItem); setDetailItem(null) }}>
+                <DownloadIcon className="size-3.5 mr-1.5" /> İndir
+              </Button>
+              {detailItem.type !== "folder" && (
+                <Button size="sm" variant="outline" className="flex-1" onClick={() => { setInternalPreviewFile(detailItem); setInternalPreviewOpen(true); setDetailItem(null) }}>
+                  <FileIcon className="size-3.5 mr-1.5" /> Önizle
+                </Button>
+              )}
+            </div>
+            <style>{`@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }`}</style>
+          </div>
+        </div>
       )}
     </>
     </UploadQueueProvider>

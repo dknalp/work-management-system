@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircleIcon, FolderXIcon, RefreshCwIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { LayoutListIcon, LayoutGridIcon } from "lucide-react"
 import type { FileItem } from "@/components/files/file-utils"
 import { fileRecordToItem } from "@/components/files/file-utils"
 import { FileExplorer } from "@/components/files/file-explorer"
 import { TrashView } from "@/components/files/trash-view"
-import { listFiles, listStarred, listRecent } from "@/lib/actions/files"
+import { listFiles, listStarred, listRecent, getQuota } from "@/lib/actions/files"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 
 interface FileClientPageProps {
   initialItems: FileItem[]
@@ -27,9 +29,15 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view") // "starred" | "recent" | "trash" | null
-  const [viewMode] = React.useState<"grid" | "list">("list")
+  const [viewMode, setViewMode] = useLocalStorage<"grid" | "list">("wms:files-view", "list")
   const [showPreview, setShowPreview] = React.useState(false)
   const [state, setState] = React.useState<LoadState>({ status: "loading" })
+  const [quota, setQuota] = React.useState<{ used_bytes: number; file_count: number } | null>(null)
+
+  // Load quota once on mount
+  React.useEffect(() => {
+    getQuota().then(setQuota).catch(() => {})
+  }, [])
 
   const load = React.useCallback(async () => {
     setState({ status: "loading" })
@@ -188,17 +196,54 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
     )
   }
 
+  const usedMB = quota ? (quota.used_bytes / 1024 / 1024).toFixed(1) : null
+  const usedGB = quota && quota.used_bytes > 1024 * 1024 * 1024
+    ? (quota.used_bytes / 1024 / 1024 / 1024).toFixed(2)
+    : null
+
   return (
-    <FileExplorer
-      items={state.items}
-      currentPath={currentPath}
-      viewMode={viewMode}
-      showPreview={showPreview}
-      onTogglePreview={() => setShowPreview((v) => !v)}
-      searchQuery=""
-      searchResults={null}
-      isSearching={false}
-    />
+    <div className="flex flex-col h-full">
+      {/* Top bar: view toggle + quota */}
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/40 bg-muted/20">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            title="Liste görünümü"
+          >
+            <LayoutListIcon className="size-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            title="Izgara görünümü"
+          >
+            <LayoutGridIcon className="size-4" />
+          </button>
+        </div>
+        {quota && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{usedGB ? `${usedGB} GB` : `${usedMB} MB`} kullanıldı</span>
+            <span className="text-muted-foreground/50">·</span>
+            <span>{quota.file_count} dosya</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-h-0">
+        <FileExplorer
+          items={state.items}
+          currentPath={currentPath}
+          viewMode={viewMode}
+          showPreview={showPreview}
+          onTogglePreview={() => setShowPreview((v) => !v)}
+          searchQuery=""
+          searchResults={null}
+          isSearching={false}
+          onFilesChanged={load}
+        />
+      </div>
+    </div>
   )
 }
 
