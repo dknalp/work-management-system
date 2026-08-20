@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google"
 
 import "./globals.css"
@@ -18,6 +19,12 @@ import { NotificationsProvider } from "@/contexts/notifications-context"
 import { ProjectProvider } from "@/contexts/project-context"
 import { PipelineProvider } from "@/contexts/pipeline-context"
 import { CalendarProvider } from "@/contexts/calendar-context"
+
+export const metadata: Metadata = {
+  title: "Kiwimi - Workin",
+  description: "Kiwimi tarafından sunulan iş yönetim platformu.",
+  applicationName: "Kiwimi - Workin",
+}
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 

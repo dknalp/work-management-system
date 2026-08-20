@@ -79,7 +79,7 @@ export default function SettingsPage() {
                   <div>
                     <h2 className="text-base font-semibold">Görünüm</h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      WorkOS'un cihazınızda nasıl göründüğünü özelleştirin.
+                      Workin'in cihazınızda nasıl göründüğünü özelleştirin.
                     </p>
                   </div>
                   <Separator />

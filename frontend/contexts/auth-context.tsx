@@ -23,7 +23,7 @@ export type User = {
 const MOCK_USERS_SEED: User[] = [
   {
     id: "user-1",
-    email: "admin@workos.com",
+    email: "admin@workin.app",
     name: "Admin",
     bio: null,
     avatar_url: null,
@@ -34,7 +34,7 @@ const MOCK_USERS_SEED: User[] = [
   },
   {
     id: "user-2",
-    email: "demo@workos.app",
+    email: "demo@workin.app",
     name: "Demo User",
     bio: null,
     avatar_url: null,
@@ -45,7 +45,7 @@ const MOCK_USERS_SEED: User[] = [
   },
   {
     id: "user-3",
-    email: "yetkili@workos.app",
+    email: "yetkili@workin.app",
     name: "Yetkili Kullanıcı",
     bio: null,
     avatar_url: null,
@@ -56,7 +56,7 @@ const MOCK_USERS_SEED: User[] = [
   },
   {
     id: "user-4",
-    email: "uye@workos.app",
+    email: "uye@workin.app",
     name: "Üye Kullanıcı",
     bio: null,
     avatar_url: null,

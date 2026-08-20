@@ -158,9 +158,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:p-2!"
             >
               <a href="/home" className="flex items-center gap-2.5">
-                <img src="/kiwimi-office-black-logo.png" alt="Kiwimi Office" className="size-7 rounded-lg object-contain" />
+                <img src="/kiwimi-office-black-logo.png" alt="Kiwimi - Workin" className="size-7 rounded-lg object-contain" />
                 <span className="text-base font-semibold tracking-tight">
-                  Kiwimi Office
+                  Kiwimi - Workin
                 </span>
               </a>
             </SidebarMenuButton>
