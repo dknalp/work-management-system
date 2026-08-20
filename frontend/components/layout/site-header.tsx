@@ -13,6 +13,7 @@ const routeLabels: Record<string, string> = {
   "/calendar": "Takvim",
   "/files": "Dosyalar",
   "/team": "Ekip",
+  "/expenses": "Gider Yönetimi",
   "/settings": "Ayarlar",
   "/profile": "Profil",
   "/admin": "Yönetici Paneli",

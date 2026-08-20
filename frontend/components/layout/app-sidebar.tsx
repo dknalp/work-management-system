@@ -19,14 +19,15 @@ import {
   KanbanIcon,
   CheckSquareIcon,
   CalendarIcon,
-    FolderIcon,
-    UsersIcon,
+  FolderIcon,
+  UsersIcon,
   Settings2Icon,
   ShieldIcon,
   KeyRoundIcon,
   ExternalLinkIcon,
   BotIcon,
   BookOpenIcon,
+  ReceiptIcon,
 } from "lucide-react"
 
 import Link from "next/link"
@@ -72,6 +73,11 @@ const navMain = [
     url: "/team",
     icon: <UsersIcon />,
   },
+  {
+    title: "Gider Yönetimi",
+    url: "/expenses",
+    icon: <ReceiptIcon />,
+  },
 ]
 
 const navSecondary = [
@@ -116,6 +122,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       if (item.url === "/calendar") return canViewCalendar
       if (item.url === "/files") return canViewFiles
       if (item.url === "/team") return canViewTeam
+      if (item.url === "/expenses")
+        return (
+          user?.is_admin ||
+          user?.role === "admin" ||
+          user?.role === "manager"
+        ) ?? false
       return true
     })
     .map((item) => ({

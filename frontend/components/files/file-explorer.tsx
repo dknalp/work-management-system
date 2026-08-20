@@ -846,12 +846,16 @@ export function FileExplorer({
       <div
         ref={containerRef}
         className="relative flex min-h-0 flex-1 overflow-hidden select-none"
-        onClick={() => {
-          setSelectedPaths(new Set())
-          setActiveItem(null)
-        }}
+        onDragStart={(e) => e.preventDefault()}
       >
-        <SelectionLasso containerRef={containerRef} onSelectionChange={handleLassoChange} />
+        <SelectionLasso
+          containerRef={containerRef}
+          onSelectionChange={handleLassoChange}
+          onEmptyClick={() => {
+            setSelectedPaths(new Set())
+            setActiveItem(null)
+          }}
+        />
 
         <div className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto">
           {localSearching && localSearchResults === null ? (
