@@ -162,6 +162,22 @@ class BulkResult(BaseModel):
     failed: list[str]
 
 
+class DriveImportBody(BaseModel):
+    """Request body for POST /import-from-drive."""
+
+    file_id: str
+    """Google Drive file ID (from the Picker callback)."""
+
+    access_token: str
+    """Short-lived OAuth access token with drive.readonly scope."""
+
+    parent_path: str = ""
+    """Destination folder inside the virtual filesystem (empty = root)."""
+
+    overwrite: bool = False
+    """If True, replace an existing file with the same name at parent_path."""
+
+
 # ---------------------------------------------------------------------------
 # Internal utilities
 # ---------------------------------------------------------------------------
@@ -288,16 +304,19 @@ async def upload_file(
         # If size was not provided by the client, query R2 for the real byte count.
         if size is None:
             try:
-                from app.r2 import get_r2_client
-                import asyncio
-                bucket = os.environ.get("R2_BUCKET_NAME", "")
+                import logging
+                from app.r2 import get_r2_client, get_bucket
+                bucket = get_bucket()
                 def _head() -> int:
                     client = get_r2_client()
                     resp = client.head_object(Bucket=bucket, Key=r2_key)
                     return int(resp["ContentLength"])
-                size = await asyncio.get_event_loop().run_in_executor(None, _head)
+                size = await asyncio.get_running_loop().run_in_executor(None, _head)
             except Exception:
-                pass  # quota will be slightly off; non-fatal
+                logging.getLogger(__name__).warning(
+                    "Could not determine file size for r2_key=%s; defaulting to 0", r2_key
+                )
+                size = 0  # safe fallback — quota will be slightly off but not None
     else:
         # Local disk mode: write the stream and count bytes simultaneously.
         disk_path = _local_path(r2_key)
@@ -925,9 +944,7 @@ def search_files(
             pass
 
     if is_starred is not None:
-        starred_val = getattr(FileRecord, "starred", None)
-        if starred_val is not None:
-            stmt = stmt.where(FileRecord.starred == is_starred)  # type: ignore[attr-defined]
+        stmt = stmt.where(FileRecord.is_starred == is_starred)
 
     records = session.exec(stmt).all()
     records = sorted(records, key=lambda r: (0 if r.type == "folder" else 1, r.name.lower()))
@@ -1203,3 +1220,120 @@ def bulk_trash(
             failed.append(fid)
     session.commit()
     return BulkResult(succeeded=succeeded, failed=failed)
+
+
+# ---------------------------------------------------------------------------
+# Google Drive import
+# ---------------------------------------------------------------------------
+
+@router.post("/import-from-drive", response_model=FileRecordResponse)
+async def import_from_drive(
+    body: DriveImportBody,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> FileRecordResponse:
+    """Import a file from Google Drive into R2 (or local disk) storage.
+
+    Flow:
+    1. Resolve Drive file metadata (name, MIME type, size).
+    2. Conflict check: if a file with the same name already exists at
+       ``parent_path``, return 409 unless ``overwrite=True``.
+    3. Stream file bytes from Drive into a BytesIO buffer.
+       Google Workspace documents are automatically exported to their Office
+       equivalent (Docs→DOCX, Sheets→XLSX, Slides→PPTX, Drawings→PNG).
+    4. Upload the buffer to R2 (or write to local disk).
+    5. Persist a ``FileRecord`` with the resolved metadata.
+
+    The ``access_token`` is used only during this request and is never stored.
+    """
+    import logging
+    from app.google_drive import download_drive_file, get_drive_file_info
+
+    _log = logging.getLogger(__name__)
+
+    # ── 1. Resolve metadata ──────────────────────────────────────────────────
+    try:
+        info = await get_drive_file_info(body.access_token, body.file_id)
+    except Exception as exc:
+        _log.error("Drive metadata fetch failed for file_id=%s: %s", body.file_id, exc)
+        raise HTTPException(status_code=502, detail="Failed to fetch file metadata from Google Drive")
+
+    parent = body.parent_path.strip("/")
+    full_path = _build_path(parent, info.name)
+
+    # ── 2. Conflict check ────────────────────────────────────────────────────
+    existing = session.exec(
+        select(FileRecord).where(
+            FileRecord.owner_id == current_user.id,
+            FileRecord.path == full_path,
+            FileRecord.is_deleted == False,  # noqa: E712
+        )
+    ).first()
+
+    if existing and not body.overwrite:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A file named '{info.name}' already exists at this location. "
+                   "Set overwrite=true to replace it.",
+        )
+
+    # ── 3. Download from Drive ───────────────────────────────────────────────
+    # Pass the *original* Drive mimeType so the helper branches correctly
+    # between get_media (binary) and export_media (Google Workspace docs).
+    try:
+        buf, actual_size = await download_drive_file(
+            body.access_token, body.file_id, info.original_mime
+        )
+    except Exception as exc:
+        _log.error("Drive download failed for file_id=%s: %s", body.file_id, exc)
+        raise HTTPException(status_code=502, detail="Failed to download file from Google Drive")
+
+    # ── 4. Upload to storage ─────────────────────────────────────────────────
+    new_id = uuid.uuid4()
+    r2_key = f"{current_user.id}/{new_id}"
+
+    if _use_r2():
+        await r2_upload_fileobj(buf, r2_key, info.mime_type)
+    else:
+        disk_path = _local_path(r2_key)
+        disk_path.parent.mkdir(parents=True, exist_ok=True)
+        disk_path.write_bytes(buf.read())
+
+    # ── 5. Persist metadata ──────────────────────────────────────────────────
+    if existing and body.overwrite:
+        # Remove old bytes from storage before replacing the record
+        if existing.r2_key and existing.r2_key != r2_key:
+            if _use_r2():
+                await r2_delete_object(existing.r2_key)
+            else:
+                old_disk = _local_path(existing.r2_key)
+                if old_disk.exists():
+                    old_disk.unlink()
+        existing.r2_key = r2_key
+        existing.mime_type = info.mime_type
+        existing.size = actual_size
+        existing.updated_at = _now()
+        session.add(existing)
+        session.commit()
+        session.refresh(existing)
+        return _to_response(existing)
+
+    record = FileRecord(
+        id=new_id,
+        owner_id=current_user.id,
+        name=info.name,
+        path=full_path,
+        parent_path=parent,
+        type="file",
+        size=actual_size,
+        mime_type=info.mime_type,
+        r2_key=r2_key,
+    )
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    _log.info(
+        "Drive import complete: user=%s drive_file_id=%s name=%r size=%d",
+        current_user.id, body.file_id, info.name, actual_size,
+    )
+    return _to_response(record)

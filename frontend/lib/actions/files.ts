@@ -397,3 +397,46 @@ export async function bulkTrash(ids: string[]): Promise<{ succeeded: string[]; f
   if (!res.ok) throw new Error("Bulk trash failed")
   return res.json()
 }
+
+// ---------------------------------------------------------------------------
+// Google Drive import
+// ---------------------------------------------------------------------------
+
+export type DriveImportResult = FileRecord
+
+/**
+ * Import a single file from Google Drive into R2 storage.
+ *
+ * @param fileId      Google Drive file ID (from the Picker callback)
+ * @param accessToken Short-lived OAuth access token with drive.readonly scope
+ * @param parentPath  Destination folder inside the virtual filesystem (empty = root)
+ * @param overwrite   Replace an existing file with the same name if true
+ */
+export async function importFromDrive(
+  fileId: string,
+  accessToken: string,
+  parentPath: string = "",
+  overwrite: boolean = false,
+): Promise<DriveImportResult> {
+  const token = tokenStorage.getAccess()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers["Authorization"] = `Bearer ${token}`
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/files/import-from-drive`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      file_id: fileId,
+      access_token: accessToken,
+      parent_path: parentPath,
+      overwrite,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error((body as { detail?: string }).detail ?? "Google Drive içe aktarma başarısız")
+  }
+
+  return res.json()
+}

@@ -25,15 +25,7 @@ import {
   PaletteIcon,
   SearchIcon,
   FileIcon,
-  ImageIcon,
-  VideoIcon,
-  Music2Icon,
-  FileTextIcon,
-  FileSpreadsheetIcon,
-  PresentationIcon,
-  ArchiveIcon,
-  CodeIcon,
-} from "lucide-react"
+  } from "lucide-react"
 import { format } from "date-fns"
 import {
   Table,
@@ -82,17 +74,15 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SearchFilterPanel } from "@/components/files/search-filter-panel"
-import { FolderCustomizeDialog } from "@/components/files/folder-customize-dialog"
-import { searchFiles, customizeFile, type SearchFilters } from "@/lib/actions/files"
+import { searchFiles, type SearchFilters } from "@/lib/actions/files"
 import { cn } from "@/lib/utils"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { FileGrid } from "./file-grid"
 import { FilePreviewPanel } from "./file-preview-panel"
 import { FileToolbar } from "./file-toolbar"
 import { FileDropZone } from "./file-drop-zone"
-import { SelectionLasso } from "./selection-lasso"
 import { SearchResultsView } from "./search-results-view"
-import { getFileIcon, formatSize, getFileOpenUrl, downloadFile, isImageFile } from "./file-utils"
+import { formatSize, getFileOpenUrl, downloadFile } from "./file-utils"
 import type { FileItem, SearchResult } from "./file-utils"
 import { toast } from "sonner"
 import { usePermission } from "@/hooks/use-permission"
@@ -106,148 +96,9 @@ import {
   starFile,
 } from "@/lib/actions/files"
 import { ShareDialog } from "./share-dialog"
+import { FileThumbnail, FileTypeBadge, StarredStrip } from "./file-explorer-helpers"
 
-// ---------------------------------------------------------------------------
-// FileThumbnail — resimler için lazy thumbnail, diğerleri için ikon
-// ---------------------------------------------------------------------------
-
-const TYPE_ICON_MAP: Record<string, React.ReactNode> = {
-  folder: <FolderIcon className="size-5 text-amber-400" />,
-  image: <ImageIcon className="size-5 text-blue-400" />,
-  video: <VideoIcon className="size-5 text-purple-400" />,
-  audio: <Music2Icon className="size-5 text-pink-400" />,
-  pdf: <FileTextIcon className="size-5 text-red-400" />,
-  word: <FileTextIcon className="size-5 text-blue-500" />,
-  excel: <FileSpreadsheetIcon className="size-5 text-green-500" />,
-  powerpoint: <PresentationIcon className="size-5 text-orange-400" />,
-  archive: <ArchiveIcon className="size-5 text-yellow-500" />,
-  code: <CodeIcon className="size-5 text-emerald-400" />,
-  markdown: <FileTextIcon className="size-5 text-slate-400" />,
-  text: <FileTextIcon className="size-5 text-muted-foreground" />,
-  file: <FileIcon className="size-5 text-muted-foreground" />,
-}
-
-const TYPE_LABEL_MAP: Record<string, string> = {
-  folder: "Klasör",
-  image: "Görsel",
-  video: "Video",
-  audio: "Ses",
-  pdf: "PDF",
-  word: "Word",
-  excel: "Excel",
-  powerpoint: "PowerPoint",
-  archive: "Arşiv",
-  code: "Kod",
-  markdown: "Markdown",
-  text: "Metin",
-  file: "Dosya",
-}
-
-function FileThumbnail({ item }: { item: FileItem }) {
-  const [thumbUrl, setThumbUrl] = React.useState<string | null>(null)
-  const [failed, setFailed] = React.useState(false)
-  const isImage = isImageFile(item)
-
-  React.useEffect(() => {
-    if (!isImage) return
-    let cancelled = false
-    import("@/lib/actions/files").then(({ getPreviewUrl }) => {
-      getPreviewUrl(item.id).then((url) => {
-        if (!cancelled) setThumbUrl(url)
-      }).catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-    })
-    return () => { cancelled = true }
-  }, [item.id, isImage])
-
-  if (isImage && thumbUrl && !failed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={thumbUrl}
-        alt={item.name}
-        className="size-8 rounded object-cover shrink-0 border border-border/40"
-        onError={() => setFailed(true)}
-      />
-    )
-  }
-
-  const iconType = getFileIcon(item)
-  return (
-    <span className="size-8 flex items-center justify-center shrink-0">
-      {TYPE_ICON_MAP[iconType] ?? TYPE_ICON_MAP.file}
-    </span>
-  )
-}
-
-function FileTypeBadge({ item }: { item: FileItem }) {
-  const iconType = getFileIcon(item)
-  const label = TYPE_LABEL_MAP[iconType] ?? "Dosya"
-  return (
-    <span className="inline-flex items-center rounded-md border border-border/50 bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-      {label}
-    </span>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// StarredStrip — yıldızlı dosyaları yatay şerit olarak gösterir
-// ---------------------------------------------------------------------------
-
-function StarredStrip({
-  currentPath,
-  onOpen,
-}: {
-  currentPath: string
-  onOpen: (item: FileItem) => void
-}) {
-  const [starred, setStarred] = React.useState<FileItem[]>([])
-
-  const loadStarred = React.useCallback(async () => {
-    try {
-      const { listStarred } = await import("@/lib/actions/files")
-      const { fileRecordToItem: toItem } = await import("./file-utils")
-      const records = await listStarred()
-      setStarred(records.map(toItem))
-    } catch { /* ignore */ }
-  }, [])
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadStarred()
-  }, [loadStarred, currentPath])
-
-  React.useEffect(() => {
-    window.addEventListener("wms:files:changed", loadStarred)
-    return () => window.removeEventListener("wms:files:changed", loadStarred)
-  }, [loadStarred])
-
-  if (starred.length === 0) return null
-
-  return (
-    <div className="border-b border-border px-6 py-3">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-        <StarIcon className="size-3 fill-yellow-400 text-yellow-400" />
-        Yıldızlılar
-      </p>
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-        {starred.map((item) => (
-          <button
-            key={item.id}
-            className="flex shrink-0 items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-1.5 text-xs hover:bg-muted/80 transition-colors max-w-[180px]"
-            onDoubleClick={() => onOpen(item)}
-            onClick={() => onOpen(item)}
-            title={item.path}
-          >
-            <span className="shrink-0">{TYPE_ICON_MAP[getFileIcon(item)] ?? TYPE_ICON_MAP.file}</span>
-            <span className="truncate">{item.name}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
+// (FileThumbnail, FileTypeBadge, StarredStrip, TYPE_ICON_MAP are now in ./file-explorer-helpers.tsx)
 
 // ---------------------------------------------------------------------------
 
@@ -275,10 +126,10 @@ export function FileExplorer({
   currentPath,
   sourceFilter = "all",
   viewMode,
-  showPreview: _showPreview,
+  showPreview: _showPreview, // eslint-disable-line @typescript-eslint/no-unused-vars
   searchQuery,
-  searchResults,
-  isSearching,
+  searchResults: _searchResults, // eslint-disable-line @typescript-eslint/no-unused-vars
+  isSearching: _isSearching, // eslint-disable-line @typescript-eslint/no-unused-vars
   onFilesChanged,
 }: FileExplorerProps) {
   const router = useRouter()
@@ -286,6 +137,7 @@ export function FileExplorer({
   const canDelete = usePermission("files:delete")
   const canMove = canDelete
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const scrollDivRef = React.useRef<HTMLDivElement>(null)
   const { pin, isPinned } = usePinnedFolders()
   const [selectedPaths, setSelectedPaths] = React.useState<Set<string>>(new Set())
   const [activeItem, setActiveItem] = React.useState<FileItem | null>(null)
@@ -321,7 +173,6 @@ export function FileExplorer({
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalItems(itemsProp ?? [])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemsProp])
   const items = localItems
 
@@ -334,8 +185,72 @@ export function FileExplorer({
   const [internalPreviewOpen, setInternalPreviewOpen] = React.useState(false)
   const [internalPreviewFile, setInternalPreviewFile] = React.useState<FileItem | null>(null)
 
+  // ── Lasso selection ──────────────────────────────────────────────────────
+  const [lassoRect, setLassoRect] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null)
+
+  React.useEffect(() => {
+    let startX = 0, startY = 0, active = false
+
+    const onMove = (e: MouseEvent) => {
+      if (!active) return
+      const x = Math.min(startX, e.clientX)
+      const y = Math.min(startY, e.clientY)
+      const w = Math.abs(e.clientX - startX)
+      const h = Math.abs(e.clientY - startY)
+      setLassoRect({ x, y, w, h })
+
+      // Hit-test every [data-file-path] row against the lasso rect
+      const el = scrollDivRef.current
+      if (!el) return
+      const newSelected = new Set<string>()
+      el.querySelectorAll("[data-file-path]").forEach((rowEl) => {
+        const r = rowEl.getBoundingClientRect()
+        if (x < r.right && x + w > r.left && y < r.bottom && y + h > r.top) {
+          const path = (rowEl as HTMLElement).dataset.filePath
+          if (path) newSelected.add(path)
+        }
+      })
+      setSelectedPaths(newSelected)
+    }
+
+    const onUp = () => {
+      if (!active) return
+      active = false
+      setLassoRect(null)
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return
+      const el = scrollDivRef.current
+      if (!el || !el.contains(e.target as Node)) return
+      const t = e.target as HTMLElement
+      if (t.closest("[data-file-path]")) return
+      if (t.closest('button, a, input, select, textarea, [role="menuitem"], [role="menu"]')) return
+      // Prevent browser from starting a native drag/text-selection
+      e.preventDefault()
+      startX = e.clientX
+      startY = e.clientY
+      active = true
+      setLassoRect(null)
+      window.addEventListener("mousemove", onMove)
+      window.addEventListener("mouseup", onUp)
+    }
+
+    document.addEventListener("mousedown", onDown)
+    return () => {
+      document.removeEventListener("mousedown", onDown)
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseup", onUp)
+    }
+  }, [])
+  // ────────────────────────────────────────────────────────────────────────
+
   const handleItemDoubleClick = (item: FileItem) => {
     if (item.type === "folder") {
+      // TODO(FIX-6): backend /list endpoint does not yet accept a `source` query param.
+      // The sourceFilter prop is wired here for when Google Drive mount is implemented.
       const qs = sourceFilter !== "all" ? `?source=${sourceFilter}` : ""
       router.push(`/files/${item.path}${qs}`)
     } else {
@@ -501,50 +416,7 @@ export function FileExplorer({
     }
   }, [clipboard, currentPath, router])
 
-  const handleLassoChange = React.useCallback(
-    (rect: { top: number; left: number; width: number; height: number } | null) => {
-      if (!rect) return
-      const newSelected = new Set<string>()
-      const container = containerRef.current
-      if (!container) return
-
-      container.querySelectorAll("[data-file-path]").forEach((el) => {
-        const elRect = el.getBoundingClientRect()
-        const containerRect = container.getBoundingClientRect()
-        const rel = {
-          top: elRect.top - containerRect.top + container.scrollTop,
-          left: elRect.left - containerRect.left + container.scrollLeft,
-          width: elRect.width,
-          height: elRect.height,
-        }
-        const intersects =
-          rect.left < rel.left + rel.width &&
-          rect.left + rect.width > rel.left &&
-          rect.top < rel.top + rel.height &&
-          rect.top + rect.height > rel.top
-
-        if (intersects) {
-          const path = (el as HTMLElement).dataset.filePath
-          if (path) newSelected.add(path)
-        }
-      })
-
-      setSelectedPaths((prev) => {
-        if (prev.size === newSelected.size && Array.from(newSelected).every((p) => prev.has(p)))
-          return prev
-        return newSelected
-      })
-
-      if (newSelected.size > 0) {
-        const firstPath = Array.from(newSelected)[0]
-        const firstItem = items.find((i) => i.path === firstPath)
-        if (firstItem) setActiveItem((prev) => (prev?.path === firstItem.path ? prev : firstItem))
-      }
-    },
-    [items]
-  )
-
-  const displayItems = React.useMemo(() => {
+    const displayItems = React.useMemo(() => {
     const filtered = searchQuery
       ? items.filter((i) => i.name.toLowerCase().includes(searchQuery.toLowerCase()))
       : [...items]
@@ -848,16 +720,17 @@ export function FileExplorer({
         className="relative flex min-h-0 flex-1 overflow-hidden select-none"
         onDragStart={(e) => e.preventDefault()}
       >
-        <SelectionLasso
-          containerRef={containerRef}
-          onSelectionChange={handleLassoChange}
-          onEmptyClick={() => {
-            setSelectedPaths(new Set())
-            setActiveItem(null)
-          }}
-        />
-
-        <div className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto">
+        {/* Lasso selection rect — fixed so it's immune to scroll/overflow */}
+        {lassoRect && (
+          <div
+            className="pointer-events-none fixed z-[9999] rounded-sm border border-primary bg-primary/10"
+            style={{ left: lassoRect.x, top: lassoRect.y, width: lassoRect.w, height: lassoRect.h }}
+          />
+        )}
+        <div
+          ref={scrollDivRef}
+          className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto"
+        >
           {localSearching && localSearchResults === null ? (
             <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
               <div className="size-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
@@ -1239,6 +1112,7 @@ export function FileExplorer({
               selectedPaths={selectedPaths}
               onSelect={handleSelect}
               onNavigate={(p) => {
+                // TODO(FIX-6): backend /list does not yet accept `source` param — see Google Drive integration.
                 const qs = sourceFilter !== "all" ? `?source=${sourceFilter}` : ""
                 router.push(`/files/${p}${qs}`)
               }}

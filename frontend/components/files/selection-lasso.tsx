@@ -39,6 +39,8 @@ export function SelectionLasso({
 
     const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return
+      // Only activate when the click is inside our container
+      if (!container || !container.contains(e.target as Node)) return
       const target = e.target as HTMLElement
       if (target.closest('button, a, input, select, textarea, [role="menuitem"], [role="menu"]')) return
       if (target.closest("[data-file-path]")) return
@@ -100,16 +102,33 @@ export function SelectionLasso({
       document.body.style.userSelect = ""
     }
 
+    // Block dragstart so the browser can't hijack mousemove after a mousedown
+    // on a draggable row. We only block it when we've decided to lasso (active=true).
+    const onDragStart = (e: DragEvent) => {
+      if (active) e.preventDefault()
+    }
+
+    // Prevent text selection from appearing during lasso drag
+    const onSelectStart = (e: Event) => {
+      if (active) e.preventDefault()
+    }
+
     const attach = (el: HTMLElement) => {
       container = el
-      el.addEventListener("mousedown", onMouseDown, { capture: true })
+      // Listen on window so nothing inside the tree can block the event.
+      // The handler itself checks that the click target is inside `container`.
+      window.addEventListener("mousedown", onMouseDown, { capture: true })
+      el.addEventListener("dragstart", onDragStart, { capture: true })
+      el.addEventListener("selectstart", onSelectStart)
       window.addEventListener("mousemove", onMouseMove)
       window.addEventListener("mouseup", onMouseUp)
     }
 
     const detach = () => {
       if (!container) return
-      container.removeEventListener("mousedown", onMouseDown, { capture: true })
+      window.removeEventListener("mousedown", onMouseDown, { capture: true })
+      container.removeEventListener("dragstart", onDragStart, { capture: true })
+      container.removeEventListener("selectstart", onSelectStart)
       window.removeEventListener("mousemove", onMouseMove)
       window.removeEventListener("mouseup", onMouseUp)
       container = null

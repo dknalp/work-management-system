@@ -7,17 +7,24 @@ thread executor to avoid blocking the event loop.
 
 import asyncio
 import os
-from functools import partial
+from functools import lru_cache, partial
 from typing import IO, Any
 
 import boto3
 from botocore.config import Config
 
 
+@lru_cache(maxsize=1)
 def get_r2_client() -> Any:
-    """Create and return a configured boto3 S3 client pointing at R2."""
-    # Accept both CLOUDFLARE_ACCOUNT_ID (documented in CLAUDE.md / .env.example)
-    # and the legacy R2_ACCOUNT_ID name so neither breaks.
+    """Return a configured boto3 S3 client pointing at R2.
+
+    The client is created once and cached for the lifetime of the process.
+    Re-reading env vars on every call is unnecessary and creates a new TCP
+    connection pool each time. If env vars change, restart the process.
+
+    Accepts both CLOUDFLARE_ACCOUNT_ID (documented in CLAUDE.md / .env.example)
+    and the legacy R2_ACCOUNT_ID name so neither breaks.
+    """
     account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID") or os.environ.get("R2_ACCOUNT_ID", "")
     return boto3.client(
         "s3",
@@ -37,7 +44,7 @@ async def r2_upload_fileobj(file_obj: IO[bytes], key: str, content_type: str) ->
     """Upload a file-like object to R2 (runs in thread executor)."""
     client = get_r2_client()
     bucket = get_bucket()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(
         None,
         partial(
@@ -54,7 +61,7 @@ async def r2_delete_object(key: str) -> None:
     """Delete an object from R2."""
     client = get_r2_client()
     bucket = get_bucket()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     await loop.run_in_executor(
         None,
         partial(client.delete_object, Bucket=bucket, Key=key),
@@ -65,7 +72,7 @@ async def r2_copy_object(source_key: str, dest_key: str) -> None:
     """Copy an object within R2."""
     client = get_r2_client()
     bucket = get_bucket()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     copy_source = {"Bucket": bucket, "Key": source_key}
     await loop.run_in_executor(
         None,
@@ -77,7 +84,7 @@ async def r2_get_object_bytes(key: str) -> bytes:
     """Download an object from R2 and return its bytes."""
     client = get_r2_client()
     bucket = get_bucket()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _get() -> bytes:
         response = client.get_object(Bucket=bucket, Key=key)
@@ -90,7 +97,7 @@ async def r2_generate_presigned_url(key: str, expires_in: int = 3600, dispositio
     """Generate a presigned GET URL for an R2 object."""
     client = get_r2_client()
     bucket = get_bucket()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _sign() -> str:
         return client.generate_presigned_url(
@@ -112,7 +119,7 @@ async def r2_delete_objects(keys: list[str]) -> None:
         return
     client = get_r2_client()
     bucket = get_bucket()
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     objects = [{"Key": k} for k in keys]
     await loop.run_in_executor(
         None,

@@ -10,8 +10,11 @@ import type { FileItem } from "@/components/files/file-utils"
 import { fileRecordToItem } from "@/components/files/file-utils"
 import { FileExplorer } from "@/components/files/file-explorer"
 import { TrashView } from "@/components/files/trash-view"
-import { listFiles, listStarred, listRecent, getQuota } from "@/lib/actions/files"
+import { listFiles, listStarred, listRecent, getQuota, importFromDrive } from "@/lib/actions/files"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useDrivePicker } from "@/hooks/use-drive-picker"
+import { toast } from "sonner"
+import { HardDriveDownloadIcon } from "lucide-react"
 
 interface FileClientPageProps {
   initialItems: FileItem[]
@@ -33,11 +36,34 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   const [showPreview, setShowPreview] = React.useState(false)
   const [state, setState] = React.useState<LoadState>({ status: "loading" })
   const [quota, setQuota] = React.useState<{ used_bytes: number; file_count: number } | null>(null)
+  const [driveImporting, setDriveImporting] = React.useState(false)
+  const { openPicker } = useDrivePicker()
 
   // Load quota once on mount
   React.useEffect(() => {
     getQuota().then(setQuota).catch(() => {})
   }, [])
+
+  const handleDriveImport = React.useCallback(async () => {
+    setDriveImporting(true)
+    try {
+      const result = await openPicker()
+      if (!result) {
+        // User cancelled the picker
+        return
+      }
+      toast.loading(`"${result.fileName}" Drive'dan içe aktarılıyor...`, { id: "drive-import" })
+      await importFromDrive(result.fileId, result.accessToken, currentPath)
+      toast.success(`"${result.fileName}" başarıyla içe aktarıldı`, { id: "drive-import" })
+      // Refresh file list
+      window.dispatchEvent(new Event("wms:files:changed"))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "İçe aktarma başarısız"
+      toast.error(msg, { id: "drive-import" })
+    } finally {
+      setDriveImporting(false)
+    }
+  }, [openPicker, currentPath])
 
   const load = React.useCallback(async () => {
     setState({ status: "loading" })
@@ -221,13 +247,27 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
             <LayoutGridIcon className="size-4" />
           </button>
         </div>
-        {quota && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{usedGB ? `${usedGB} GB` : `${usedMB} MB`} kullanıldı</span>
-            <span className="text-muted-foreground/50">·</span>
-            <span>{quota.file_count} dosya</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Drive import button */}
+          <button
+            onClick={handleDriveImport}
+            disabled={driveImporting}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Google Drive'dan dosya içe aktar"
+          >
+            <HardDriveDownloadIcon className="size-3.5" />
+            <span>{"Drive'dan İçe Aktar"}</span>
+          </button>
+
+          {quota && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="text-muted-foreground/50">·</span>
+              <span>{usedGB ? `${usedGB} GB` : `${usedMB} MB`} kullanıldı</span>
+              <span className="text-muted-foreground/50">·</span>
+              <span>{quota.file_count} dosya</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 min-h-0">
