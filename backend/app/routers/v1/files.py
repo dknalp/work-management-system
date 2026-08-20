@@ -215,21 +215,20 @@ def _get_record_or_404(file_id: str, current_user: User, session: Session) -> Fi
     except ValueError:
         raise HTTPException(status_code=404, detail="File not found")
     record = session.get(FileRecord, uid)
-    if not record or record.owner_id != current_user.id:
+    if not record or record.is_deleted:
         raise HTTPException(status_code=404, detail="File not found")
     return record
 
 
 def _cascade_rename(
     session: Session,
-    owner_id: uuid.UUID,
+    _owner_id: uuid.UUID,
     old_prefix: str,
     new_prefix: str,
 ) -> None:
     """Update path / parent_path for all descendants after a rename/move."""
     children = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == owner_id,
             col(FileRecord.path).startswith(old_prefix + "/"),
         )
     ).all()
@@ -255,7 +254,6 @@ def list_files(
     """List files/folders at the given path (non-recursive)."""
     parent = path.strip("/")
     stmt = select(FileRecord).where(
-        FileRecord.owner_id == current_user.id,
         FileRecord.parent_path == parent,
         FileRecord.is_deleted == show_trash,
     )
@@ -283,7 +281,6 @@ async def upload_file(
     # Conflict check
     existing = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.path == full_path,
             FileRecord.is_deleted == False,  # noqa: E712
         )
@@ -294,7 +291,7 @@ async def upload_file(
 
     mime = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
     file_id = uuid.uuid4()
-    r2_key = f"{current_user.id}/{file_id}"
+    r2_key = f"shared/{file_id}"
 
     # --- Upload to storage and determine real size ---
     size: Optional[int] = file.size  # may be None for streams
@@ -491,7 +488,6 @@ def create_folder(
 
     existing = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.path == full_path,
         )
     ).first()
@@ -525,7 +521,6 @@ def rename_file(
 
     conflict = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.path == new_path,
             FileRecord.id != record.id,
         )
@@ -561,7 +556,6 @@ def move_file(
 
     conflict = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.path == new_path,
             FileRecord.id != record.id,
         )
@@ -579,7 +573,6 @@ def move_file(
         _cascade_rename(session, current_user.id, old_prefix, new_path)
         children = session.exec(
             select(FileRecord).where(
-                FileRecord.owner_id == current_user.id,
                 col(FileRecord.path).startswith(new_path + "/"),
             )
         ).all()
@@ -609,7 +602,6 @@ async def copy_file(
 
     conflict = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.path == dest_path,
         )
     ).first()
@@ -622,7 +614,7 @@ async def copy_file(
         dest_path = _build_path(dest_parent, copy_name)
 
     new_id = uuid.uuid4()
-    new_r2_key = f"{current_user.id}/{new_id}"
+    new_r2_key = f"shared/{new_id}"
 
     if _use_r2():
         if record.r2_key:
@@ -667,7 +659,6 @@ def trash_file(
     if record.type == "folder":
         children = session.exec(
             select(FileRecord).where(
-                FileRecord.owner_id == current_user.id,
                 col(FileRecord.path).startswith(record.path + "/"),
             )
         ).all()
@@ -719,7 +710,6 @@ async def delete_permanent(
     if record.type == "folder":
         children = session.exec(
             select(FileRecord).where(
-                FileRecord.owner_id == current_user.id,
                 col(FileRecord.path).startswith(record.path + "/"),
             )
         ).all()
@@ -750,7 +740,6 @@ async def empty_trash(
     """Permanently delete all trashed files for the current user."""
     trashed = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.is_deleted == True,  # noqa: E712
         )
     ).all()
@@ -783,7 +772,6 @@ def get_quota(
             func.coalesce(func.sum(FileRecord.size), 0),
             func.count(FileRecord.id),
         ).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.is_deleted == False,  # noqa: E712
             FileRecord.type == "file",
         )
@@ -811,7 +799,7 @@ async def download_zip(
         except ValueError:
             continue
         record = session.get(FileRecord, uid)
-        if record and record.owner_id == current_user.id and not record.is_deleted:
+        if record and not record.is_deleted:
             records.append(record)
 
     if not records:
@@ -899,7 +887,6 @@ def search_files(
     from sqlalchemy import or_
 
     stmt = select(FileRecord).where(
-        FileRecord.owner_id == current_user.id,
         FileRecord.is_deleted == False,  # noqa: E712
     )
 
@@ -998,10 +985,9 @@ def list_starred(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Return all starred (non-deleted) files for the current user."""
+    """Return all starred (non-deleted) files."""
     records = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.is_starred == True,  # noqa: E712
             FileRecord.is_deleted == False,  # noqa: E712
         )
@@ -1028,7 +1014,6 @@ def list_recent(
         select(FileRecord)
         .join(subq, FileRecord.id == subq.c.file_id)
         .where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.is_deleted == False,  # noqa: E712
         )
         .order_by(col(subq.c.last_access).desc())
@@ -1169,7 +1154,7 @@ async def bulk_copy(
             new_name = record.name
             new_path = _build_path(body.dest_parent, new_name)
             new_id = uuid.uuid4()
-            new_r2_key = f"{current_user.id}/{new_id}"
+            new_r2_key = f"shared/{new_id}"
             if record.r2_key and record.type == "file":
                 if _use_r2():
                     await r2_copy_object(record.r2_key, new_r2_key)
@@ -1264,7 +1249,6 @@ async def import_from_drive(
     # ── 2. Conflict check ────────────────────────────────────────────────────
     existing = session.exec(
         select(FileRecord).where(
-            FileRecord.owner_id == current_user.id,
             FileRecord.path == full_path,
             FileRecord.is_deleted == False,  # noqa: E712
         )
@@ -1290,7 +1274,7 @@ async def import_from_drive(
 
     # ── 4. Upload to storage ─────────────────────────────────────────────────
     new_id = uuid.uuid4()
-    r2_key = f"{current_user.id}/{new_id}"
+    r2_key = f"shared/{new_id}"
 
     if _use_r2():
         await r2_upload_fileobj(buf, r2_key, info.mime_type)
