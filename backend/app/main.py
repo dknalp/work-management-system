@@ -225,10 +225,11 @@ app.include_router(v1_files.router, prefix=_V1)
 
 @app.get("/health", tags=["health"])
 def health_check():
-    """Public health endpoint — shows DB connectivity, table presence, CORS config, and env."""
+    """Public health endpoint — full diagnostics for deployment debugging."""
     import os
     from sqlalchemy import text as _text
     from app.database import engine
+    from app.security import verify_password
 
     def _check_table(conn, name: str) -> bool:
         r = conn.execute(
@@ -248,6 +249,8 @@ def health_check():
     tables: dict = {}
     columns: dict = {}
     db_error: str = ""
+    users_info: dict = {}
+    login_test: dict = {}
 
     WATCHED_TABLES = [
         "users", "tasks", "file_records", "file_access_logs", "file_shares",
@@ -260,6 +263,9 @@ def health_check():
         "tasks": ["assignees", "completed_at"],
     }
 
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip()
+    admin_password = os.getenv("ADMIN_PASSWORD", "").strip()
+
     try:
         with engine.connect() as conn:
             db_ok = True
@@ -269,26 +275,72 @@ def health_check():
                 if tables.get(table):
                     columns[table] = {c: _check_column(conn, table, c) for c in cols}
                 else:
-                    columns[table] = {c: None for c in cols}  # None = table missing
+                    columns[table] = {c: None for c in cols}
+
+            # User summary
+            total_users = conn.execute(_text("SELECT COUNT(*) FROM users")).scalar()
+            admin_users = conn.execute(_text("SELECT COUNT(*) FROM users WHERE is_admin=true OR role='admin'")).scalar()
+            users_info = {
+                "total": total_users,
+                "admin_count": admin_users,
+                "ADMIN_EMAIL_set": bool(admin_email),
+                "ADMIN_EMAIL_value": admin_email or "(not set)",
+                "ADMIN_PASSWORD_set": bool(admin_password),
+            }
+
+            # Check if ADMIN_EMAIL user exists and password is correct
+            if admin_email:
+                row = conn.execute(
+                    _text("SELECT id, email, is_admin, role, is_active, hashed_password FROM users WHERE email=:e"),
+                    {"e": admin_email},
+                ).fetchone()
+                if row is None:
+                    login_test = {
+                        "user_found": False,
+                        "reason": "No user with ADMIN_EMAIL exists in DB — seed may not have run",
+                    }
+                else:
+                    pwd_ok = verify_password(admin_password, row.hashed_password) if admin_password else False
+                    login_test = {
+                        "user_found": True,
+                        "user_id": str(row.id),
+                        "is_admin": row.is_admin,
+                        "role": row.role,
+                        "is_active": row.is_active,
+                        "password_correct": pwd_ok,
+                        "diagnosis": (
+                            "OK — credentials match" if pwd_ok
+                            else "WRONG PASSWORD — ADMIN_PASSWORD env var does not match stored hash"
+                            if admin_password else "ADMIN_PASSWORD not set"
+                        ),
+                    }
+            else:
+                login_test = {"skipped": "ADMIN_EMAIL not set"}
+
     except Exception as e:
         db_error = str(e)
 
     env_info = {
         "FRONTEND_URL": os.getenv("FRONTEND_URL", "(not set)"),
-        "NEXT_PUBLIC_API_URL": os.getenv("NEXT_PUBLIC_API_URL", "(not set — frontend var)"),
+        "FRONTEND_URL_stripped": os.getenv("FRONTEND_URL", "").strip().rstrip("/") or "(not set)",
+        "ALLOWED_ORIGINS": ALLOWED_ORIGINS,
         "DATABASE_URL_set": bool(os.getenv("DATABASE_URL")),
         "SECRET_KEY_set": bool(os.getenv("SECRET_KEY")),
         "R2_configured": bool(os.getenv("CLOUDFLARE_ACCOUNT_ID") and os.getenv("R2_BUCKET_NAME")),
     }
 
+    all_ok = db_ok and login_test.get("password_correct", False)
+
     return {
-        "status": "ok" if db_ok else "degraded",
+        "status": "ok" if all_ok else "degraded",
         "database": {
             "connected": db_ok,
             "error": db_error or None,
             "tables": tables,
             "columns": columns,
         },
+        "users": users_info,
+        "login_test": login_test,
         "cors": {
             "allowed_origins": ALLOWED_ORIGINS,
         },
