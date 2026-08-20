@@ -11,6 +11,8 @@ import { fileRecordToItem } from "@/components/files/file-utils"
 import { FileExplorer } from "@/components/files/file-explorer"
 import { TrashView } from "@/components/files/trash-view"
 import { listFiles, listStarred, listRecent, getQuota, importFromDrive } from "@/lib/actions/files"
+import { API_BASE_URL } from "@/lib/api"
+import { tokenStorage } from "@/lib/auth"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useDrivePicker } from "@/hooks/use-drive-picker"
 import { toast } from "sonner"
@@ -37,6 +39,9 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   const [state, setState] = React.useState<LoadState>({ status: "loading" })
   const [quota, setQuota] = React.useState<{ used_bytes: number; file_count: number } | null>(null)
   const [driveImporting, setDriveImporting] = React.useState(false)
+  const [folderProgress, setFolderProgress] = React.useState<{
+    folder: string; done: number; total: number
+  } | null>(null)
   const { openPicker } = useDrivePicker()
 
   // Load quota once on mount
@@ -48,16 +53,84 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
     setDriveImporting(true)
     try {
       const result = await openPicker()
-      if (!result) {
-        // User cancelled the picker
-        return
+      if (!result || result.items.length === 0) return
+
+      const folders = result.items.filter((i) => i.isFolder)
+      const files   = result.items.filter((i) => !i.isFolder)
+
+      // ── Import individual files (non-folder) in parallel ──
+      if (files.length > 0) {
+        const label = files.length === 1 ? `"${files[0].fileName}"` : `${files.length} dosya`
+        toast.loading(`${label} Drive'dan içe aktarılıyor...`, { id: "drive-import" })
+        await Promise.all(files.map((item) => importFromDrive(item.fileId, result.accessToken, currentPath, false)))
+        toast.success(`${label} başarıyla içe aktarıldı`, { id: "drive-import" })
+        window.dispatchEvent(new Event("wms:files:changed"))
       }
-      toast.loading(`"${result.fileName}" Drive'dan içe aktarılıyor...`, { id: "drive-import" })
-      await importFromDrive(result.fileId, result.accessToken, currentPath)
-      toast.success(`"${result.fileName}" başarıyla içe aktarıldı`, { id: "drive-import" })
-      // Refresh file list
-      window.dispatchEvent(new Event("wms:files:changed"))
+
+      // ── Import folders via SSE stream ──
+      for (const folder of folders) {
+        const token = tokenStorage.getAccess()
+        const res = await fetch(`${API_BASE_URL}/api/v1/files/import-folder-stream`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            folder_id: folder.fileId,
+            access_token: result.accessToken,
+            parent_path: currentPath,
+          }),
+        })
+
+        if (!res.ok || !res.body) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error((body as { detail?: string }).detail ?? "Klasör aktarımı başarısız")
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() ?? ""
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue
+            try {
+              const event = JSON.parse(line.slice(6)) as {
+                type: string; total?: number; done?: number; folder?: string
+                imported?: number; skipped?: number; errors?: string[]; message?: string
+              }
+
+              if (event.type === "start") {
+                setFolderProgress({ folder: event.folder ?? folder.fileName, done: 0, total: event.total ?? 0 })
+              } else if (event.type === "progress") {
+                setFolderProgress((p) => p ? { ...p, done: event.done ?? p.done } : null)
+              } else if (event.type === "done") {
+                setFolderProgress(null)
+                toast.success(
+                  `📁 "${folder.fileName}" — ${event.imported} dosya aktarıldı` +
+                  (event.skipped ? `, ${event.skipped} atlandı` : "") +
+                  (event.errors?.length ? `, ${event.errors.length} hata` : ""),
+                )
+                window.dispatchEvent(new Event("wms:files:changed"))
+              } else if (event.type === "error") {
+                setFolderProgress(null)
+                throw new Error(event.message ?? "Klasör aktarımı başarısız")
+              }
+            } catch {
+              // skip malformed SSE lines
+            }
+          }
+        }
+      }
     } catch (err) {
+      setFolderProgress(null)
       const msg = err instanceof Error ? err.message : "İçe aktarma başarısız"
       toast.error(msg, { id: "drive-import" })
     } finally {
@@ -258,6 +331,27 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
             <HardDriveDownloadIcon className="size-3.5" />
             <span>{"Drive'dan İçe Aktar"}</span>
           </button>
+
+          {/* Folder import progress bar */}
+          {folderProgress && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="text-muted-foreground/50">·</span>
+              <span className="max-w-[120px] truncate" title={folderProgress.folder}>
+                📁 {folderProgress.folder}
+              </span>
+              <div className="relative h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all duration-300"
+                  style={{
+                    width: folderProgress.total > 0
+                      ? `${Math.round((folderProgress.done / folderProgress.total) * 100)}%`
+                      : "0%"
+                  }}
+                />
+              </div>
+              <span>{folderProgress.done}/{folderProgress.total}</span>
+            </div>
+          )}
 
           {quota && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

@@ -195,10 +195,11 @@ class FileRecord(SQLModel, table=True):
     """
     __tablename__ = "file_records"
     __table_args__ = (
-        UniqueConstraint("owner_id", "path", name="uq_file_record_owner_path"),
+        UniqueConstraint("path", name="uq_file_record_path"),
     )
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    # owner_id records who uploaded the file; access is shared across all users
     owner_id: uuid.UUID = Field(foreign_key="users.id", index=True)
 
     # Human-readable display name, e.g. "report.pdf"

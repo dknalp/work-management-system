@@ -177,6 +177,17 @@ class DriveImportBody(BaseModel):
     overwrite: bool = False
     """If True, replace an existing file with the same name at parent_path."""
 
+    is_folder: bool = False
+    """If True, file_id points to a Drive folder — recursively import all files inside."""
+
+
+class DriveImportFolderResult(BaseModel):
+    """Response for a folder import (many files)."""
+    folder_name: str
+    imported: int
+    skipped: int
+    errors: list[str]
+
 
 # ---------------------------------------------------------------------------
 # Internal utilities
@@ -1211,31 +1222,163 @@ def bulk_trash(
 # Google Drive import
 # ---------------------------------------------------------------------------
 
-@router.post("/import-from-drive", response_model=FileRecordResponse)
+@router.post("/import-from-drive")
 async def import_from_drive(
     body: DriveImportBody,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> FileRecordResponse:
-    """Import a file from Google Drive into R2 (or local disk) storage.
+) -> FileRecordResponse | DriveImportFolderResult:
+    """Import a file or folder from Google Drive into R2 (or local disk) storage.
 
-    Flow:
+    Single file flow:
     1. Resolve Drive file metadata (name, MIME type, size).
-    2. Conflict check: if a file with the same name already exists at
-       ``parent_path``, return 409 unless ``overwrite=True``.
-    3. Stream file bytes from Drive into a BytesIO buffer.
-       Google Workspace documents are automatically exported to their Office
-       equivalent (Docs→DOCX, Sheets→XLSX, Slides→PPTX, Drawings→PNG).
-    4. Upload the buffer to R2 (or write to local disk).
-    5. Persist a ``FileRecord`` with the resolved metadata.
+    2. Conflict check — return 409 unless overwrite=True.
+    3. Stream file bytes (Workspace docs exported to Office format).
+    4. Upload to R2 / local disk.
+    5. Persist FileRecord.
 
-    The ``access_token`` is used only during this request and is never stored.
+    Folder flow (is_folder=True):
+    1. Recursively list all files inside the Drive folder.
+    2. For each file: download + upload + persist (same as single file).
+    3. Return DriveImportFolderResult with counts.
+
+    The access_token is used only during this request and is never stored.
     """
     import logging
-    from app.google_drive import download_drive_file, get_drive_file_info
+    from app.google_drive import download_drive_file, get_drive_file_info, list_drive_folder
 
     _log = logging.getLogger(__name__)
 
+    # ── FOLDER BRANCH ────────────────────────────────────────────────────────
+    if body.is_folder:
+        # Get folder name first
+        try:
+            folder_info = await get_drive_file_info(body.access_token, body.file_id)
+        except Exception as exc:
+            _log.error("Drive folder metadata failed: %s", exc)
+            raise HTTPException(status_code=502, detail="Failed to fetch folder metadata from Google Drive")
+
+        parent = body.parent_path.strip("/")
+        folder_dest = _build_path(parent, folder_info.name)
+
+        # Ensure folder record exists in DB
+        existing_folder = session.exec(
+            select(FileRecord).where(FileRecord.path == folder_dest, FileRecord.is_deleted == False)  # noqa: E712
+        ).first()
+        if not existing_folder:
+            folder_record = FileRecord(
+                id=uuid.uuid4(),
+                owner_id=current_user.id,
+                name=folder_info.name,
+                path=folder_dest,
+                parent_path=parent,
+                type="folder",
+                size=0,
+            )
+            session.add(folder_record)
+            session.commit()
+
+        # Recursively list all files
+        try:
+            drive_files = await list_drive_folder(body.access_token, body.file_id)
+        except Exception as exc:
+            _log.error("Drive folder listing failed: %s", exc)
+            raise HTTPException(status_code=502, detail="Failed to list Google Drive folder contents")
+
+        imported = 0
+        skipped = 0
+        errors: list[str] = []
+
+        for file_info, rel_path in drive_files:
+            dest_path = _build_path(folder_dest, rel_path)
+            dest_parent = str(Path(dest_path).parent) if "/" in dest_path else folder_dest
+
+            # Ensure intermediate folders exist
+            parts = rel_path.split("/")
+            if len(parts) > 1:
+                cumulative = folder_dest
+                for part in parts[:-1]:
+                    cumulative = _build_path(cumulative, part)
+                    existing_sub = session.exec(
+                        select(FileRecord).where(FileRecord.path == cumulative, FileRecord.is_deleted == False)  # noqa: E712
+                    ).first()
+                    if not existing_sub:
+                        sub_folder = FileRecord(
+                            id=uuid.uuid4(),
+                            owner_id=current_user.id,
+                            name=part,
+                            path=cumulative,
+                            parent_path=str(Path(cumulative).parent) if "/" in cumulative else folder_dest,
+                            type="folder",
+                            size=0,
+                        )
+                        session.add(sub_folder)
+                        session.commit()
+
+            # Skip if already exists and not overwriting
+            existing_file = session.exec(
+                select(FileRecord).where(FileRecord.path == dest_path, FileRecord.is_deleted == False)  # noqa: E712
+            ).first()
+            if existing_file and not body.overwrite:
+                skipped += 1
+                continue
+
+            try:
+                buf, actual_size = await download_drive_file(body.access_token, file_info.file_id, file_info.original_mime)
+            except Exception as exc:
+                _log.warning("Drive file download failed: %s %s", file_info.name, exc)
+                errors.append(file_info.name)
+                continue
+
+            new_id = uuid.uuid4()
+            r2_key = f"shared/{new_id}"
+            try:
+                if _use_r2():
+                    await r2_upload_fileobj(buf, r2_key, file_info.mime_type)
+                else:
+                    disk_path = _local_path(r2_key)
+                    disk_path.parent.mkdir(parents=True, exist_ok=True)
+                    disk_path.write_bytes(buf.read())
+            except Exception as exc:
+                _log.warning("Drive file upload failed: %s %s", file_info.name, exc)
+                errors.append(file_info.name)
+                continue
+
+            if existing_file and body.overwrite:
+                existing_file.r2_key = r2_key
+                existing_file.mime_type = file_info.mime_type
+                existing_file.size = actual_size
+                existing_file.updated_at = _now()
+                session.add(existing_file)
+            else:
+                file_name = parts[-1]
+                record = FileRecord(
+                    id=new_id,
+                    owner_id=current_user.id,
+                    name=file_name,
+                    path=dest_path,
+                    parent_path=dest_parent,
+                    type="file",
+                    size=actual_size,
+                    mime_type=file_info.mime_type,
+                    r2_key=r2_key,
+                )
+                session.add(record)
+            session.commit()
+            imported += 1
+
+        _log.info(
+            "Drive folder import complete: user=%s folder=%r imported=%d skipped=%d errors=%d",
+            current_user.id, folder_info.name, imported, skipped, len(errors),
+        )
+        return DriveImportFolderResult(
+            folder_name=folder_info.name,
+            imported=imported,
+            skipped=skipped,
+            errors=errors,
+        )
+
+    # ── SINGLE FILE BRANCH ───────────────────────────────────────────────────
     # ── 1. Resolve metadata ──────────────────────────────────────────────────
     try:
         info = await get_drive_file_info(body.access_token, body.file_id)
@@ -1321,3 +1464,171 @@ async def import_from_drive(
         current_user.id, body.file_id, info.name, actual_size,
     )
     return _to_response(record)
+
+
+# ---------------------------------------------------------------------------
+# SSE folder import — streams progress events to the client
+# ---------------------------------------------------------------------------
+
+class DriveFolderImportBody(BaseModel):
+    folder_id: str
+    access_token: str
+    parent_path: str = ""
+    overwrite: bool = False
+
+
+@router.post("/import-folder-stream")
+async def import_folder_stream(
+    body: DriveFolderImportBody,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> StreamingResponse:
+    """Stream Server-Sent Events while importing a Drive folder.
+
+    Each event is a JSON line:
+      data: {"type": "start",    "total": N, "folder": "name"}
+      data: {"type": "progress", "done": N, "total": M, "name": "file.txt"}
+      data: {"type": "done",     "imported": N, "skipped": S, "errors": [...]}
+      data: {"type": "error",    "message": "..."}
+    """
+    import json as _json
+    from app.google_drive import download_drive_file, get_drive_file_info, list_drive_folder
+
+    _log = logging.getLogger(__name__)
+
+    async def event_stream():
+        # 1. Folder metadata
+        try:
+            folder_info = await get_drive_file_info(body.access_token, body.folder_id)
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            return
+
+        parent = body.parent_path.strip("/")
+        folder_dest = _build_path(parent, folder_info.name)
+
+        # Ensure top-level folder record exists
+        existing_folder = session.exec(
+            select(FileRecord).where(FileRecord.path == folder_dest, FileRecord.is_deleted == False)  # noqa: E712
+        ).first()
+        if not existing_folder:
+            folder_record = FileRecord(
+                id=uuid.uuid4(),
+                owner_id=current_user.id,
+                name=folder_info.name,
+                path=folder_dest,
+                parent_path=parent,
+                type="folder",
+                size=0,
+            )
+            session.add(folder_record)
+            session.commit()
+
+        # 2. List all files recursively
+        try:
+            drive_files = await list_drive_folder(body.access_token, body.folder_id)
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            return
+
+        total = len(drive_files)
+        yield f"data: {_json.dumps({'type': 'start', 'total': total, 'folder': folder_info.name})}\n\n"
+
+        imported = 0
+        skipped = 0
+        errors: list[str] = []
+
+        for idx, (file_info, rel_path) in enumerate(drive_files):
+            dest_path = _build_path(folder_dest, rel_path)
+            parts = rel_path.split("/")
+            dest_parent = _build_path(folder_dest, "/".join(parts[:-1])) if len(parts) > 1 else folder_dest
+
+            # Ensure intermediate sub-folders
+            if len(parts) > 1:
+                cumulative = folder_dest
+                for part in parts[:-1]:
+                    cumulative = _build_path(cumulative, part)
+                    existing_sub = session.exec(
+                        select(FileRecord).where(FileRecord.path == cumulative, FileRecord.is_deleted == False)  # noqa: E712
+                    ).first()
+                    if not existing_sub:
+                        sub_folder = FileRecord(
+                            id=uuid.uuid4(),
+                            owner_id=current_user.id,
+                            name=part,
+                            path=cumulative,
+                            parent_path=str(Path(cumulative).parent) if "/" in cumulative else folder_dest,
+                            type="folder",
+                            size=0,
+                        )
+                        session.add(sub_folder)
+                        session.commit()
+
+            # Conflict check
+            existing_file = session.exec(
+                select(FileRecord).where(FileRecord.path == dest_path, FileRecord.is_deleted == False)  # noqa: E712
+            ).first()
+            if existing_file and not body.overwrite:
+                skipped += 1
+                yield f"data: {_json.dumps({'type': 'progress', 'done': idx + 1, 'total': total, 'name': file_info.name, 'skipped': True})}\n\n"
+                continue
+
+            # Download from Drive
+            try:
+                buf, actual_size = await download_drive_file(body.access_token, file_info.file_id, file_info.original_mime)
+            except Exception as exc:
+                _log.warning("Drive file download failed: %s %s", file_info.name, exc)
+                errors.append(file_info.name)
+                yield f"data: {_json.dumps({'type': 'progress', 'done': idx + 1, 'total': total, 'name': file_info.name, 'error': True})}\n\n"
+                continue
+
+            # Upload to storage
+            new_id = uuid.uuid4()
+            r2_key = f"shared/{new_id}"
+            try:
+                if _use_r2():
+                    await r2_upload_fileobj(buf, r2_key, file_info.mime_type)
+                else:
+                    disk_path = _local_path(r2_key)
+                    disk_path.parent.mkdir(parents=True, exist_ok=True)
+                    disk_path.write_bytes(buf.read())
+            except Exception as exc:
+                _log.warning("Drive file upload failed: %s %s", file_info.name, exc)
+                errors.append(file_info.name)
+                yield f"data: {_json.dumps({'type': 'progress', 'done': idx + 1, 'total': total, 'name': file_info.name, 'error': True})}\n\n"
+                continue
+
+            # Persist DB record
+            if existing_file and body.overwrite:
+                existing_file.r2_key = r2_key
+                existing_file.mime_type = file_info.mime_type
+                existing_file.size = actual_size
+                existing_file.updated_at = _now()
+                session.add(existing_file)
+            else:
+                session.add(FileRecord(
+                    id=new_id,
+                    owner_id=current_user.id,
+                    name=parts[-1],
+                    path=dest_path,
+                    parent_path=dest_parent,
+                    type="file",
+                    size=actual_size,
+                    mime_type=file_info.mime_type,
+                    r2_key=r2_key,
+                ))
+            session.commit()
+            imported += 1
+
+            yield f"data: {_json.dumps({'type': 'progress', 'done': idx + 1, 'total': total, 'name': file_info.name})}\n\n"
+
+        yield f"data: {_json.dumps({'type': 'done', 'imported': imported, 'skipped': skipped, 'errors': errors})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disable nginx buffering
+        },
+    )

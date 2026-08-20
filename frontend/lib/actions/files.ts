@@ -416,6 +416,7 @@ export async function importFromDrive(
   fileId: string,
   accessToken: string,
   parentPath: string = "",
+  isFolder: boolean = false,
   overwrite: boolean = false,
 ): Promise<DriveImportResult> {
   const token = tokenStorage.getAccess()
@@ -429,6 +430,7 @@ export async function importFromDrive(
       file_id: fileId,
       access_token: accessToken,
       parent_path: parentPath,
+      is_folder: isFolder,
       overwrite,
     }),
   })

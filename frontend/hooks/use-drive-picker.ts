@@ -22,10 +22,16 @@
 
 import { useCallback } from "react"
 
-export interface DrivePickerResult {
+export interface DrivePickerItem {
   fileId: string
   fileName: string
   mimeType: string
+  isFolder: boolean
+}
+
+export interface DrivePickerResult {
+  /** All selected items (files and/or folders). */
+  items: DrivePickerItem[]
   /** Short-lived OAuth access token (drive.readonly scope, ~1 h TTL). */
   accessToken: string
 }
@@ -55,6 +61,7 @@ declare global {
         DocsView: new () => GoogleDocsView
         Action: { PICKED: string; CANCEL: string }
         ViewId: { DOCS: string }
+        Feature: { MULTISELECT_ENABLED: string }
       }
     }
   }
@@ -152,22 +159,25 @@ export function useDrivePicker() {
 
           const accessToken = tokenResponse.access_token
 
-          // Step 2: Build and show the Picker
+          // Step 2: Build and show the Picker with multi-select + folder navigation
           const docsView = new window.google.picker.DocsView()
-            .setIncludeFolders(false)
-            .setSelectFolderEnabled(false)
+            .setIncludeFolders(true)      // show folders in the list
+            .setSelectFolderEnabled(true) // allow selecting a folder to import it recursively
 
           const picker = new window.google.picker.PickerBuilder()
             .addView(docsView)
+            .enableFeature(window.google.picker.Feature.MULTISELECT_ENABLED)
             .setOAuthToken(accessToken)
             .setDeveloperKey(apiKey)
             .setCallback((data: GooglePickerData) => {
               if (data.action === window.google.picker.Action.PICKED && data.docs?.length) {
-                const doc = data.docs[0]
                 resolve({
-                  fileId: doc.id,
-                  fileName: doc.name,
-                  mimeType: doc.mimeType,
+                  items: data.docs.map((doc) => ({
+                    fileId: doc.id,
+                    fileName: doc.name,
+                    mimeType: doc.mimeType,
+                    isFolder: doc.mimeType === "application/vnd.google-apps.folder",
+                  })),
                   accessToken,
                 })
               } else if (data.action === window.google.picker.Action.CANCEL) {

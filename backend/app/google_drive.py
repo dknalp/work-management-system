@@ -112,6 +112,87 @@ async def get_drive_file_info(access_token: str, file_id: str) -> DriveFileInfo:
     )
 
 
+async def list_drive_folder(
+    access_token: str,
+    folder_id: str,
+    relative_prefix: str = "",
+) -> list[tuple["DriveFileInfo", str]]:
+    """Recursively list all non-folder files inside a Drive folder.
+
+    Returns a list of (DriveFileInfo, relative_path) tuples where
+    relative_path is the path relative to the top-level folder root
+    (e.g. "subdir/file.txt").  Folders themselves are not included —
+    only leaf files that need to be downloaded.
+    """
+    headers = {"Authorization": f"Bearer {access_token}"}
+    results: list[tuple[DriveFileInfo, str]] = []
+    page_token: str | None = None
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        while True:
+            params: dict[str, str] = {
+                "q": f"'{folder_id}' in parents and trashed = false",
+                "fields": "nextPageToken,files(id,name,mimeType,size)",
+                "supportsAllDrives": "true",
+                "includeItemsFromAllDrives": "true",
+                "pageSize": "200",
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            resp = await client.get(
+                f"{DRIVE_API}/files",
+                headers=headers,
+                params=params,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            for item in data.get("files", []):
+                mime: str = item.get("mimeType", "application/octet-stream")
+                name: str = item.get("name", "untitled")
+                item_id: str = item["id"]
+                rel_path = f"{relative_prefix}/{name}" if relative_prefix else name
+
+                if mime == "application/vnd.google-apps.folder":
+                    # Recurse into sub-folder
+                    sub = await list_drive_folder(access_token, item_id, rel_path)
+                    results.extend(sub)
+                else:
+                    # Resolve export name/mime for Workspace docs
+                    if mime in _GWORKSPACE_EXPORT:
+                        resolved_mime, suffix = _GWORKSPACE_EXPORT[mime]
+                        if not name.endswith(suffix):
+                            rel_path = rel_path + suffix
+                            name = name + suffix
+                        size = 0
+                    else:
+                        resolved_mime = mime
+                        try:
+                            size = int(item.get("size", 0))
+                        except (TypeError, ValueError):
+                            size = 0
+
+                    info = DriveFileInfo(
+                        file_id=item_id,
+                        name=name,
+                        mime_type=resolved_mime,
+                        original_mime=mime,
+                        size=size,
+                    )
+                    results.append((info, rel_path))
+
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+    logger.info(
+        "Drive folder listed: folder_id=%s files=%d",
+        folder_id, len(results),
+    )
+    return results
+
+
 async def download_drive_file(
     access_token: str,
     file_id: str,
