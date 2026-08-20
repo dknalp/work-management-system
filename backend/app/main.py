@@ -221,3 +221,76 @@ app.include_router(v1_webhooks.router, prefix=_V1)
 app.include_router(v1_chat.router, prefix=_V1)
 app.include_router(v1_presence.router, prefix=_V1)
 app.include_router(v1_files.router, prefix=_V1)
+
+
+@app.get("/health", tags=["health"])
+def health_check():
+    """Public health endpoint — shows DB connectivity, table presence, CORS config, and env."""
+    import os
+    from sqlalchemy import text as _text
+    from app.database import engine
+
+    def _check_table(conn, name: str) -> bool:
+        r = conn.execute(
+            _text("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=:t)"),
+            {"t": name},
+        )
+        return bool(r.scalar())
+
+    def _check_column(conn, table: str, col: str) -> bool:
+        r = conn.execute(
+            _text("SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=:t AND column_name=:c)"),
+            {"t": table, "c": col},
+        )
+        return bool(r.scalar())
+
+    db_ok = False
+    tables: dict = {}
+    columns: dict = {}
+    db_error: str = ""
+
+    WATCHED_TABLES = [
+        "users", "tasks", "file_records", "file_access_logs", "file_shares",
+        "role_permissions", "projects", "pipelines", "kanban_tasks",
+        "calendar_events", "bots", "team_members",
+    ]
+    WATCHED_COLUMNS = {
+        "file_records": ["color", "icon_emoji", "is_starred"],
+        "users": ["role", "is_admin"],
+        "tasks": ["assignees", "completed_at"],
+    }
+
+    try:
+        with engine.connect() as conn:
+            db_ok = True
+            for t in WATCHED_TABLES:
+                tables[t] = _check_table(conn, t)
+            for table, cols in WATCHED_COLUMNS.items():
+                if tables.get(table):
+                    columns[table] = {c: _check_column(conn, table, c) for c in cols}
+                else:
+                    columns[table] = {c: None for c in cols}  # None = table missing
+    except Exception as e:
+        db_error = str(e)
+
+    env_info = {
+        "FRONTEND_URL": os.getenv("FRONTEND_URL", "(not set)"),
+        "NEXT_PUBLIC_API_URL": os.getenv("NEXT_PUBLIC_API_URL", "(not set — frontend var)"),
+        "DATABASE_URL_set": bool(os.getenv("DATABASE_URL")),
+        "SECRET_KEY_set": bool(os.getenv("SECRET_KEY")),
+        "R2_configured": bool(os.getenv("CLOUDFLARE_ACCOUNT_ID") and os.getenv("R2_BUCKET_NAME")),
+    }
+
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": {
+            "connected": db_ok,
+            "error": db_error or None,
+            "tables": tables,
+            "columns": columns,
+        },
+        "cors": {
+            "allowed_origins": ALLOWED_ORIGINS,
+        },
+        "env": env_info,
+    }
