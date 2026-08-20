@@ -1,6 +1,6 @@
 import { tokenStorage } from "./auth"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3052"
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3052").replace(/\/+$/, "")
 
 let isRefreshing = false
 let refreshPromise: Promise<string | null> | null = null
