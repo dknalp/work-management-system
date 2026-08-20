@@ -18,6 +18,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # SIGINT triggers uvicorn's clean shutdown path more reliably than SIGTERM.
+    # 10 s gives in-flight requests time to finish before Docker force-kills.
+    stop_signal: SIGINT
+    stop_grace_period: 10s
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/workos
       SECRET_KEY: ${SECRET_KEY:-change_this_in_production_min_32_chars}
