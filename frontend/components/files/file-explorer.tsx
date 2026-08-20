@@ -189,17 +189,17 @@ export function FileExplorer({
   const [lassoRect, setLassoRect] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null)
 
   React.useEffect(() => {
-    let startX = 0, startY = 0, active = false
+    let startX = 0, startY = 0
+    // "pending" = mousedown fired but we haven't moved enough to commit to lasso yet
+    let pending = false
+    let active = false
+    // If mousedown landed on a file row, remember it so we can keep the
+    // single-click select behaviour when the user doesn't actually drag.
+    let pendingOnRow = false
 
-    const onMove = (e: MouseEvent) => {
-      if (!active) return
-      const x = Math.min(startX, e.clientX)
-      const y = Math.min(startY, e.clientY)
-      const w = Math.abs(e.clientX - startX)
-      const h = Math.abs(e.clientY - startY)
-      setLassoRect({ x, y, w, h })
+    const DRAG_THRESHOLD = 5 // px — below this we treat it as a click, not a lasso
 
-      // Hit-test every [data-file-path] row against the lasso rect
+    const hitTest = (x: number, y: number, w: number, h: number) => {
       const el = scrollDivRef.current
       if (!el) return
       const newSelected = new Set<string>()
@@ -213,7 +213,31 @@ export function FileExplorer({
       setSelectedPaths(newSelected)
     }
 
+    const onMove = (e: MouseEvent) => {
+      if (!pending && !active) return
+      const dx = Math.abs(e.clientX - startX)
+      const dy = Math.abs(e.clientY - startY)
+
+      // Commit to lasso once the user has moved past the threshold
+      if (!active && (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD)) {
+        active = true
+        pending = false
+        // If we started on a file row, deselect it — lasso takes over
+        if (pendingOnRow) setSelectedPaths(new Set())
+      }
+
+      if (!active) return
+      const x = Math.min(startX, e.clientX)
+      const y = Math.min(startY, e.clientY)
+      const w = Math.abs(e.clientX - startX)
+      const h = Math.abs(e.clientY - startY)
+      setLassoRect({ x, y, w, h })
+      hitTest(x, y, w, h)
+    }
+
     const onUp = () => {
+      pending = false
+      pendingOnRow = false
       if (!active) return
       active = false
       setLassoRect(null)
@@ -223,17 +247,25 @@ export function FileExplorer({
 
     const onDown = (e: MouseEvent) => {
       if (e.button !== 0) return
-      const el = scrollDivRef.current
-      if (!el || !el.contains(e.target as Node)) return
+      // Accept clicks anywhere inside the outer container (includes the empty
+      // space below the table that lives outside scrollDivRef).
+      const container = containerRef.current
+      if (!container || !container.contains(e.target as Node)) return
       const t = e.target as HTMLElement
-      if (t.closest("[data-file-path]")) return
+      // Block interactive elements — never start a lasso on them
       if (t.closest('button, a, input, select, textarea, [role="menuitem"], [role="menu"]')) return
-      // Prevent browser from starting a native drag/text-selection
-      e.preventDefault()
+
       startX = e.clientX
       startY = e.clientY
-      active = true
+      pendingOnRow = !!t.closest("[data-file-path]")
+      pending = true
+      active = false
       setLassoRect(null)
+
+      // Only suppress the browser's native drag/text-select when we're NOT on
+      // a file row (so row click → drag-to-move still works).
+      if (!pendingOnRow) e.preventDefault()
+
       window.addEventListener("mousemove", onMove)
       window.addEventListener("mouseup", onUp)
     }
