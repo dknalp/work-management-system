@@ -153,11 +153,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="WorkOS API", version="1.0.0", lifespan=lifespan)
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3051")
+_raw_origins = os.getenv("FRONTEND_URL", "http://localhost:3051")
+ALLOWED_ORIGINS: list[str] = [o.strip().rstrip("/") for o in _raw_origins.split(",") if o.strip()]
+# Back-compat: keep FRONTEND_URL pointing to the first entry
+FRONTEND_URL = ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "http://localhost:3051"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -166,7 +169,7 @@ app.add_middleware(
 
 def _cors_headers(request: Request) -> dict:
     origin = request.headers.get("origin", "")
-    if origin == FRONTEND_URL:
+    if origin in ALLOWED_ORIGINS:
         return {
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",

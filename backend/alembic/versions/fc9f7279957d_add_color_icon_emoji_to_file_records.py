@@ -18,13 +18,45 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
+def _table_exists(table_name: str) -> bool:
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema='public' AND table_name=:t)"
+        ),
+        {"t": table_name},
+    )
+    return result.scalar()
+
+
+def _column_exists(table_name: str, column_name: str) -> bool:
+    conn = op.get_bind()
+    result = conn.execute(
+        sa.text(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name=:t AND column_name=:c)"
+        ),
+        {"t": table_name, "c": column_name},
+    )
+    return result.scalar()
+
+
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column('file_records', sa.Column('color', sa.String(length=32), nullable=True))
-    op.add_column('file_records', sa.Column('icon_emoji', sa.String(length=8), nullable=True))
+    if not _table_exists('file_records'):
+        return
+    if not _column_exists('file_records', 'color'):
+        op.add_column('file_records', sa.Column('color', sa.String(length=32), nullable=True))
+    if not _column_exists('file_records', 'icon_emoji'):
+        op.add_column('file_records', sa.Column('icon_emoji', sa.String(length=8), nullable=True))
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_column('file_records', 'icon_emoji')
-    op.drop_column('file_records', 'color')
+    if not _table_exists('file_records'):
+        return
+    if _column_exists('file_records', 'icon_emoji'):
+        op.drop_column('file_records', 'icon_emoji')
+    if _column_exists('file_records', 'color'):
+        op.drop_column('file_records', 'color')
