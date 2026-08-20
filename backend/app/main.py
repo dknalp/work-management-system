@@ -9,7 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 
-load_dotenv()
+from pathlib import Path
+
+# Load .env from the repo root first, then fall back to backend/.env
+_repo_root = Path(__file__).resolve().parents[2]
+load_dotenv(_repo_root / ".env")
+load_dotenv(_repo_root / "backend" / ".env", override=False)
 
 from sqlalchemy import text
 from .database import create_db_and_tables, engine

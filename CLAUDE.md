@@ -12,6 +12,15 @@ work-management-system/
 
 Frontend commands run from `frontend/`. Backend commands run from `backend/`.
 
+## Non-Negotiable Session Rules
+
+These apply to every task in every conversation — no exceptions, no shortcuts:
+
+1. **Maintainable & readable code.** Every piece of code you write must be understandable to a stranger with no prior context. Clear naming, single-responsibility functions, no clever tricks that sacrifice clarity for brevity.
+2. **No dead code.** Never leave commented-out code, unused imports, unused variables, or abandoned functions in the codebase. If something is removed, remove it completely.
+3. **Comments in English — always.** Every module opens with a docstring stating what it owns. Every non-trivial function has a docstring (purpose, params, return, gotchas). Inline comments explain *why*, not *what*. Magic numbers, business rules, and non-obvious constraints must be commented. Use standard Python docstrings and JSDoc (`/** */`) in TypeScript.
+4. **Tests are mandatory.** Before considering any non-trivial feature or bug fix done, write a corresponding test in `backend/tests/` (Python) or `frontend/tests/` (TypeScript). A task is not complete until a test exists that would catch its regression.
+
 ## Performance Policy
 
 - You may run `pnpm lint` or `tsc --noEmit` when needed.
@@ -25,6 +34,26 @@ Frontend commands run from `frontend/`. Backend commands run from `backend/`.
 **NEVER start dev servers or backend processes on your own.** Do not run `pnpm dev`, `uvicorn`, `npm start`, or any server/process that binds to a port. The user manages their own servers. If verification requires a running server, ask the user to start it — do not start it yourself.
 
 **NEVER run `pnpm typecheck` (or `tsc --noEmit`) without explicit user instruction.** It is resource-intensive and can crash the user's machine. Do not run it as part of verification, post-edit checks, or any autonomous workflow.
+
+## Engineering Philosophy
+
+Write code for the version of this codebase that exists 10 years and 40 releases from now, not just for today's ticket.
+
+**Maintainability over quick fixes.** Never patch around a problem to make it pass — fix the root cause. If a proper fix requires touching more files, do it. Hacks compound; a codebase full of them becomes unmaintainable within a year.
+
+**File size discipline.** Keep files under ~300 lines. If a file grows past 400–500 lines, split it into focused modules (the `files.py` → `files_core.py` / `files_bulk.py` / etc. split is the reference pattern for how to do this). Each file should have one clear responsibility that fits in a single sentence.
+
+**Readable, not clever.** Name variables, functions, and modules for what they do, not how they do it. A future engineer should understand a function's intent in 10 seconds without reading its implementation.
+
+**Documentation & comments.** Write comments for the developer who joins this project two years from now with zero context. Every module must open with a docstring explaining what it owns and what it does not own. Every non-trivial function must have a docstring covering its purpose, parameters, return value, and any gotchas. Inline comments should explain *why* a decision was made, not *what* the code literally does — the code already shows the what. Comment on business rules, edge cases, magic numbers, and non-obvious constraints. In Python use standard docstring format; in TypeScript use JSDoc (`/** ... */`). A function that is hard to explain in a comment is a signal it needs to be broken up.
+
+**Explicit interfaces.** Every function's inputs and outputs must be clear from its signature alone — typed parameters, typed return values, no implicit side effects hidden in the body. In Python, use full type annotations. In TypeScript, avoid `any`.
+
+**Test before done.** When adding a non-trivial function or fixing a bug, write a test in `backend/tests/` (Python) or `frontend/tests/` (TypeScript). Tests are named after the module they cover (`test_files_core.py`, `test_bulk_operations.py`). Do not mark a task done until a test exists that would catch its regression — "it works" is not verification, a passing test is.
+
+**No dead code.** If you remove a feature or refactor a path, delete the old code immediately in the same commit. Commented-out code, unused imports, and abandoned functions are noise that misleads future readers and must never be left behind.
+
+**Change blast radius.** Before editing a shared utility, type, or model, check how many files import it. Prefer adding a new focused helper over modifying a widely-used one. If you must change a shared contract, update all call sites in the same commit.
 
 ## Commands
 
@@ -47,8 +76,6 @@ alembic revision --autogenerate -m "..."  # Generate migration from model change
 ```bash
 docker-compose up --build   # Build and start all services (frontend :3000, backend :3052, postgres :5433)
 ```
-
-There are no tests in this project.
 
 ## Environment Variables
 
@@ -98,7 +125,10 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 - `/(auth)/login`, `/(auth)/register`, `/(auth)/forgot-password`, `/(auth)/reset-password` — Auth pages (no sidebar, own layout)
 
 **API Routes** (all deleted/moved to backend — files are now served via backend v1 API):
-- File operations (list, upload, rename, move, delete, raw preview, zip download) are handled by `backend/app/routers/v1/files.py` via `POST /api/v1/files/...`
+- File operations are handled by the split file routers under `backend/app/routers/v1/files_*.py` via `/api/v1/files/...`
+- Google Drive import streams progress via SSE (`/api/v1/files/drive/import`)
+- Bulk operations (move, copy, trash) via `/api/v1/files/bulk/...`
+- Share links via `/api/v1/files/share/...`
 
 **Sidebar layout pattern:** Every app page (not landing/auth) wraps content in:
 ```tsx
@@ -163,7 +193,16 @@ FastAPI + SQLModel application in `backend/app/`. SQLModel combines Pydantic v2 
 - `app/routers/` — one file per domain: `auth`, `users`, `admin`, `bots`, `tasks`, `activity`, `team`, `analytics`, `permissions`
 - `app/routers/v1/` — versioned public API (`/api/v1`): `me`, `tasks`, `team`, `activity`, `analytics`, `files`, `webhooks`, `chat`, `presence` — accepts both JWT and API key auth
 
-**File storage routing:** `app/routers/v1/files.py` checks for R2 env vars at request time. If `CLOUDFLARE_ACCOUNT_ID` / `R2_BUCKET_NAME` are set it delegates to `app/r2.py`; otherwise it reads/writes from `FILE_STORAGE_PATH` (defaults to `frontend/data/` relative to the repo root).
+**File storage routing:** The v1 files API has been split into focused modules under `app/routers/v1/`:
+- `files_core.py` — list, upload, download, rename, delete (basic CRUD)
+- `files_bulk.py` — bulk move, copy, and trash operations
+- `files_trash.py` — trash management (list, restore, permanent delete)
+- `files_share.py` — file sharing (create/revoke share links, access by token)
+- `files_drive.py` — recursive Google Drive folder import with progress tracking (SSE)
+- `files_misc.py` — zip download, raw preview, and other utilities
+- `files_utils.py` — shared helpers (path safety, storage backend selection)
+
+Each module checks for R2 env vars at request time. If `CLOUDFLARE_ACCOUNT_ID` / `R2_BUCKET_NAME` are set it delegates to `app/r2.py`; otherwise it reads/writes from `FILE_STORAGE_PATH` (defaults to `frontend/data/` relative to the repo root). The legacy `files.py` still exists but the split modules are the active implementation.
 
 **Auth:** JWT access + refresh tokens. `POST /auth/register`, `POST /auth/login` return both. `POST /auth/refresh` rotates access token. Password reset is mock-email only (prints reset URL to stdout). Google OAuth is wired in the auth router.
 

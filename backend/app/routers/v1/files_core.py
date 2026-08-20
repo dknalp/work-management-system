@@ -147,7 +147,7 @@ async def upload_file(
     return _to_response(record)
 
 
-@router.get("/download/{file_id}")
+@router.get("/download/{file_id}", response_model=None)
 async def download_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
@@ -167,7 +167,7 @@ async def download_file(
     return FileResponse(str(disk_path), filename=record.name, media_type=record.mime_type or "application/octet-stream")
 
 
-@router.get("/preview/{file_id}")
+@router.get("/preview/{file_id}", response_model=None)
 async def preview_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
@@ -186,7 +186,7 @@ async def preview_file(
     return FileResponse(str(disk_path), media_type=record.mime_type or "application/octet-stream")
 
 
-@router.get("/raw/{file_id}")
+@router.get("/raw/{file_id}", response_model=None)
 async def raw_file(
     file_id: str,
     session: Session = Depends(get_session),

@@ -27,23 +27,23 @@ def upgrade() -> None:
     # Remove duplicate rows first: keep the newest record for each path,
     # delete older duplicates introduced by the old per-user constraint.
     op.execute("""
-        DELETE FROM filerecord
+        DELETE FROM file_records
         WHERE id NOT IN (
             SELECT DISTINCT ON (path) id
-            FROM filerecord
+            FROM file_records
             ORDER BY path, updated_at DESC NULLS LAST, id
         )
     """)
 
     # Drop old composite unique constraint
-    op.drop_constraint("uq_file_record_owner_path", "filerecord", type_="unique")
+    op.drop_constraint("uq_file_record_owner_path", "file_records", type_="unique")
 
     # Add new path-only unique constraint
-    op.create_unique_constraint("uq_file_record_path", "filerecord", ["path"])
+    op.create_unique_constraint("uq_file_record_path", "file_records", ["path"])
 
 
 def downgrade() -> None:
-    op.drop_constraint("uq_file_record_path", "filerecord", type_="unique")
+    op.drop_constraint("uq_file_record_path", "file_records", type_="unique")
     op.create_unique_constraint(
-        "uq_file_record_owner_path", "filerecord", ["owner_id", "path"]
+        "uq_file_record_owner_path", "file_records", ["owner_id", "path"]
     )
