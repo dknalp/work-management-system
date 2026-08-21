@@ -1021,8 +1021,22 @@ export function FileExplorer({
                               } else {
                                 try {
                                   const { getPreviewUrl } = await import("@/lib/actions/files")
-                                  const url = await getPreviewUrl(item.id)
-                                  window.open(url ?? getFileOpenUrl(item), "_blank")
+                                  const { tokenStorage } = await import("@/lib/auth")
+                                  const backendUrl = await getPreviewUrl(item.id)
+                                  if (!backendUrl) throw new Error("no url")
+                                  // Fetch with auth token and open as a blob URL so the
+                                  // new tab doesn't need to send Authorization headers.
+                                  const token = tokenStorage.getAccess()
+                                  const headers: Record<string, string> = {}
+                                  if (token) headers["Authorization"] = `Bearer ${token}`
+                                  const res = await fetch(backendUrl, { headers })
+                                  if (!res.ok) throw new Error("fetch failed")
+                                  const blob = await res.blob()
+                                  const blobUrl = URL.createObjectURL(blob)
+                                  const win = window.open(blobUrl, "_blank")
+                                  // Revoke after a short delay to allow the tab to load.
+                                  setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000)
+                                  if (!win) URL.revokeObjectURL(blobUrl)
                                 } catch {
                                   window.open(getFileOpenUrl(item), "_blank")
                                 }

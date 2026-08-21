@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.deps import get_current_user
-from app.models import FileRecord, User
+from app.models import FileAccessLog, FileRecord, FileShare, User
 from app.routers.v1.files_utils import (
     FileRecordResponse,
     _build_path,
@@ -104,6 +104,13 @@ async def delete_permanent(
             if disk_path.exists():
                 disk_path.unlink()
 
+    # Remove FK-dependent rows before deleting the parent FileRecord to avoid
+    # constraint violations (FileAccessLog and FileShare reference file_records.id).
+    for log in session.exec(select(FileAccessLog).where(FileAccessLog.file_id == record.id)).all():
+        session.delete(log)
+    for share in session.exec(select(FileShare).where(FileShare.file_id == record.id)).all():
+        session.delete(share)
+
     session.delete(record)
     session.commit()
     return {"ok": True}
@@ -128,6 +135,16 @@ async def empty_trash(
                 p = _local_path(key)
                 if p.exists():
                     p.unlink()
+
+    # Delete dependent rows first to avoid FK constraint violations.
+    # FileAccessLog and FileShare both hold a foreign key to file_records.id
+    # without ON DELETE CASCADE, so they must be removed before the parent row.
+    record_ids = [r.id for r in records]
+    for file_id in record_ids:
+        for log in session.exec(select(FileAccessLog).where(FileAccessLog.file_id == file_id)).all():
+            session.delete(log)
+        for share in session.exec(select(FileShare).where(FileShare.file_id == file_id)).all():
+            session.delete(share)
 
     for record in records:
         session.delete(record)

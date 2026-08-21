@@ -11,7 +11,11 @@ const PROTECTED_PREFIXES = [
   "/settings",
   "/profile",
   "/admin",
+  "/expenses",
 ]
+
+/** Routes that require admin or manager role. Members are redirected to /home. */
+const ADMIN_OR_MANAGER_ROUTES = ["/expenses"]
 
 const AUTH_ROUTES = ["/login", "/forgot-password", "/reset-password"]
 
@@ -32,6 +36,14 @@ export function proxy(req: NextRequest) {
   const isAdminRole = isAdminCookie || userRole === "admin"
 
   if (isAdminRoute && hasSession && !isAdminRole) {
+    return NextResponse.redirect(new URL("/home", req.url))
+  }
+
+  const isAdminOrManagerRoute = ADMIN_OR_MANAGER_ROUTES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  )
+  const isManagerRole = userRole === "manager"
+  if (isAdminOrManagerRoute && hasSession && !isAdminRole && !isManagerRole) {
     return NextResponse.redirect(new URL("/home", req.url))
   }
 
