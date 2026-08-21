@@ -152,17 +152,32 @@ async def download_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> RedirectResponse | FileResponse:
-    """Download a file (redirect to presigned URL or serve from disk)."""
+) -> StreamingResponse | FileResponse:
+    """Download a file by streaming it through the backend.
+
+    R2 mode: fetches bytes from R2 and streams them to the client so the
+    browser never contacts R2 directly (avoids CORS issues).
+
+    Local-disk mode: serves directly via FastAPI FileResponse.
+    """
+    from app.r2 import r2_get_object_bytes
+
     record = _get_record_or_404(file_id, current_user, session)
     if record.type == "folder" or not record.r2_key:
         raise HTTPException(status_code=400, detail="Cannot download a folder directly; use /zip")
     session.add(FileAccessLog(file_id=record.id, user_id=current_user.id, action="download"))
     session.commit()
     if _use_r2():
-        disposition = f'attachment; filename="{record.name}"'
-        url = await r2_generate_presigned_url(record.r2_key, expires_in=_DOWNLOAD_TTL, disposition=disposition)
-        return RedirectResponse(url)
+        data = await r2_get_object_bytes(record.r2_key)
+        mime = record.mime_type or "application/octet-stream"
+        return StreamingResponse(
+            io.BytesIO(data),
+            media_type=mime,
+            headers={
+                "Content-Disposition": f'attachment; filename="{record.name}"',
+                "Content-Length": str(len(data)),
+            },
+        )
     disk_path = _local_path(record.r2_key)
     return FileResponse(str(disk_path), filename=record.name, media_type=record.mime_type or "application/octet-stream")
 
@@ -172,18 +187,69 @@ async def preview_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
-) -> RedirectResponse | FileResponse:
-    """Inline preview URL for a file."""
+) -> StreamingResponse | FileResponse:
+    """Stream a file inline for preview.
+
+    R2 mode: downloads from R2 and proxies the bytes through the backend so
+    the browser never needs to contact R2 directly. This avoids CORS issues
+    when the R2 bucket does not allow the frontend origin.
+
+    Local-disk mode: serves directly via FastAPI FileResponse.
+    """
+    from app.r2 import r2_get_object_bytes
+
     record = _get_record_or_404(file_id, current_user, session)
     if record.type == "folder" or not record.r2_key:
         raise HTTPException(status_code=400, detail="Cannot preview a folder")
     session.add(FileAccessLog(file_id=record.id, user_id=current_user.id, action="view"))
     session.commit()
     if _use_r2():
-        url = await r2_generate_presigned_url(record.r2_key, expires_in=_PREVIEW_TTL, disposition="inline")
-        return RedirectResponse(url)
+        data = await r2_get_object_bytes(record.r2_key)
+        mime = record.mime_type or "application/octet-stream"
+        return StreamingResponse(
+            io.BytesIO(data),
+            media_type=mime,
+            headers={"Content-Disposition": "inline", "Content-Length": str(len(data))},
+        )
     disk_path = _local_path(record.r2_key)
     return FileResponse(str(disk_path), media_type=record.mime_type or "application/octet-stream")
+
+
+@router.get("/preview-url/{file_id}")
+async def preview_url(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Return a JSON object with a backend-proxied URL for previewing a file.
+
+    Always routes through the backend (/api/v1/files/preview/{id}) rather than
+    returning a raw R2 presigned URL. This avoids browser CORS blocks when the
+    R2 bucket does not have a CORS policy configured for the frontend origin.
+    """
+    record = _get_record_or_404(file_id, current_user, session)
+    if record.type == "folder" or not record.r2_key:
+        raise HTTPException(status_code=400, detail="Cannot preview a folder")
+    return {"url": f"/api/v1/files/preview/{file_id}"}
+
+
+@router.get("/download-url/{file_id}")
+async def download_url(
+    file_id: str,
+    inline: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Return a JSON object with a backend-proxied download URL for a file.
+
+    Always routes through the backend (/api/v1/files/download/{id}) rather than
+    returning a raw R2 presigned URL, to avoid CORS issues on the frontend.
+    """
+    record = _get_record_or_404(file_id, current_user, session)
+    if record.type == "folder" or not record.r2_key:
+        raise HTTPException(status_code=400, detail="Cannot download a folder directly; use /zip")
+    qs = "?inline=true" if inline else ""
+    return {"url": f"/api/v1/files/download/{file_id}{qs}"}
 
 
 @router.get("/raw/{file_id}", response_model=None)

@@ -190,7 +190,13 @@ async function _getPresignedUrl(endpoint: string): Promise<string | null> {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, { headers })
     if (!res.ok) return null
     const data = (await res.json()) as { url?: string }
-    return data.url ?? null
+    const url = data.url ?? null
+    if (!url) return null
+    // If the backend returned a relative path (e.g. "/api/v1/files/preview/{id}"),
+    // prepend API_BASE_URL so the caller always gets an absolute URL it can use
+    // without knowing the backend origin.
+    if (url.startsWith("/")) return `${API_BASE_URL}${url}`
+    return url
   } catch {
     return null
   }

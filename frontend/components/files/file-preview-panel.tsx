@@ -17,6 +17,7 @@ import {
   XIcon,
 } from "lucide-react"
 import { getPreviewUrl } from "@/lib/actions/files"
+import { tokenStorage } from "@/lib/auth"
 import type { FileItem } from "./file-utils"
 
 // ---------------------------------------------------------------------------
@@ -100,14 +101,33 @@ const CODE_LANG_MAP: Record<string, string> = {
   env: "bash",
 }
 
+/** Build Authorization header with the stored JWT access token, if present. */
+function authHeaders(): Record<string, string> {
+  const token = tokenStorage.getAccess()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 async function fetchText(url: string, maxBytes = 1_000_000): Promise<string> {
-  const res = await fetch(url)
+  const res = await fetch(url, { headers: authHeaders() })
   if (!res.ok) throw new Error("fetch failed")
   const size = parseInt(res.headers.get("content-length") || "0", 10)
   if (size > maxBytes) throw new Error("too large")
   const text = await res.text()
   if (text.length > maxBytes) throw new Error("too large")
   return text
+}
+
+/**
+ * Fetch a file URL with auth and return an object URL that can be used as
+ * an `src` attribute in `<img>`, `<video>`, or `<audio>` tags without needing
+ * to pass the Authorization header (the browser handles object URLs directly).
+ * The caller is responsible for revoking the URL via URL.revokeObjectURL().
+ */
+async function fetchBlobUrl(url: string): Promise<string> {
+  const res = await fetch(url, { headers: authHeaders() })
+  if (!res.ok) throw new Error("fetch failed")
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
 }
 
 // ---------------------------------------------------------------------------
@@ -445,8 +465,13 @@ export function FilePreviewPanel({
     setUrlError(false)
     setPreviewUrl(null)
     try {
-      const url = await getPreviewUrl(f.id)
-      setPreviewUrl(url)
+      const backendUrl = await getPreviewUrl(f.id)
+      if (!backendUrl) throw new Error("no url")
+      // Convert to a blob object URL so that <img>, <video>, <audio>, and
+      // fetchText() can all use it without needing to forward the Authorization
+      // header themselves (the browser handles blob: URLs without extra headers).
+      const blob = await fetchBlobUrl(backendUrl)
+      setPreviewUrl(blob)
     } catch {
       setUrlError(true)
     } finally {
@@ -464,6 +489,14 @@ export function FilePreviewPanel({
       await fetchUrl(file)
     }
     run()
+    // Revoke any previous blob URL when the file or open state changes to
+    // prevent memory leaks from accumulated object URLs.
+    return () => {
+      setPreviewUrl((prev) => {
+        if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev)
+        return null
+      })
+    }
   }, [open, file, fetchUrl])
 
   const previewType = file ? getPreviewType(file) : "unsupported"

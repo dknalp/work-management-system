@@ -1,22 +1,33 @@
+/**
+ * FileClientPage — client-side shell for the file explorer.
+ *
+ * Owns:
+ * - Loading/error/not-found state for the current directory listing
+ * - View mode (list vs. grid) persisted to localStorage
+ * - Quota display
+ * - Google Drive import trigger (opens the picker, then hands off to
+ *   DriveImportDialog for all import logic and progress display)
+ *
+ * Does NOT own: file CRUD operations (those live inside FileExplorer and
+ * its sub-components), or the import SSE stream (that lives in DriveImportDialog).
+ */
+
 "use client"
 
 import * as React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircleIcon, FolderXIcon, RefreshCwIcon } from "lucide-react"
+import { LayoutListIcon, LayoutGridIcon, HardDriveDownloadIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { LayoutListIcon, LayoutGridIcon } from "lucide-react"
 import type { FileItem } from "@/components/files/file-utils"
 import { fileRecordToItem } from "@/components/files/file-utils"
 import { FileExplorer } from "@/components/files/file-explorer"
 import { TrashView } from "@/components/files/trash-view"
-import { listFiles, listStarred, listRecent, getQuota, importFromDrive } from "@/lib/actions/files"
-import { API_BASE_URL } from "@/lib/api"
-import { tokenStorage } from "@/lib/auth"
+import { DriveImportDialog } from "@/components/files/drive-import-dialog"
+import { listFiles, listStarred, listRecent, getQuota } from "@/lib/actions/files"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useDrivePicker } from "@/hooks/use-drive-picker"
-import { toast } from "sonner"
-import { HardDriveDownloadIcon } from "lucide-react"
 
 interface FileClientPageProps {
   initialItems: FileItem[]
@@ -38,10 +49,14 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   const [showPreview, setShowPreview] = React.useState(false)
   const [state, setState] = React.useState<LoadState>({ status: "loading" })
   const [quota, setQuota] = React.useState<{ used_bytes: number; file_count: number } | null>(null)
-  const [driveImporting, setDriveImporting] = React.useState(false)
-  const [folderProgress, setFolderProgress] = React.useState<{
-    folder: string; done: number; total: number
+
+  // Drive import dialog state — set after the Picker resolves, cleared on complete/close
+  const [driveDialogOpen, setDriveDialogOpen] = React.useState(false)
+  const [drivePickerResult, setDrivePickerResult] = React.useState<{
+    items: Array<{ fileId: string; name: string; isFolder: boolean }>
+    accessToken: string
   } | null>(null)
+
   const { openPicker } = useDrivePicker()
 
   // Load quota once on mount
@@ -49,94 +64,9 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
     getQuota().then(setQuota).catch(() => {})
   }, [])
 
-  const handleDriveImport = React.useCallback(async () => {
-    setDriveImporting(true)
-    try {
-      const result = await openPicker()
-      if (!result || result.items.length === 0) return
-
-      const folders = result.items.filter((i) => i.isFolder)
-      const files   = result.items.filter((i) => !i.isFolder)
-
-      // ── Import individual files (non-folder) in parallel ──
-      if (files.length > 0) {
-        const label = files.length === 1 ? `"${files[0].fileName}"` : `${files.length} dosya`
-        toast.loading(`${label} Drive'dan içe aktarılıyor...`, { id: "drive-import" })
-        await Promise.all(files.map((item) => importFromDrive(item.fileId, result.accessToken, currentPath, false)))
-        toast.success(`${label} başarıyla içe aktarıldı`, { id: "drive-import" })
-        window.dispatchEvent(new Event("wms:files:changed"))
-      }
-
-      // ── Import folders via SSE stream ──
-      for (const folder of folders) {
-        const token = tokenStorage.getAccess()
-        const res = await fetch(`${API_BASE_URL}/api/v1/files/import-folder-stream`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            folder_id: folder.fileId,
-            access_token: result.accessToken,
-            parent_path: currentPath,
-          }),
-        })
-
-        if (!res.ok || !res.body) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error((body as { detail?: string }).detail ?? "Klasör aktarımı başarısız")
-        }
-
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ""
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split("\n")
-          buffer = lines.pop() ?? ""
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue
-            try {
-              const event = JSON.parse(line.slice(6)) as {
-                type: string; total?: number; done?: number; folder?: string
-                imported?: number; skipped?: number; errors?: string[]; message?: string
-              }
-
-              if (event.type === "start") {
-                setFolderProgress({ folder: event.folder ?? folder.fileName, done: 0, total: event.total ?? 0 })
-              } else if (event.type === "progress") {
-                setFolderProgress((p) => p ? { ...p, done: event.done ?? p.done } : null)
-              } else if (event.type === "done") {
-                setFolderProgress(null)
-                toast.success(
-                  `📁 "${folder.fileName}" — ${event.imported} dosya aktarıldı` +
-                  (event.skipped ? `, ${event.skipped} atlandı` : "") +
-                  (event.errors?.length ? `, ${event.errors.length} hata` : ""),
-                )
-                window.dispatchEvent(new Event("wms:files:changed"))
-              } else if (event.type === "error") {
-                setFolderProgress(null)
-                throw new Error(event.message ?? "Klasör aktarımı başarısız")
-              }
-            } catch {
-              // skip malformed SSE lines
-            }
-          }
-        }
-      }
-    } catch (err) {
-      setFolderProgress(null)
-      const msg = err instanceof Error ? err.message : "İçe aktarma başarısız"
-      toast.error(msg, { id: "drive-import" })
-    } finally {
-      setDriveImporting(false)
-    }
-  }, [openPicker, currentPath])
+  // ------------------------------------------------------------------
+  // Directory listing
+  // ------------------------------------------------------------------
 
   const load = React.useCallback(async () => {
     setState({ status: "loading" })
@@ -161,9 +91,8 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
       const records = await listFiles(currentPath)
 
       // Path validation: if we're inside a subfolder and got 0 results,
-      // verify the folder actually exists by checking the parent
+      // verify the folder actually exists by checking the parent listing
       if (records.length === 0 && currentPath !== "") {
-        // Try to find this path in its parent listing
         const parentPath = currentPath.includes("/")
           ? currentPath.split("/").slice(0, -1).join("/")
           : ""
@@ -177,17 +106,14 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
             return
           }
         } catch {
-          // If parent check fails, still show empty (don't block)
+          // If parent check fails, still show empty rather than block navigation
         }
       }
 
       setState({ status: "ok", items: records.map(fileRecordToItem) })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Dosyalar yüklenemedi"
-      // Session expired → redirect to login
-      if (message.includes("Session expired")) {
-        return
-      }
+      if (message.includes("Session expired")) return
       setState({ status: "error", message })
     }
   }, [currentPath, view])
@@ -197,67 +123,82 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
     load()
   }, [load])
 
-  // Re-fetch after uploads/deletes/moves
+  // Re-fetch after uploads/deletes/moves dispatched by child components
   React.useEffect(() => {
-    const handler = () => load()
+    const handler = () => void load()
     window.addEventListener("wms:files:changed", handler)
     return () => window.removeEventListener("wms:files:changed", handler)
   }, [load])
 
-  if (view === "trash") {
-    return <TrashView />
-  }
+  // ------------------------------------------------------------------
+  // Google Drive import
+  // ------------------------------------------------------------------
+
+  /**
+   * Opens the Google Drive Picker. Once the user confirms a selection
+   * the result is stored and the DriveImportDialog is opened to handle
+   * all import logic and show real-time SSE progress.
+   */
+  const handleDriveImport = React.useCallback(async () => {
+    try {
+      const result = await openPicker()
+      if (!result || result.items.length === 0) return
+
+      setDrivePickerResult({
+        items: result.items.map((item) => ({
+          fileId: item.fileId,
+          name: item.fileName,
+          isFolder: item.isFolder,
+        })),
+        accessToken: result.accessToken,
+      })
+      setDriveDialogOpen(true)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Google Drive açılamadı"
+      // Surface picker errors (e.g. missing env vars) as a console warning.
+      // The picker itself shows its own UI for auth failures.
+      console.warn("Drive picker error:", message)
+    }
+  }, [openPicker])
+
+  // ------------------------------------------------------------------
+  // Loading skeleton
+  // ------------------------------------------------------------------
 
   if (state.status === "loading") {
     return (
-      <div className="flex flex-col gap-3 p-6">
-        <div className="flex items-center gap-2 h-8">
-          <Skeleton className="h-7 w-24 rounded-md" />
-          <Skeleton className="h-7 w-24 rounded-md" />
-          <Skeleton className="h-7 w-24 rounded-md" />
-          <div className="ml-auto flex gap-2">
-            <Skeleton className="h-7 w-32 rounded-md" />
-          </div>
-        </div>
-        <div className="mt-2 overflow-hidden rounded-xl border border-border">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 border-b border-border/50 px-6 py-3 last:border-0">
-              <Skeleton className="size-8 rounded-md" />
-              <Skeleton className="h-4 w-48 rounded" />
-              <div className="ml-auto flex gap-8">
-                <Skeleton className="h-4 w-16 rounded" />
-                <Skeleton className="h-4 w-20 rounded" />
-                <Skeleton className="h-4 w-24 rounded" />
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="flex flex-col gap-2 p-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 w-full rounded-lg" />
+        ))}
       </div>
     )
   }
+
+  // ------------------------------------------------------------------
+  // Not-found state
+  // ------------------------------------------------------------------
 
   if (state.status === "not-found") {
     const parentPath = currentPath.includes("/")
       ? currentPath.split("/").slice(0, -1).join("/")
       : ""
-    const folderName = currentPath.split("/").pop() ?? currentPath
+
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 p-12 text-center">
-        <FolderXIcon className="size-16 text-muted-foreground/20" />
+        <FolderXIcon className="size-12 text-muted-foreground/40" />
         <div className="space-y-1">
-          <p className="text-base font-medium">
-            &quot;{folderName}&quot; klasörü bulunamadı
-          </p>
+          <p className="text-base font-medium">Klasör bulunamadı</p>
           <p className="text-sm text-muted-foreground">
-            Bu klasör mevcut değil veya silinmiş olabilir.
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">{currentPath}</code> mevcut değil.
           </p>
         </div>
-        <div className="flex gap-2 mt-2">
-          {parentPath !== currentPath && (
+        <div className="flex gap-2">
+          {parentPath && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push(parentPath ? `/files/${parentPath}` : "/files")}
+              onClick={() => router.push(`/files/${parentPath}`)}
             >
               Üst Klasöre Git
             </Button>
@@ -273,6 +214,10 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
       </div>
     )
   }
+
+  // ------------------------------------------------------------------
+  // Error state
+  // ------------------------------------------------------------------
 
   if (state.status === "error") {
     return (
@@ -295,6 +240,10 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
     )
   }
 
+  // ------------------------------------------------------------------
+  // Main render (ok state)
+  // ------------------------------------------------------------------
+
   const usedMB = quota ? (quota.used_bytes / 1024 / 1024).toFixed(1) : null
   const usedGB = quota && quota.used_bytes > 1024 * 1024 * 1024
     ? (quota.used_bytes / 1024 / 1024 / 1024).toFixed(2)
@@ -302,7 +251,7 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Top bar: view toggle + quota */}
+      {/* Top bar: view toggle, Drive import button, quota */}
       <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/40 bg-muted/20">
         <div className="flex items-center gap-1">
           <button
@@ -320,38 +269,17 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
             <LayoutGridIcon className="size-4" />
           </button>
         </div>
+
         <div className="flex items-center gap-2">
-          {/* Drive import button */}
+          {/* Drive import trigger — all progress is shown inside DriveImportDialog */}
           <button
-            onClick={handleDriveImport}
-            disabled={driveImporting}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => void handleDriveImport()}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             title="Google Drive'dan dosya içe aktar"
           >
             <HardDriveDownloadIcon className="size-3.5" />
             <span>{"Drive'dan İçe Aktar"}</span>
           </button>
-
-          {/* Folder import progress bar */}
-          {folderProgress && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="text-muted-foreground/50">·</span>
-              <span className="max-w-[120px] truncate" title={folderProgress.folder}>
-                📁 {folderProgress.folder}
-              </span>
-              <div className="relative h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all duration-300"
-                  style={{
-                    width: folderProgress.total > 0
-                      ? `${Math.round((folderProgress.done / folderProgress.total) * 100)}%`
-                      : "0%"
-                  }}
-                />
-              </div>
-              <span>{folderProgress.done}/{folderProgress.total}</span>
-            </div>
-          )}
 
           {quota && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -364,22 +292,41 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
         </div>
       </div>
 
+      {/* File list / grid */}
       <div className="flex flex-col flex-1 min-h-0 h-full">
-        <FileExplorer
-          items={state.items}
-          currentPath={currentPath}
-          viewMode={viewMode}
-          showPreview={showPreview}
-          onTogglePreview={() => setShowPreview((v) => !v)}
-          searchQuery=""
-          searchResults={null}
-          isSearching={false}
-          onFilesChanged={load}
-        />
+        {view === "trash" ? (
+          <TrashView />
+        ) : (
+          <FileExplorer
+            items={state.items}
+            currentPath={currentPath}
+            viewMode={viewMode}
+            showPreview={showPreview}
+            onTogglePreview={() => setShowPreview((v) => !v)}
+            searchQuery=""
+            searchResults={null}
+            isSearching={false}
+            onFilesChanged={load}
+          />
+        )}
       </div>
+
+      {/* Drive import progress dialog — mounts only while a picker result is pending */}
+      {drivePickerResult && (
+        <DriveImportDialog
+          open={driveDialogOpen}
+          onOpenChange={setDriveDialogOpen}
+          items={drivePickerResult.items}
+          accessToken={drivePickerResult.accessToken}
+          parentPath={currentPath}
+          onComplete={() => {
+            load()
+            setDrivePickerResult(null)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-// Export setters so FileLayout toolbar can trigger search
 export type { FileClientPageProps }

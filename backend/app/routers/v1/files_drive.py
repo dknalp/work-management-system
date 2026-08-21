@@ -29,19 +29,8 @@ from app.routers.v1.files_utils import (
 router = APIRouter()
 _log = logging.getLogger(__name__)
 
-# Google Workspace MIME → (export_mime, file_suffix)
-_GWORKSPACE_EXPORT: dict[str, tuple[str, str]] = {
-    "application/vnd.google-apps.document": (
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx",
-    ),
-    "application/vnd.google-apps.spreadsheet": (
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx",
-    ),
-    "application/vnd.google-apps.presentation": (
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx",
-    ),
-    "application/vnd.google-apps.drawing": ("image/png", ".png"),
-}
+# MIME resolution for Google Workspace documents is handled entirely by
+# app.google_drive._GWORKSPACE_EXPORT — there is no local copy here.
 
 
 @router.post("/import-from-drive")
@@ -308,5 +297,12 @@ async def import_folder_stream(
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            # Allow EventSource connections from any origin (the CORS middleware
+            # on the FastAPI app covers standard requests, but StreamingResponse
+            # bypasses it for SSE — so we set the header explicitly here).
+            "Access-Control-Allow-Origin": "*",
+        },
     )

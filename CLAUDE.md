@@ -55,6 +55,28 @@ Write code for the version of this codebase that exists 10 years and 40 releases
 
 **Change blast radius.** Before editing a shared utility, type, or model, check how many files import it. Prefer adding a new focused helper over modifying a widely-used one. If you must change a shared contract, update all call sites in the same commit.
 
+---
+
+## Agent Team (added by workers-init on 2026-08-21)
+
+This project uses the **team-lead agent system**.
+
+### Mandatory behavior
+
+- Complex or multi-step tasks → Team Lead MUST coordinate workers
+- Team Lead MUST NOT implement features directly — spawn the appropriate worker
+- Workers available: worker-frontend, worker-backend, worker-tester, worker-reviewer,
+  worker-devops, worker-researcher, worker-architect, worker-security
+
+### Auto-detected stack
+
+- **Language/Runtime:** TypeScript (Node 20) + Python 3.x
+- **Framework:** Next.js 16 (App Router) + FastAPI
+- **Test runner:** not detected (no jest/vitest/pytest config found)
+- **Services:** frontend (port 3051), backend (port 3052), db — PostgreSQL 15 (port 5433)
+
+---
+
 ## Commands
 
 **Frontend** — run from `frontend/`:
