@@ -115,6 +115,32 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request, exc: Exception):
+    """Ensure CORS headers are present on unhandled 500 responses.
+
+    FastAPI's CORSMiddleware only injects Access-Control-Allow-Origin into
+    responses that pass through the normal response pipeline.  When an
+    unhandled exception escapes all route handlers the middleware never runs,
+    so the browser sees no CORS header and mis-reports the real error as a
+    CORS block.  This handler catches those cases and re-adds the header.
+    """
+    import traceback
+    from fastapi.responses import JSONResponse
+
+    logger.error("Unhandled exception: %s", traceback.format_exc())
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin == FRONTEND_URL or not origin:
+        headers["Access-Control-Allow-Origin"] = origin or FRONTEND_URL
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=headers,
+    )
+
+
 # ── Routers ────────────────────────────────────────────────────────────────────
 
 # Legacy (non-versioned) routers.

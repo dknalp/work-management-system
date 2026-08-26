@@ -81,7 +81,10 @@ async def r2_copy_object(source_key: str, dest_key: str) -> None:
 
 
 async def r2_get_object_bytes(key: str) -> bytes:
-    """Download an object from R2 and return its bytes."""
+    """Download an object from R2 and return its bytes.
+
+    Use r2_iter_object for large files — this loads the full content into RAM.
+    """
     client = get_r2_client()
     bucket = get_bucket()
     loop = asyncio.get_running_loop()
@@ -91,6 +94,31 @@ async def r2_get_object_bytes(key: str) -> bytes:
         return response["Body"].read()
 
     return await loop.run_in_executor(None, _get)
+
+
+def r2_iter_object(key: str, chunk_size: int = 1024 * 1024):
+    """Yield raw bytes chunks from R2 without buffering the full object.
+
+    This is a synchronous generator intended to be passed to
+    ``fastapi.responses.StreamingResponse`` — FastAPI iterates it in a thread
+    executor automatically when used as the response body.
+
+    Args:
+        key: R2 object key.
+        chunk_size: Bytes per chunk (default 1 MiB).
+
+    Yields:
+        ``bytes`` chunks until the object is exhausted.
+    """
+    client = get_r2_client()
+    bucket = get_bucket()
+    response = client.get_object(Bucket=bucket, Key=key)
+    body = response["Body"]
+    while True:
+        chunk = body.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
 
 
 async def r2_generate_presigned_url(key: str, expires_in: int = 3600, disposition: str = "inline") -> str:

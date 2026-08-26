@@ -19,7 +19,7 @@ from app.routers.v1.files_utils import (
     _use_r2,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/files", tags=["v1-files"])
 
 
 @router.delete("/trash/{file_id}", response_model=FileRecordResponse)

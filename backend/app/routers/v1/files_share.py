@@ -18,7 +18,7 @@ from app.routers.v1.files_utils import (
     _now,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/files", tags=["v1-files"])
 
 
 def _share_doc_to_response(doc_id: str, data: dict) -> ShareResponse:

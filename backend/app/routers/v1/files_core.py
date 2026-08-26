@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from firebase_admin import firestore
 
@@ -23,8 +23,7 @@ from app.models import User
 from app.r2 import (
     r2_copy_object,
     r2_delete_object,
-    r2_generate_presigned_url,
-    r2_upload_fileobj,
+        r2_upload_fileobj,
 )
 logger = logging.getLogger(__name__)
 
@@ -50,9 +49,7 @@ from app.routers.v1.files_utils import (
     MoveBody,
     QuotaResponse,
     RenameBody,
-    _DOWNLOAD_TTL,
-    _PREVIEW_TTL,
-    _assert_owner,
+        _assert_owner,
     _build_path,
     _cascade_rename,
     _doc_to_response,
@@ -85,36 +82,69 @@ def list_files(
 @router.post("/upload", response_model=FileRecordResponse, status_code=201)
 async def upload_file(
     file: UploadFile,
-    parent_path: str = Query(default=""),
+    # The frontend sends "path" (the parent directory) as a FormData field.
+    # We read it via Form() rather than Query() so multipart requests work correctly.
+    path: str = Form(default=""),
+    overwrite: bool = Form(default=False),
     current_user: User = Depends(get_current_user),
     db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    """Upload a file to the given parent directory path."""
-    file_id = str(uuid.uuid4())
-    r2_key = f"shared/{file_id}"
-    # Use only the basename to strip any directory components from the client-supplied name.
-    from pathlib import Path as _Path
-    raw_name = file.filename or f"upload-{file_id}"
-    filename = _Path(raw_name).name or f"upload-{file_id}"
-    if not filename or filename in (".", ".."):
-        filename = f"upload-{file_id}"
-    path = _build_path(parent_path, filename)
-    content = await file.read()
-    _MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # 500 MB
-    if len(content) > _MAX_UPLOAD_BYTES:
+    """Upload a file to the given parent directory path.
+
+    The upload is queued behind UPLOAD_SEMAPHORE so at most 2 large uploads
+    buffer in memory at once per process; additional requests wait rather than
+    competing for RAM.
+    """
+    # Reject oversized uploads before buffering any bytes.
+    content_length = file.size  # set by FastAPI from Content-Length header when present
+    if content_length is not None and content_length > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
-            detail="File exceeds maximum upload size of 500 MB.",
+            detail=f"File exceeds maximum upload size of {MAX_UPLOAD_BYTES // (1024 ** 3)} GB.",
         )
-    size = len(content)
 
-    if _use_r2():
-        import io
-        await r2_upload_fileobj(io.BytesIO(content), r2_key, file.content_type or "application/octet-stream")
-    else:
-        local = _local_path(r2_key)
-        local.parent.mkdir(parents=True, exist_ok=True)
-        local.write_bytes(content)
+    file_id = str(uuid.uuid4())
+    r2_key = f"shared/{file_id}"
+
+    # Strip directory components from client-supplied filename to prevent traversal.
+    raw_name = file.filename or f"upload-{file_id}"
+    filename = Path(raw_name).name or f"upload-{file_id}"
+    if not filename or filename in (".", ".."):
+        filename = f"upload-{file_id}"
+
+    # parent_path is the "path" field from the frontend FormData.
+    parent_path = path
+    virtual_path = _build_path(parent_path, filename)
+
+    async with UPLOAD_SEMAPHORE:
+        if _use_r2():
+            # Stream directly to R2 without buffering in RAM.
+            content = await file.read()
+            if len(content) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="File too large.")
+            size = len(content)
+            import io as _io
+            await r2_upload_fileobj(
+                _io.BytesIO(content),
+                r2_key,
+                file.content_type or "application/octet-stream",
+            )
+        else:
+            local = _local_path(r2_key)
+            local.parent.mkdir(parents=True, exist_ok=True)
+            # Write in 1 MiB chunks to avoid loading the entire file into RAM.
+            size = 0
+            with open(local, "wb") as dest:
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    if size + len(chunk) > MAX_UPLOAD_BYTES:
+                        dest.close()
+                        local.unlink(missing_ok=True)
+                        raise HTTPException(status_code=413, detail="File too large.")
+                    dest.write(chunk)
+                    size += len(chunk)
 
     now = _now()
     data = {
@@ -186,18 +216,27 @@ async def download_file(
 
     filename = data.get("name", "download")
 
+    mime = data.get("mime_type") or "application/octet-stream"
+    disposition = f'attachment; filename="{filename}"'
+
     if _use_r2():
-        url = await r2_generate_presigned_url(r2_key, expires=_DOWNLOAD_TTL, disposition="attachment")
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url)
+        # Stream through the backend so the browser never hits R2 directly.
+        # A direct redirect to a presigned R2 URL fails with CORS errors on
+        # private Cloudflare R2 buckets.
+        from app.r2 import r2_iter_object
+        _log_access(file_id, current_user.id, "download", db)
+        return StreamingResponse(
+            r2_iter_object(r2_key),
+            media_type=mime,
+            headers={"Content-Disposition": disposition},
+        )
 
     local = _local_path(r2_key)
     if not local.exists():
         raise HTTPException(status_code=404, detail="File not found on disk.")
 
-    # Log access
     _log_access(file_id, current_user.id, "download", db)
-    return FileResponse(str(local), filename=filename, media_type=data.get("mime_type") or "application/octet-stream")
+    return FileResponse(str(local), filename=filename, media_type=mime)
 
 
 @router.get("/preview/{file_id}")
@@ -212,17 +251,25 @@ async def preview_file(
     if not r2_key:
         raise HTTPException(status_code=404, detail="File content not found.")
 
+    mime = data.get("mime_type") or "application/octet-stream"
+
     if _use_r2():
-        url = await r2_generate_presigned_url(r2_key, expires=_PREVIEW_TTL, disposition="inline")
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url)
+        # Stream through the backend — direct R2 redirects cause CORS errors
+        # on private Cloudflare R2 buckets.
+        from app.r2 import r2_iter_object
+        _log_access(file_id, current_user.id, "preview", db)
+        return StreamingResponse(
+            r2_iter_object(r2_key),
+            media_type=mime,
+            headers={"Content-Disposition": "inline"},
+        )
 
     local = _local_path(r2_key)
     if not local.exists():
         raise HTTPException(status_code=404, detail="File not found on disk.")
 
     _log_access(file_id, current_user.id, "preview", db)
-    return FileResponse(str(local), media_type=data.get("mime_type") or "application/octet-stream")
+    return FileResponse(str(local), media_type=mime)
 
 
 @router.put("/rename/{file_id}", response_model=FileRecordResponse)
@@ -424,23 +471,6 @@ def get_quota(
         file_count += 1
 
     return QuotaResponse(used_bytes=used_bytes, file_count=file_count)
-
-
-@router.patch("/{file_id}", response_model=FileRecordResponse)
-def patch_file(
-    file_id: str,
-    body: dict,
-    current_user: User = Depends(get_current_user),
-    db: firestore.Client = Depends(get_db),
-) -> FileRecordResponse:
-    """Partially update file metadata (color, icon_emoji, is_starred)."""
-    fid, data = _get_record_or_404(file_id, db)
-    _assert_owner(data, current_user)
-    allowed = {"is_starred", "color", "icon_emoji"}
-    updates = {k: v for k, v in body.items() if k in allowed}
-    updates["updated_at"] = _now()
-    db.collection("file_records").document(fid).update(updates)
-    return _doc_to_response(fid, {**data, **updates})
 
 
 # ---------------------------------------------------------------------------

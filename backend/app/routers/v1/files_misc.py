@@ -26,10 +26,7 @@ from app.routers.v1.files_utils import (
     _local_path,
     _now,
     _use_r2,
-    _DOWNLOAD_TTL,
-    _PREVIEW_TTL,
 )
-from app.r2 import r2_generate_presigned_url
 
 router = APIRouter(prefix="/files", tags=["v1-files"])
 
@@ -111,9 +108,11 @@ async def raw_preview(
     mime = data.get("mime_type") or "application/octet-stream"
 
     if _use_r2():
-        from app.r2 import r2_download_fileobj
-        content = await r2_download_fileobj(r2_key)
-        return StreamingResponse(io.BytesIO(content), media_type=mime)
+        from app.r2 import r2_iter_object
+        # r2_iter_object is a synchronous generator; FastAPI/Starlette will
+        # iterate it in a thread pool automatically, so we never buffer the
+        # full file in memory.
+        return StreamingResponse(r2_iter_object(r2_key), media_type=mime)
 
     local = _local_path(r2_key)
     if not local.exists():
@@ -143,38 +142,29 @@ def patch_metadata(
     return _doc_to_response(file_id, {**data, **updates})
 
 @router.get("/preview-url/{file_id}")
-async def get_preview_url(
+def get_preview_url(
     file_id: str,
     current_user: User = Depends(get_current_user),
     db: firestore.Client = Depends(get_db),
 ) -> dict:
     """Return a JSON object with a ``url`` key suitable for inline preview.
 
-    For R2 storage the URL is a presigned GET URL with
-    ``Content-Disposition: inline``.  For local storage the URL is the
-    backend raw-preview proxy path which the caller must hit with its auth
-    token (the frontend passes it as a src on an <img> or <video> tag via
-    the authenticated API client).
+    Always returns the backend proxy path (/api/v1/files/raw/{id}) regardless
+    of whether R2 or local storage is in use.  The frontend fetches this URL
+    with its Authorization header — the backend streams the bytes from R2 or
+    disk and sets the correct Content-Type.
+
+    Returning a direct R2 presigned URL would cause CORS errors because
+    Cloudflare R2 private buckets do not emit Access-Control-Allow-Origin
+    headers for browser preflight requests.
     """
-    doc_ref, data = _get_record_or_404(file_id, db)
+    _, data = _get_record_or_404(file_id, db)
     _assert_owner(data, current_user)
-
-    if _use_r2():
-        r2_key = data.get("r2_key") or data.get("storage_key", "")
-        url = await r2_generate_presigned_url(
-            r2_key, expires_in=_PREVIEW_TTL, disposition="inline"
-        )
-    else:
-        # Return a relative path — the frontend's _getPresignedUrl helper
-        # prepends API_BASE_URL to any URL starting with "/", so a relative
-        # path is sufficient and avoids hardcoding the backend origin here.
-        url = f"/api/v1/files/raw/{file_id}"
-
-    return {"url": url}
+    return {"url": f"/api/v1/files/raw/{file_id}"}
 
 
 @router.get("/download-url/{file_id}")
-async def get_download_url(
+def get_download_url(
     file_id: str,
     inline: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
@@ -182,22 +172,12 @@ async def get_download_url(
 ) -> dict:
     """Return a JSON object with a ``url`` key for file download.
 
-    When ``inline=true`` the URL is served with ``Content-Disposition: inline``
-    (browser renders it); otherwise ``attachment`` (browser downloads it).
-    For R2 this is a presigned URL.  For local storage this is the backend
-    download proxy path.
+    Always returns the backend proxy path so the browser never hits R2 directly
+    (which would fail with CORS errors on private buckets).  The ``inline``
+    flag is forwarded as a query parameter so the backend can set the correct
+    Content-Disposition header when streaming the file.
     """
-    doc_ref, data = _get_record_or_404(file_id, db)
+    _, data = _get_record_or_404(file_id, db)
     _assert_owner(data, current_user)
-
-    if _use_r2():
-        r2_key = data.get("r2_key") or data.get("storage_key", "")
-        disposition = "inline" if inline else "attachment"
-        url = await r2_generate_presigned_url(
-            r2_key, expires_in=_DOWNLOAD_TTL, disposition=disposition
-        )
-    else:
-        qs = "?inline=true" if inline else ""
-        url = f"/api/v1/files/download/{file_id}{qs}"
-
-    return {"url": url}
+    qs = "?inline=true" if inline else ""
+    return {"url": f"/api/v1/files/download/{file_id}{qs}"}
