@@ -56,7 +56,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
 
   const fetchEvents = useCallback(async () => {
     try {
-      const data = await apiClient<ApiEvent[]>("/calendar-events")
+      const data = await apiClient<ApiEvent[]>("/calendar")
       setEvents(data.map(fromApi))
     } catch {
       // keep previous state
@@ -70,7 +70,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   }, [fetchEvents])
 
   const addEvent = useCallback(async (event: Omit<CalendarEvent, "createdAt">) => {
-    const created = await apiClient<ApiEvent>("/calendar-events", {
+    const created = await apiClient<ApiEvent>("/calendar", {
       method: "POST",
       body: JSON.stringify({
         id: event.id,
@@ -86,7 +86,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const deleteEvent = useCallback(async (id: string) => {
-    await apiClient(`/calendar-events/${id}`, { method: "DELETE" })
+    await apiClient(`/calendar/${id}`, { method: "DELETE" })
     setEvents((prev) => prev.filter((e) => e.id !== id))
   }, [])
 
@@ -99,7 +99,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     if (updates.remind !== undefined) body.remind = updates.remind
     if (updates.assigneeNames !== undefined) body.assignee_names = updates.assigneeNames
 
-    const updated = await apiClient<ApiEvent>(`/calendar-events/${id}`, {
+    const updated = await apiClient<ApiEvent>(`/calendar/${id}`, {
       method: "PUT",
       body: JSON.stringify(body),
     })

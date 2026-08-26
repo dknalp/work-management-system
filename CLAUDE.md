@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 work-management-system/
-├── backend/     # FastAPI + SQLAlchemy Python backend
+├── backend/     # FastAPI + Firebase Firestore backend
 └── frontend/    # Next.js web application
 ```
 
@@ -90,13 +90,13 @@ pnpm format     # Prettier (writes in place)
 ```bash
 pip install -r requirements.txt           # Install dependencies
 uvicorn app.main:app --reload --port 3052  # Dev server (port 3052)
-alembic upgrade head                      # Apply DB migrations (alembic/ dir is at backend/alembic/)
-alembic revision --autogenerate -m "..."  # Generate migration from model changes
 ```
+
+There are no migrations — Firestore is schemaless. Default permissions and seed tasks are written on first startup automatically (idempotent).
 
 **Docker** — run from the repo root:
 ```bash
-docker-compose up --build   # Build and start all services (frontend :3000, backend :3052, postgres :5433)
+docker-compose up --build   # Build and start all services (frontend :3051, backend :3052)
 ```
 
 ## Environment Variables
@@ -109,9 +109,10 @@ NEXT_PUBLIC_API_URL=             # Backend base URL (defaults to http://localhos
 
 **Backend** (`backend/.env`):
 ```bash
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workos
-SECRET_KEY=...          # JWT signing key
-FRONTEND_URL=http://localhost:3000
+# Path to Firebase service account JSON key file, OR the raw JSON string.
+# Falls back to Application Default Credentials (ADC) when unset.
+FIREBASE_SERVICE_ACCOUNT_JSON=
+FRONTEND_URL=http://localhost:3051
 # Cloudflare R2 (optional — if set, files are stored in R2 instead of local disk)
 CLOUDFLARE_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
@@ -201,19 +202,20 @@ Next.js 16 App Router project under `frontend/`. All routes live under `frontend
 
 ## Backend Architecture
 
-FastAPI + SQLModel application in `backend/app/`. SQLModel combines Pydantic v2 and SQLAlchemy; Alembic handles migrations. Activate the venv at `backend/.venv` before running any Python commands.
+FastAPI + Firebase application in `backend/app/`. Firestore is the primary database; Firebase Authentication handles user auth. Activate the venv at `backend/.venv` before running any Python commands. There are no migrations — Firestore is schemaless.
 
-**Entry point:** `backend/app/main.py` — creates the app, registers all routers, configures CORS (allowed origin from `FRONTEND_URL` env var, defaults to `http://localhost:3000`). On startup: creates tables, runs idempotent column migrations (`migrate_db()`), seeds initial tasks (only on first run when no users exist), seeds roles, seeds default RBAC permissions, and cleans up expired tokens.
+**Entry point:** `backend/app/main.py` — initializes Firebase Admin SDK, registers all routers, configures CORS (allowed origin from `FRONTEND_URL` env var, defaults to `http://localhost:3000`). On startup: seeds default RBAC permissions and initial tasks (idempotent — never overwrites existing documents).
 
 **Flat module layout**:
-- `app/models.py` — all SQLModel table models (`User`, `Task`, `RolePermission`, `PasswordResetToken`, `CustomRole`, etc.)
+- `app/models.py` — plain Pydantic `BaseModel` classes matching Firestore collections (no SQLAlchemy)
 - `app/schemas.py` — all Pydantic request/response schemas
-- `app/database.py` — engine (`DATABASE_URL` env var, defaults to `postgresql://postgres:postgres@localhost:5432/workos`), `get_session` FastAPI dependency
-- `app/security.py` — JWT creation/decoding (python-jose), password hashing (passlib/bcrypt)
-- `app/deps.py` — `get_current_user` FastAPI dependency
+- `app/firebase.py` — Firebase Admin SDK initialization (`initialize_firebase()`) and `get_db()` FastAPI dependency
+- `app/firebase_auth.py` — `verify_firebase_token()` wrapper around Firebase Admin `auth.verify_id_token()`
+- `app/security.py` — API key generation and SHA-256 hashing (no JWT, no bcrypt)
+- `app/deps.py` — `get_current_actor` / `get_current_user` / `require_permission` FastAPI dependencies
 - `app/r2.py` — Cloudflare R2 storage client (boto3/s3 compatible); used by the v1 files router when R2 env vars are present
-- `app/routers/` — one file per domain: `auth`, `users`, `admin`, `bots`, `tasks`, `activity`, `team`, `analytics`, `permissions`
-- `app/routers/v1/` — versioned public API (`/api/v1`): `me`, `tasks`, `team`, `activity`, `analytics`, `files`, `webhooks`, `chat`, `presence` — accepts both JWT and API key auth
+- `app/routers/` — one file per domain: `auth`, `users`, `admin`, `bots`, `tasks`, `activity`, `team`, `analytics`, `permissions`, `projects`, `pipelines`, `kanban`, `calendar`
+- `app/routers/v1/` — versioned public API (`/api/v1`): `me`, `tasks`, `team`, `activity`, `analytics`, `files`, `webhooks`, `chat`, `presence` — accepts both Firebase ID tokens and bot API keys
 
 **File storage routing:** The v1 files API has been split into focused modules under `app/routers/v1/`:
 - `files_core.py` — list, upload, download, rename, delete (basic CRUD)
@@ -224,13 +226,13 @@ FastAPI + SQLModel application in `backend/app/`. SQLModel combines Pydantic v2 
 - `files_misc.py` — zip download, raw preview, and other utilities
 - `files_utils.py` — shared helpers (path safety, storage backend selection)
 
-Each module checks for R2 env vars at request time. If `CLOUDFLARE_ACCOUNT_ID` / `R2_BUCKET_NAME` are set it delegates to `app/r2.py`; otherwise it reads/writes from `FILE_STORAGE_PATH` (defaults to `frontend/data/` relative to the repo root). The legacy `files.py` still exists but the split modules are the active implementation.
+Each module checks for R2 env vars at request time. If `CLOUDFLARE_ACCOUNT_ID` / `R2_BUCKET_NAME` are set it delegates to `app/r2.py`; otherwise it reads/writes from `FILE_STORAGE_PATH` (defaults to `frontend/data/` relative to the repo root). File metadata (name, path, size, mime_type, owner_id, etc.) is stored in Firestore `file_records` collection; file bytes live in R2 or on local disk unchanged.
 
-**Auth:** JWT access + refresh tokens. `POST /auth/register`, `POST /auth/login` return both. `POST /auth/refresh` rotates access token. Password reset is mock-email only (prints reset URL to stdout). Google OAuth is wired in the auth router.
+**Auth:** Firebase Authentication. `POST /auth/register` creates a Firebase Auth user + a Firestore `users/{uid}` profile document. Login is done **client-side** via the Firebase JS SDK (`signInWithEmailAndPassword`), which returns an ID token. The backend verifies ID tokens via `firebase_admin.auth.verify_id_token()` in `firebase_auth.py`. Password reset uses Firebase's built-in link generation. Google OAuth is handled client-side through Firebase Auth.
 
-**RBAC:** Three roles (`admin`, `manager`, `member`) with per-permission grants stored in `RolePermission` table. Default permissions are seeded at startup in `app/routers/permissions.py`. Admin users: `is_admin=True` OR `role="admin"` — both are checked. Frontend enforces RBAC via `frontend/contexts/permissions-context.tsx` and `frontend/lib/permissions.ts`; `frontend/components/auth/access-denied.tsx` is the blocked-access fallback UI.
+**RBAC:** Three built-in roles (`admin`, `manager`, `member`) with per-permission grants stored in the `role_permissions` Firestore collection (document ID: `{role}_{permission}`). Default permissions are seeded at startup in `app/routers/permissions.py`. Admin users: `is_admin=True` OR `role="admin"` — both are checked. Frontend enforces RBAC via `frontend/contexts/permissions-context.tsx` and `frontend/lib/permissions.ts`; `frontend/components/auth/access-denied.tsx` is the blocked-access fallback UI.
 
 **Docker topology** (`docker-compose.yml`):
-- `frontend` — Next.js, port 3000, standalone output
-- `backend` — FastAPI via `entrypoint.sh` (runs migrations then uvicorn), port 3052
-- `db` — PostgreSQL 15, port 5433 (host) → 5432 (container), volume `pgdata`
+- `frontend` — Next.js, port 3051, standalone output
+- `backend` — FastAPI via `entrypoint.sh` (no migrations), port 3052
+- No database container — Firestore is a hosted Firebase service

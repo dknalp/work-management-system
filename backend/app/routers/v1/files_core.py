@@ -1,406 +1,434 @@
-"""Core file CRUD routes: list, upload, download, preview, folder, rename, move, copy."""
+"""Core CRUD routes for /api/v1/files.
 
-import asyncio
-import io
-import logging
-import mimetypes
-import shutil
+Handles: list directory, upload file, create folder, download, rename,
+move, copy, delete, star, patch metadata, quota, and recent files.
+"""
+
+import secrets
 import uuid
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
+from firebase_admin import firestore
 
-from app.database import get_session
-from app.deps import get_current_user
-from app.models import FileAccessLog, FileRecord, User
-from app.r2 import r2_copy_object, r2_generate_presigned_url, r2_upload_fileobj
+from app.deps import Actor, get_current_actor, get_current_user
+from app.firebase import get_db
+from app.models import User
+from app.r2 import (
+    r2_copy_object,
+    r2_delete_object,
+    r2_generate_presigned_url,
+    r2_upload_fileobj,
+)
 from app.routers.v1.files_utils import (
     CopyBody,
     FileRecordResponse,
     FolderCreateBody,
     MoveBody,
+    QuotaResponse,
     RenameBody,
+    _DOWNLOAD_TTL,
+    _PREVIEW_TTL,
+    _assert_owner,
     _build_path,
     _cascade_rename,
+    _doc_to_response,
     _get_record_or_404,
     _local_path,
     _now,
-    _to_response,
     _use_r2,
 )
 
-router = APIRouter()
-_log = logging.getLogger(__name__)
-
-_PREVIEW_TTL = 300
-_DOWNLOAD_TTL = 3600
+router = APIRouter(prefix="/files", tags=["v1-files"])
 
 
-@router.get("/list", response_model=list[FileRecordResponse])
+@router.get("", response_model=list[FileRecordResponse])
 def list_files(
     path: str = Query(default=""),
-    show_trash: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> list[FileRecordResponse]:
-    """List files/folders at the given path (non-recursive)."""
-    parent = path.strip("/")
-    records = session.exec(
-        select(FileRecord).where(
-            FileRecord.parent_path == parent,
-            FileRecord.is_deleted == show_trash,
-        )
-    ).all()
-    records = sorted(records, key=lambda r: (0 if r.type == "folder" else 1, r.name.lower()))
-    return [_to_response(r) for r in records]
+    """List non-deleted files/folders at the given directory path."""
+    docs = (
+        db.collection("file_records")
+        .where("owner_id", "==", current_user.id)
+        .where("parent_path", "==", path)
+        .where("is_deleted", "==", False)
+        .stream()
+    )
+    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
 
 
-@router.post("/upload", response_model=FileRecordResponse)
+@router.post("/upload", response_model=FileRecordResponse, status_code=201)
 async def upload_file(
     file: UploadFile,
-    path: str = Form(default=""),
-    overwrite: bool = Form(default=False),
+    parent_path: str = Query(default=""),
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    """Upload a file to storage and record metadata in the DB."""
-    parent = path.strip("/")
-    full_path = _build_path(parent, file.filename or "untitled")
-
-    existing = session.exec(
-        select(FileRecord).where(
-            FileRecord.path == full_path,
-            FileRecord.is_deleted == False,  # noqa: E712
-        )
-    ).first()
-    if existing and not overwrite:
-        raise HTTPException(status_code=409, detail="File already exists")
-
-    mime = file.content_type or mimetypes.guess_type(file.filename or "")[0] or "application/octet-stream"
-    file_id = uuid.uuid4()
+    """Upload a file to the given parent directory path."""
+    file_id = str(uuid.uuid4())
     r2_key = f"shared/{file_id}"
-    size: Optional[int] = file.size
+    # Use only the basename to strip any directory components from the client-supplied name.
+    from pathlib import Path as _Path
+    raw_name = file.filename or f"upload-{file_id}"
+    filename = _Path(raw_name).name or f"upload-{file_id}"
+    if not filename or filename in (".", ".."):
+        filename = f"upload-{file_id}"
+    path = _build_path(parent_path, filename)
+    content = await file.read()
+    _MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # 500 MB
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="File exceeds maximum upload size of 500 MB.",
+        )
+    size = len(content)
 
     if _use_r2():
-        await r2_upload_fileobj(file.file, r2_key, mime)
-        if size is None:
-            try:
-                from app.r2 import get_bucket, get_r2_client
-                bucket = get_bucket()
-                def _head() -> int:
-                    client = get_r2_client()
-                    resp = client.head_object(Bucket=bucket, Key=r2_key)
-                    return int(resp["ContentLength"])
-                size = await asyncio.get_running_loop().run_in_executor(None, _head)
-            except Exception:
-                _log.warning("Could not determine file size for r2_key=%s", r2_key)
-                size = 0
+        import io
+        await r2_upload_fileobj(io.BytesIO(content), r2_key, file.content_type or "application/octet-stream")
     else:
-        disk_path = _local_path(r2_key)
-        disk_path.parent.mkdir(parents=True, exist_ok=True)
-        written = 0
-        with disk_path.open("wb") as out_fh:
-            while True:
-                chunk = await file.read(1024 * 1024)
-                if not chunk:
-                    break
-                out_fh.write(chunk)
-                written += len(chunk)
-        if size is None:
-            size = written
+        local = _local_path(r2_key)
+        local.parent.mkdir(parents=True, exist_ok=True)
+        local.write_bytes(content)
 
-    if existing and overwrite:
-        if _use_r2():
-            from app.r2 import r2_delete_object
-            if existing.r2_key and existing.r2_key != r2_key:
-                await r2_delete_object(existing.r2_key)
-        else:
-            if existing.r2_key and existing.r2_key != r2_key:
-                old_disk = _local_path(existing.r2_key)
-                if old_disk.exists():
-                    old_disk.unlink()
-        existing.r2_key = r2_key
-        existing.size = size
-        existing.mime_type = mime
-        existing.updated_at = _now()
-        session.add(existing)
-        session.commit()
-        session.refresh(existing)
-        return _to_response(existing)
-
-    record = FileRecord(
-        id=file_id,
-        owner_id=current_user.id,
-        name=file.filename or "untitled",
-        path=full_path,
-        parent_path=parent,
-        type="file",
-        size=size,
-        mime_type=mime,
-        r2_key=r2_key,
-    )
-    session.add(record)
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
+    now = _now()
+    data = {
+        "owner_id": current_user.id,
+        "name": filename,
+        "path": path,
+        "parent_path": parent_path,
+        "type": "file",
+        "size": size,
+        "mime_type": file.content_type,
+        "r2_key": r2_key,
+        "is_deleted": False,
+        "deleted_at": None,
+        "is_starred": False,
+        "color": None,
+        "icon_emoji": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    db.collection("file_records").document(file_id).set(data)
+    return _doc_to_response(file_id, data)
 
 
-@router.get("/download/{file_id}", response_model=None)
-async def download_file(
-    file_id: str,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> StreamingResponse | FileResponse:
-    """Download a file by streaming it through the backend.
-
-    R2 mode: fetches bytes from R2 and streams them to the client so the
-    browser never contacts R2 directly (avoids CORS issues).
-
-    Local-disk mode: serves directly via FastAPI FileResponse.
-    """
-    from app.r2 import r2_get_object_bytes
-
-    record = _get_record_or_404(file_id, current_user, session)
-    if record.type == "folder" or not record.r2_key:
-        raise HTTPException(status_code=400, detail="Cannot download a folder directly; use /zip")
-    session.add(FileAccessLog(file_id=record.id, user_id=current_user.id, action="download"))
-    session.commit()
-    if _use_r2():
-        data = await r2_get_object_bytes(record.r2_key)
-        mime = record.mime_type or "application/octet-stream"
-        return StreamingResponse(
-            io.BytesIO(data),
-            media_type=mime,
-            headers={
-                "Content-Disposition": f'attachment; filename="{record.name}"',
-                "Content-Length": str(len(data)),
-            },
-        )
-    disk_path = _local_path(record.r2_key)
-    return FileResponse(str(disk_path), filename=record.name, media_type=record.mime_type or "application/octet-stream")
-
-
-@router.get("/preview/{file_id}", response_model=None)
-async def preview_file(
-    file_id: str,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> StreamingResponse | FileResponse:
-    """Stream a file inline for preview.
-
-    R2 mode: downloads from R2 and proxies the bytes through the backend so
-    the browser never needs to contact R2 directly. This avoids CORS issues
-    when the R2 bucket does not allow the frontend origin.
-
-    Local-disk mode: serves directly via FastAPI FileResponse.
-    """
-    from app.r2 import r2_get_object_bytes
-
-    record = _get_record_or_404(file_id, current_user, session)
-    if record.type == "folder" or not record.r2_key:
-        raise HTTPException(status_code=400, detail="Cannot preview a folder")
-    session.add(FileAccessLog(file_id=record.id, user_id=current_user.id, action="view"))
-    session.commit()
-    if _use_r2():
-        data = await r2_get_object_bytes(record.r2_key)
-        mime = record.mime_type or "application/octet-stream"
-        return StreamingResponse(
-            io.BytesIO(data),
-            media_type=mime,
-            headers={"Content-Disposition": "inline", "Content-Length": str(len(data))},
-        )
-    disk_path = _local_path(record.r2_key)
-    return FileResponse(str(disk_path), media_type=record.mime_type or "application/octet-stream")
-
-
-@router.get("/preview-url/{file_id}")
-async def preview_url(
-    file_id: str,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> dict:
-    """Return a JSON object with a backend-proxied URL for previewing a file.
-
-    Always routes through the backend (/api/v1/files/preview/{id}) rather than
-    returning a raw R2 presigned URL. This avoids browser CORS blocks when the
-    R2 bucket does not have a CORS policy configured for the frontend origin.
-    """
-    record = _get_record_or_404(file_id, current_user, session)
-    if record.type == "folder" or not record.r2_key:
-        raise HTTPException(status_code=400, detail="Cannot preview a folder")
-    return {"url": f"/api/v1/files/preview/{file_id}"}
-
-
-@router.get("/download-url/{file_id}")
-async def download_url(
-    file_id: str,
-    inline: bool = Query(default=False),
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> dict:
-    """Return a JSON object with a backend-proxied download URL for a file.
-
-    Always routes through the backend (/api/v1/files/download/{id}) rather than
-    returning a raw R2 presigned URL, to avoid CORS issues on the frontend.
-    """
-    record = _get_record_or_404(file_id, current_user, session)
-    if record.type == "folder" or not record.r2_key:
-        raise HTTPException(status_code=400, detail="Cannot download a folder directly; use /zip")
-    qs = "?inline=true" if inline else ""
-    return {"url": f"/api/v1/files/download/{file_id}{qs}"}
-
-
-@router.get("/raw/{file_id}", response_model=None)
-async def raw_file(
-    file_id: str,
-    session: Session = Depends(get_session),
-) -> RedirectResponse | FileResponse:
-    """Unauthenticated raw file access (for public embeds)."""
-    try:
-        uid = uuid.UUID(file_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="File not found")
-    record = session.get(FileRecord, uid)
-    if not record or record.is_deleted or record.type == "folder":
-        raise HTTPException(status_code=404, detail="File not found")
-    if not record.r2_key:
-        raise HTTPException(status_code=404, detail="File not found")
-    if _use_r2():
-        url = await r2_generate_presigned_url(record.r2_key, expires_in=_PREVIEW_TTL, disposition="inline")
-        return RedirectResponse(url)
-    disk_path = _local_path(record.r2_key)
-    return FileResponse(str(disk_path), media_type=record.mime_type or "application/octet-stream")
-
-
-@router.post("/folder", response_model=FileRecordResponse)
+@router.post("/folder", response_model=FileRecordResponse, status_code=201)
 def create_folder(
     body: FolderCreateBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    """Create a virtual folder (DB record only)."""
-    parent = body.parent_path.strip("/")
-    full_path = _build_path(parent, body.name)
-    existing = session.exec(
-        select(FileRecord).where(FileRecord.path == full_path, FileRecord.is_deleted == False)  # noqa: E712
-    ).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="Folder already exists")
-    record = FileRecord(
-        id=uuid.uuid4(),
-        owner_id=current_user.id,
-        name=body.name,
-        path=full_path,
-        parent_path=parent,
-        type="folder",
-        size=0,
-    )
-    session.add(record)
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
+    """Create a new (empty) folder."""
+    folder_id = str(uuid.uuid4())
+    path = _build_path(body.parent_path, body.name)
+    now = _now()
+    data = {
+        "owner_id": current_user.id,
+        "name": body.name,
+        "path": path,
+        "parent_path": body.parent_path,
+        "type": "folder",
+        "size": None,
+        "mime_type": None,
+        "r2_key": None,
+        "is_deleted": False,
+        "deleted_at": None,
+        "is_starred": False,
+        "color": None,
+        "icon_emoji": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    db.collection("file_records").document(folder_id).set(data)
+    return _doc_to_response(folder_id, data)
 
 
-@router.patch("/rename/{file_id}", response_model=FileRecordResponse)
+@router.get("/download/{file_id}")
+async def download_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+):
+    """Download a file (attachment disposition)."""
+    fid, data = _get_record_or_404(file_id, db)
+    _assert_owner(data, current_user.id)
+    if data.get("type") == "folder":
+        raise HTTPException(status_code=400, detail="Cannot download a folder directly.")
+    r2_key = data.get("r2_key")
+    if not r2_key:
+        raise HTTPException(status_code=404, detail="File content not found.")
+
+    filename = data.get("name", "download")
+
+    if _use_r2():
+        url = await r2_generate_presigned_url(r2_key, expires=_DOWNLOAD_TTL, disposition="attachment")
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url)
+
+    local = _local_path(r2_key)
+    if not local.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk.")
+
+    # Log access
+    _log_access(file_id, current_user.id, "download", db)
+    return FileResponse(str(local), filename=filename, media_type=data.get("mime_type") or "application/octet-stream")
+
+
+@router.get("/preview/{file_id}")
+async def preview_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+):
+    """Serve a file inline (preview disposition)."""
+    fid, data = _get_record_or_404(file_id, db)
+    r2_key = data.get("r2_key")
+    if not r2_key:
+        raise HTTPException(status_code=404, detail="File content not found.")
+
+    if _use_r2():
+        url = await r2_generate_presigned_url(r2_key, expires=_PREVIEW_TTL, disposition="inline")
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url)
+
+    local = _local_path(r2_key)
+    if not local.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk.")
+
+    _log_access(file_id, current_user.id, "preview", db)
+    return FileResponse(str(local), media_type=data.get("mime_type") or "application/octet-stream")
+
+
+@router.put("/rename/{file_id}", response_model=FileRecordResponse)
 def rename_file(
     file_id: str,
     body: RenameBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    """Rename a file or folder."""
-    record = _get_record_or_404(file_id, current_user, session)
-    old_prefix = record.path
-    new_path = _build_path(record.parent_path, body.name)
-    existing = session.exec(
-        select(FileRecord).where(FileRecord.path == new_path, FileRecord.is_deleted == False)  # noqa: E712
-    ).first()
-    if existing and existing.id != record.id:
-        raise HTTPException(status_code=409, detail="A file with this name already exists")
-    record.name = body.name
-    record.path = new_path
-    record.updated_at = _now()
-    session.add(record)
-    if record.type == "folder":
-        _cascade_rename(session, current_user.id, old_prefix, new_path)
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
+    """Rename a file or folder (updates paths of descendants for folders)."""
+    fid, data = _get_record_or_404(file_id, db)
+    _assert_owner(data, current_user.id)
+    old_path = data["path"]
+    parent_path = data["parent_path"]
+    new_path = _build_path(parent_path, body.name)
+    now = _now()
+
+    updates = {"name": body.name, "path": new_path, "updated_at": now}
+    db.collection("file_records").document(fid).update(updates)
+
+    if data.get("type") == "folder":
+        _cascade_rename(db, old_path, new_path)
+
+    return _doc_to_response(fid, {**data, **updates})
 
 
-@router.patch("/move/{file_id}", response_model=FileRecordResponse)
+@router.put("/move/{file_id}", response_model=FileRecordResponse)
 def move_file(
     file_id: str,
     body: MoveBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    """Move a file or folder to a new parent path."""
-    record = _get_record_or_404(file_id, current_user, session)
-    old_prefix = record.path
-    dest_parent = body.dest_parent.strip("/")
-    new_path = _build_path(dest_parent, record.name)
-    existing = session.exec(
-        select(FileRecord).where(FileRecord.path == new_path, FileRecord.is_deleted == False)  # noqa: E712
-    ).first()
-    if existing and existing.id != record.id:
-        raise HTTPException(status_code=409, detail="A file with this name already exists at the destination")
-    record.path = new_path
-    record.parent_path = dest_parent
-    record.updated_at = _now()
-    session.add(record)
-    if record.type == "folder":
-        _cascade_rename(session, current_user.id, old_prefix, new_path)
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
+    """Move a file or folder to a new parent directory."""
+    fid, data = _get_record_or_404(file_id, db)
+    old_path = data["path"]
+    new_path = _build_path(body.dest_parent, data["name"])
+    now = _now()
+
+    updates = {"path": new_path, "parent_path": body.dest_parent, "updated_at": now}
+    db.collection("file_records").document(fid).update(updates)
+
+    if data.get("type") == "folder":
+        _cascade_rename(db, old_path, new_path)
+
+    return _doc_to_response(fid, {**data, **updates})
 
 
-@router.post("/copy/{file_id}", response_model=FileRecordResponse)
+@router.post("/copy/{file_id}", response_model=FileRecordResponse, status_code=201)
 async def copy_file(
     file_id: str,
     body: CopyBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    """Copy a file to a new location."""
-    record = _get_record_or_404(file_id, current_user, session)
-    if record.type == "folder":
-        raise HTTPException(status_code=400, detail="Folder copy not supported yet")
-    dest_parent = body.dest_parent.strip("/")
-    name_parts = record.name.rsplit(".", 1)
-    if dest_parent == record.parent_path:
-        copy_name = f"{name_parts[0]} (copy).{name_parts[1]}" if len(name_parts) == 2 else f"{record.name} (copy)"
-        dest_path = _build_path(dest_parent, copy_name)
-    else:
-        dest_path = _build_path(dest_parent, record.name)
+    """Copy a file to a new parent directory."""
+    fid, data = _get_record_or_404(file_id, db)
+    new_id = str(uuid.uuid4())
+    new_r2_key: Optional[str] = None
 
-    new_id = uuid.uuid4()
-    new_r2_key = f"shared/{new_id}"
-    if _use_r2():
-        if record.r2_key:
-            await r2_copy_object(record.r2_key, new_r2_key)
-    else:
-        if record.r2_key:
-            src = _local_path(record.r2_key)
+    if data.get("r2_key") and data.get("type") == "file":
+        new_r2_key = f"shared/{new_id}"
+        if _use_r2():
+            await r2_copy_object(data["r2_key"], new_r2_key)
+        else:
+            import shutil
+            src = _local_path(data["r2_key"])
             dst = _local_path(new_r2_key)
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
 
-    new_record = FileRecord(
-        id=new_id,
-        owner_id=current_user.id,
-        name=dest_path.rsplit("/", 1)[-1],
-        path=dest_path,
-        parent_path=dest_parent,
-        type=record.type,
-        size=record.size,
-        mime_type=record.mime_type,
-        r2_key=new_r2_key if record.r2_key else None,
+    now = _now()
+    new_path = _build_path(body.dest_parent, data["name"])
+    new_data = {
+        **data,
+        "path": new_path,
+        "parent_path": body.dest_parent,
+        "r2_key": new_r2_key,
+        "is_deleted": False,
+        "deleted_at": None,
+        "is_starred": False,
+        "created_at": now,
+        "updated_at": now,
+    }
+    db.collection("file_records").document(new_id).set(new_data)
+    return _doc_to_response(new_id, new_data)
+
+
+@router.delete("/{file_id}", status_code=204)
+async def delete_file_permanently(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> None:
+    """Permanently delete a file and its storage object."""
+    fid, data = _get_record_or_404(file_id, db)
+    _assert_owner(data, current_user.id)
+    r2_key = data.get("r2_key")
+
+    if r2_key:
+        try:
+            if _use_r2():
+                await r2_delete_object(r2_key)
+            else:
+                local = _local_path(r2_key)
+                if local.exists():
+                    local.unlink()
+        except Exception:
+            pass  # Best-effort cleanup — delete the metadata regardless
+
+    db.collection("file_records").document(fid).delete()
+
+
+@router.post("/star/{file_id}", response_model=FileRecordResponse)
+def toggle_star(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> FileRecordResponse:
+    """Toggle the starred flag on a file or folder."""
+    fid, data = _get_record_or_404(file_id, db)
+    new_starred = not data.get("is_starred", False)
+    now = _now()
+    db.collection("file_records").document(fid).update({"is_starred": new_starred, "updated_at": now})
+    return _doc_to_response(fid, {**data, "is_starred": new_starred, "updated_at": now})
+
+
+@router.get("/starred", response_model=list[FileRecordResponse])
+def list_starred(
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> list[FileRecordResponse]:
+    """Return all non-deleted starred files for the current user."""
+    docs = (
+        db.collection("file_records")
+        .where("is_starred", "==", True)
+        .where("is_deleted", "==", False)
+        .stream()
     )
-    session.add(new_record)
-    session.commit()
-    session.refresh(new_record)
-    return _to_response(new_record)
+    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
+
+
+@router.get("/recent", response_model=list[FileRecordResponse])
+def list_recent(
+    limit: int = Query(default=20, le=100),
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> list[FileRecordResponse]:
+    """Return recently accessed files for the current user."""
+    logs = (
+        db.collection("file_access_logs")
+        .where("user_id", "==", current_user.id)
+        .order_by("accessed_at", direction=firestore.Query.DESCENDING)
+        .limit(limit * 3)
+        .stream()
+    )
+
+    seen: set[str] = set()
+    result: list[FileRecordResponse] = []
+    for log_doc in logs:
+        log_data = log_doc.to_dict() or {}
+        fid = log_data.get("file_id", "")
+        if fid in seen:
+            continue
+        seen.add(fid)
+        doc = db.collection("file_records").document(fid).get()
+        if doc.exists and not (doc.to_dict() or {}).get("is_deleted", False):
+            result.append(_doc_to_response(doc.id, doc.to_dict() or {}))
+        if len(result) >= limit:
+            break
+
+    return result
+
+
+@router.get("/quota", response_model=QuotaResponse)
+def get_quota(
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> QuotaResponse:
+    """Return the total used bytes and file count for the current user."""
+    docs = (
+        db.collection("file_records")
+        .where("owner_id", "==", current_user.id)
+        .where("is_deleted", "==", False)
+        .where("type", "==", "file")
+        .stream()
+    )
+    used_bytes = 0
+    file_count = 0
+    for doc in docs:
+        d = doc.to_dict() or {}
+        used_bytes += d.get("size") or 0
+        file_count += 1
+
+    return QuotaResponse(used_bytes=used_bytes, file_count=file_count)
+
+
+@router.patch("/{file_id}", response_model=FileRecordResponse)
+def patch_file(
+    file_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> FileRecordResponse:
+    """Partially update file metadata (color, icon_emoji, is_starred)."""
+    fid, data = _get_record_or_404(file_id, db)
+    _assert_owner(data, current_user.id)
+    allowed = {"is_starred", "color", "icon_emoji"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    updates["updated_at"] = _now()
+    db.collection("file_records").document(fid).update(updates)
+    return _doc_to_response(fid, {**data, **updates})
+
+
+# ---------------------------------------------------------------------------
+# Internal helper
+# ---------------------------------------------------------------------------
+
+def _log_access(file_id: str, user_id: str, action: str, db: firestore.Client) -> None:
+    """Append a file access log entry (best-effort, never raises)."""
+    try:
+        log_id = str(uuid.uuid4())
+        db.collection("file_access_logs").document(log_id).set({
+            "file_id": file_id,
+            "user_id": user_id,
+            "action": action,
+            "accessed_at": _now(),
+        })
+    except Exception:
+        pass

@@ -25,7 +25,6 @@ import { createPortal } from "react-dom"
 import { KanbanColumn, Column } from "./kanban-column"
 import { KanbanCard, Task } from "./kanban-card"
 import { TaskStatus } from "@/types/task"
-import { useTasks } from "@/contexts/task-context"
 import { toast } from "sonner"
 import { GripVertical, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -48,6 +47,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
+import { apiClient } from "@/lib/api"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const defaultColumns: Column[] = [
   { id: "todo", title: "Yapılacak" },
@@ -168,14 +169,15 @@ function SortableColumnWrapper({
                   variant="ghost"
                   size="icon"
                   className="h-5 w-5 opacity-0 group-hover/header:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <MoreHorizontal className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={() => setEditing(true)}>
                   <Pencil className="h-3.5 w-3.5 mr-2" />
-                  Sütunu Düzenle
+                  Yeniden Adlandır
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -194,7 +196,7 @@ function SortableColumnWrapper({
   )
 
   return (
-    <div ref={setNodeRef} style={style} className={cn("flex-1 min-w-[260px] max-w-[500px]", isDragging && "z-10")}>
+    <div ref={setNodeRef} style={style} className="w-72 shrink-0 flex flex-col">
       <KanbanColumn
         column={column}
         tasks={tasks}
@@ -209,299 +211,451 @@ function SortableColumnWrapper({
   )
 }
 
-// ─── Main board ──────────────────────────────────────────────────────────────
+// ─── Add column inline form ───────────────────────────────────────────────────
+
+function AddColumnInline({ onAdd }: { onAdd: (title: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const commit = () => {
+    const trimmed = value.trim()
+    if (trimmed) {
+      onAdd(trimmed)
+      setValue("")
+      setOpen(false)
+    }
+  }
+
+  useEffect(() => {
+    if (open) {
+      // Use setTimeout to allow the render to complete before focusing
+      const id = setTimeout(() => inputRef.current?.focus(), 0)
+      return () => clearTimeout(id)
+    }
+  }, [open])
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className={cn(
+          "w-72 shrink-0 flex items-center gap-2 px-4 py-3 rounded-2xl",
+          "border-2 border-dashed border-border/40 text-muted-foreground text-sm",
+          "hover:border-border hover:text-foreground transition-colors"
+        )}
+      >
+        + Sütun Ekle
+      </button>
+    )
+  }
+
+  return (
+    <div className="w-72 shrink-0 rounded-2xl border border-border/50 bg-muted/30 p-4 flex flex-col gap-2">
+      <Input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit()
+          if (e.key === "Escape") { setOpen(false); setValue("") }
+        }}
+        placeholder="Sütun başlığı…"
+        className="h-8 text-sm"
+      />
+      <div className="flex gap-2">
+        <Button size="sm" className="h-7 px-3 text-xs flex-1" onClick={commit} disabled={!value.trim()}>
+          Ekle
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setOpen(false); setValue("") }}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Loading skeleton ────────────────────────────────────────────────────────
+
+function KanbanSkeleton() {
+  return (
+    <div className="flex gap-4 overflow-x-auto">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="w-72 shrink-0 flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/30 p-4">
+          <Skeleton className="h-6 w-3/4 rounded-md" />
+          {[1, 2, 3].map((j) => (
+            <Skeleton key={j} className="h-24 w-full rounded-xl" />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Drag overlay animation ──────────────────────────────────────────────────
+
+const dropAnimation: DropAnimation = {
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.5" } },
+  }),
+}
+
+// ─── Board state shape persisted to / loaded from the backend blob ───────────
+
+interface PersistedBoardState {
+  columns: Column[]
+  tasks: Record<string, Task[]>
+}
+
+// ─── KanbanBoard ─────────────────────────────────────────────────────────────
 
 export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoardProps) {
-  const id = React.useId()
-  const globalCtx = useTasks()
+  // ── State ─────────────────────────────────────────────────────────────────
 
   const [columns, setColumns] = useState<Column[]>(defaultColumns)
-  const [localCards, setLocalCards] = useState<Task[]>([])
-  const [hydrated, setHydrated] = useState(false)
-  const columnsId = useMemo(() => columns.map((col) => col.id), [columns])
+  const [tasks, setTasks] = useState<Record<string, Task[]>>({})
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [orderedIds, setOrderedIds] = useState<string[]>([])
+  const [loading, setLoading] = useState(!!pipelineId)
 
-  // Load board state — from API when pipelineId is set, else localStorage
-  useEffect(() => {
-    if (pipelineId) {
-      import("@/lib/api").then(({ apiClient }) => {
-        apiClient<{ state: { columns?: Column[]; cards?: Task[] } | null }>(`/kanban/${pipelineId}`)
-          .then((data) => {
-            if (data.state?.columns && data.state.columns.length > 0) setColumns(data.state.columns)
-            if (data.state?.cards) setLocalCards(data.state.cards)
-          })
-          .catch(() => {/* use defaults */})
-          .finally(() => setHydrated(true))
-      })
-    } else if (storageKey) {
+  /**
+   * Ref to the last-committed board state used for optimistic-revert on save failure.
+   * We snapshot before every write so a failed PUT can restore the previous state.
+   */
+  const lastSavedRef = useRef<PersistedBoardState>({ columns: defaultColumns, tasks: {} })
+
+  // ── Backend persistence helpers ──────────────────────────────────────────
+
+  /**
+   * Persists the current board state to `PUT /kanban/{pipelineId}`.
+   * Called after every mutation when `pipelineId` is set.
+   * On failure, reverts to the last saved snapshot and shows a toast.
+   */
+  const persistBoard = useCallback(
+    async (nextColumns: Column[], nextTasks: Record<string, Task[]>) => {
+      if (!pipelineId) return
+
+      const snapshot = lastSavedRef.current
+      lastSavedRef.current = { columns: nextColumns, tasks: nextTasks }
+
       try {
-        const raw = localStorage.getItem(storageKey)
-        if (raw) {
-          const saved = JSON.parse(raw)
-          if (Array.isArray(saved.columns) && saved.columns.length > 0) setColumns(saved.columns)
-          if (Array.isArray(saved.cards)) setLocalCards(saved.cards)
-        }
-      } catch { /* ignore */ }
-      setHydrated(true)
-    } else {
-      setHydrated(true)
-    }
-  }, [storageKey, pipelineId])
+        const state: PersistedBoardState = { columns: nextColumns, tasks: nextTasks }
+        await apiClient.put(`/kanban/${pipelineId}`, { pipeline_id: pipelineId, state })
+      } catch {
+        // Revert to the last successfully saved state
+        setColumns(snapshot.columns)
+        setTasks(snapshot.tasks)
+        lastSavedRef.current = snapshot
+        toast.error("Pano kaydedilemedi. Değişiklikler geri alındı.")
+      }
+    },
+    [pipelineId]
+  )
 
-  // Persist board state — to API when pipelineId is set, else localStorage
+  // ── Load board from backend on mount (when pipelineId is provided) ────────
+
   useEffect(() => {
-    if (!hydrated) return
-    if (pipelineId) {
-      import("@/lib/api").then(({ apiClient }) => {
-        apiClient(`/kanban/${pipelineId}`, {
-          method: "PUT",
-          body: JSON.stringify({ pipeline_id: pipelineId, state: { columns, cards: localCards } }),
-        }).catch(() => {/* ignore save errors */})
-      })
-    } else if (storageKey) {
-      localStorage.setItem(storageKey, JSON.stringify({ columns, cards: localCards }))
-      window.dispatchEvent(new CustomEvent("wms:kanban-changed", { detail: { key: storageKey } }))
+    if (!pipelineId) return
+
+    async function loadBoard() {
+      try {
+        const response = await apiClient.get<{ state: PersistedBoardState | null }>(
+          `/kanban/${pipelineId}`
+        )
+        if (response?.state?.columns && response.state.tasks) {
+          setColumns(response.state.columns)
+          setTasks(response.state.tasks)
+          lastSavedRef.current = response.state
+        }
+      } catch {
+        toast.error("Pano yüklenemedi.")
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [storageKey, pipelineId, columns, localCards, hydrated])
 
-  const tasks = storageKey ? localCards : globalCtx.tasks
+    loadBoard()
+  }, [pipelineId])
 
-  const displayTasks = useMemo(() => {
-    const contextIds = tasks.map((t) => t.id)
-    const filtered = orderedIds.filter((id) => contextIds.includes(id))
-    const newIds = contextIds.filter((id) => !filtered.includes(id))
-    const merged = [...filtered, ...newIds]
-    return merged.map((id) => tasks.find((t) => t.id === id)!).filter(Boolean)
-  }, [tasks, orderedIds])
-
-  const tasksByColumn = useMemo(() => {
-    const groups: Record<string, Task[]> = {}
-    columns.forEach((col) => {
-      groups[col.id] = displayTasks.filter((t) => t.status === col.id)
-    })
-    return groups
-  }, [displayTasks, columns])
-
-  const _updateCard = useCallback(
-    (taskId: string, updates: Partial<Task>) => {
-      if (storageKey) {
-        setLocalCards((prev) => prev.map((c) => (c.id === taskId ? { ...c, ...updates } : c)))
-      } else {
-        globalCtx.updateTask(taskId, updates)
-      }
+  // Expose addColumn to the parent via callback ref
+  const addColumn = useCallback(
+    (title: string) => {
+      const newCol: Column = { id: crypto.randomUUID(), title }
+      const nextColumns = [...columns, newCol]
+      const nextTasks = { ...tasks, [newCol.id]: [] }
+      setColumns(nextColumns)
+      setTasks(nextTasks)
+      persistBoard(nextColumns, nextTasks)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [storageKey]
+    [columns, tasks, persistBoard]
   )
 
-  const _deleteCard = useCallback(
-    (taskId: string) => {
-      if (storageKey) {
-        setLocalCards((prev) => prev.filter((c) => c.id !== taskId))
-      } else {
-        globalCtx.deleteTask(taskId)
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [storageKey]
+  useEffect(() => {
+    onAddColumn?.(addColumn)
+  }, [onAddColumn, addColumn])
+
+  // ── DnD sensors ──────────────────────────────────────────────────────────
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   )
 
-  const addCard = useCallback(
-    (columnId: string, title: string) => {
-      const newTask: Task = {
-        id: `kb-${Date.now()}`,
-        title,
-        status: columnId as TaskStatus,
-        priority: "medium",
-        assignees: [],
-        dueDate: "",
-        tags: [],
-        createdAt: new Date().toISOString().slice(0, 10),
-      }
-      if (storageKey) {
-        setLocalCards((prev) => [...prev, newTask])
-      } else {
-        globalCtx.addTask(newTask)
-      }
-      toast.success("Kart eklendi")
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [storageKey]
+  // ── Derived data ─────────────────────────────────────────────────────────
+
+  const columnIds = useMemo(() => columns.map((c) => c.id), [columns])
+
+  const deleteTargetColumn = useMemo(
+    () => columns.find((c) => c.id === deleteTarget) ?? null,
+    [columns, deleteTarget]
   )
 
-  const duplicateCard = useCallback(
-    (taskId: string) => {
-      const source = (storageKey ? localCards : globalCtx.tasks).find((t) => t.id === taskId)
-      if (!source) return
-      const copy: Task = { ...source, id: `kb-${Date.now()}`, title: `${source.title} (kopya)`, createdAt: new Date().toISOString().slice(0, 10) }
-      if (storageKey) {
-        setLocalCards((prev) => [...prev, copy])
-      } else {
-        globalCtx.addTask(copy)
-      }
-      toast.success("Kart kopyalandı")
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [storageKey, localCards]
+  const deleteTargetTaskCount = useMemo(
+    () => (deleteTarget ? (tasks[deleteTarget]?.length ?? 0) : 0),
+    [tasks, deleteTarget]
   )
 
-  const updateCard = useCallback(
-    (taskId: string, updates: Partial<Task>) => {
-      _updateCard(taskId, updates)
+  const hasOtherColumns = columns.length > 1
+
+  // ── Column operations ────────────────────────────────────────────────────
+
+  const renameColumn = useCallback(
+    (id: string, newTitle: string) => {
+      const nextColumns = columns.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
+      setColumns(nextColumns)
+      persistBoard(nextColumns, tasks)
     },
-    [_updateCard]
+    [columns, tasks, persistBoard]
   )
-
-  const deleteCard = useCallback(
-    (taskId: string) => {
-      _deleteCard(taskId)
-      toast.success("Kart silindi")
-    },
-    [_deleteCard]
-  )
-
-  const addColumn = useCallback((title: string) => {
-    const trimmed = title.trim()
-    if (!trimmed) return
-    const newCol: Column = {
-      id: `col-${Date.now()}` as Column["id"],
-      title: trimmed,
-    }
-    setColumns((prev) => [...prev, newCol])
-    toast.success(`"${trimmed}" sütunu eklendi`)
-  }, [])
-
-  const renameColumn = useCallback((id: string, newTitle: string) => {
-    setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c)))
-    toast.success("Sütun adı güncellendi")
-  }, [])
 
   const requestDeleteColumn = useCallback((id: string) => {
     setDeleteTarget(id)
   }, [])
 
-  const confirmDeleteColumn = () => {
+  const confirmDeleteColumn = useCallback(() => {
     if (!deleteTarget) return
-    const remaining = columns.filter((c) => c.id !== deleteTarget)
-    if (remaining.length > 0) {
-      tasks
-        .filter((t) => t.status === deleteTarget)
-        .forEach((t) => _updateCard(t.id, { status: remaining[0].id as TaskStatus }))
+
+    const targetTasks = tasks[deleteTarget] ?? []
+    const otherColumns = columns.filter((c) => c.id !== deleteTarget)
+
+    let nextTasks: Record<string, Task[]>
+
+    if (targetTasks.length > 0 && otherColumns.length > 0) {
+      // Move orphaned cards to the first remaining column
+      const firstColId = otherColumns[0].id
+      nextTasks = {
+        ...tasks,
+        [firstColId]: [...(tasks[firstColId] ?? []), ...targetTasks],
+      }
+      delete nextTasks[deleteTarget]
     } else {
-      tasks.filter((t) => t.status === deleteTarget).forEach((t) => _deleteCard(t.id))
+      nextTasks = { ...tasks }
+      delete nextTasks[deleteTarget]
     }
-    setColumns(remaining)
+
+    setColumns(otherColumns)
+    setTasks(nextTasks)
     setDeleteTarget(null)
-    toast.success("Sütun silindi")
-  }
+    persistBoard(otherColumns, nextTasks)
+  }, [deleteTarget, columns, tasks, persistBoard])
 
-  React.useEffect(() => {
-    onAddColumn?.(addColumn)
-  }, [onAddColumn, addColumn])
+  // ── Card operations ──────────────────────────────────────────────────────
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  const addCard = useCallback(
+    (columnId: string, title: string) => {
+      const newTask: Task = {
+        id: crypto.randomUUID(),
+        title,
+        status: columnId as TaskStatus,
+        priority: "medium",
+        tags: [],
+        assignees: [],
+        dueDate: "",
+        description: "",
+        createdAt: new Date().toISOString().slice(0, 10),
+      }
+      const nextTasks = {
+        ...tasks,
+        [columnId]: [...(tasks[columnId] ?? []), newTask],
+      }
+      setTasks(nextTasks)
+      persistBoard(columns, nextTasks)
+    },
+    [tasks, columns, persistBoard]
   )
 
-  function onDragStart(event: DragStartEvent) {
-    if (event.active.data.current?.type === "Task") {
-      setActiveTask(event.active.data.current.task)
-    }
-  }
+  const deleteCard = useCallback(
+    (taskId: string) => {
+      const nextTasks = Object.fromEntries(
+        Object.entries(tasks).map(([colId, colTasks]) => [
+          colId,
+          colTasks.filter((t) => t.id !== taskId),
+        ])
+      )
+      setTasks(nextTasks)
+      persistBoard(columns, nextTasks)
+    },
+    [tasks, columns, persistBoard]
+  )
 
-  function onDragOver(event: DragOverEvent) {
-    const { active, over } = event
-    if (!over) return
-    const activeId = active.id as string
-    const overId = over.id as string
-    if (activeId === overId) return
+  const updateCard = useCallback(
+    (taskId: string, updates: Partial<Task>) => {
+      const nextTasks = Object.fromEntries(
+        Object.entries(tasks).map(([colId, colTasks]) => [
+          colId,
+          colTasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
+        ])
+      )
+      setTasks(nextTasks)
+      persistBoard(columns, nextTasks)
+    },
+    [tasks, columns, persistBoard]
+  )
 
-    const isActiveATask = active.data.current?.type === "Task"
-    const isOverATask = over.data.current?.type === "Task"
+  const duplicateCard = useCallback(
+    (taskId: string) => {
+      let sourceColId: string | null = null
+      let sourceTask: Task | null = null
 
-    if (!isActiveATask) return
-
-    if (isActiveATask && isOverATask) {
-      const ids = displayTasks.map((t) => t.id)
-      const activeIndex = ids.indexOf(activeId)
-      const overIndex = ids.indexOf(overId)
-      const aTask = displayTasks[activeIndex]
-      const oTask = displayTasks[overIndex]
-      if (aTask.status !== oTask.status) {
-        _updateCard(activeId, { status: oTask.status })
+      for (const [colId, colTasks] of Object.entries(tasks)) {
+        const found = colTasks.find((t) => t.id === taskId)
+        if (found) {
+          sourceColId = colId
+          sourceTask = found
+          break
+        }
       }
-      setOrderedIds(arrayMove(ids, activeIndex, overIndex))
-      return
-    }
 
-    const isOverAColumn = over.data.current?.type === "Column"
-    if (isActiveATask && isOverAColumn) {
-      const aTask = displayTasks.find((t) => t.id === activeId)
-      if (aTask && aTask.status !== overId) {
-        _updateCard(activeId, { status: overId as TaskStatus })
+      if (!sourceTask || !sourceColId) return
+
+      const duplicate: Task = { ...sourceTask, id: crypto.randomUUID() }
+      const nextTasks = {
+        ...tasks,
+        [sourceColId]: [...(tasks[sourceColId] ?? []), duplicate],
       }
-    }
-  }
+      setTasks(nextTasks)
+      persistBoard(columns, nextTasks)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, columns, persistBoard]
+  )
 
-  function onDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    setActiveTask(null)
-    if (!over) return
-    const activeId = active.id as string
-    const overId = over.id as string
-    if (activeId === overId) return
+  // ── DnD handlers ─────────────────────────────────────────────────────────
 
-    // Column reorder
-    if (active.data.current?.type === "Column" && columns.some((c) => c.id === overId)) {
-      const oldIndex = columns.findIndex((c) => c.id === activeId)
-      const newIndex = columns.findIndex((c) => c.id === overId)
-      if (oldIndex !== newIndex) setColumns(arrayMove(columns, oldIndex, newIndex))
-      return
-    }
-
-    // Task → column drop
-    const isActiveATask = active.data.current?.type === "Task"
-    const isOverAColumn = over.data.current?.type === "Column"
-    if (isActiveATask && isOverAColumn) {
-      const aTask = displayTasks.find((t) => t.id === activeId)
-      if (aTask && aTask.status !== overId) {
-        _updateCard(activeId, { status: overId as TaskStatus })
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const { active } = event
+      if (active.data.current?.type === "Task") {
+        setActiveTask(active.data.current.task as Task)
       }
-    }
-  }
+    },
+    []
+  )
 
-  const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({
-      styles: { active: { opacity: "0.5" } },
-    }),
-  }
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
+      if (active.data.current?.type !== "Task") return
 
-  const deleteTargetColumn = columns.find((c) => c.id === deleteTarget)
-  const deleteTargetTaskCount = deleteTarget
-    ? (tasksByColumn[deleteTarget] ?? []).length
-    : 0
-  const hasOtherColumns = columns.length > 1
+      const activeTask = active.data.current.task as Task
+      const overType = over.data.current?.type
+
+      // Determine the target column id
+      let toColId: string
+      if (overType === "Column") {
+        toColId = over.id as string
+      } else if (overType === "Task") {
+        const overTask = over.data.current?.task as Task
+        toColId = overTask.columnId
+      } else {
+        return
+      }
+
+      if (activeTask.status === toColId) return
+
+      // Move card across columns in local state (live preview during drag)
+      setTasks((prev) => {
+        const fromColId = activeTask.status
+        const fromColTasks = (prev[fromColId] ?? []).filter(
+          (t) => t.id !== activeTask.id
+        )
+        const toColTasks = [
+          ...(prev[toColId] ?? []),
+          { ...activeTask, status: toColId as TaskStatus },
+        ]
+        return { ...prev, [fromColId]: fromColTasks, [toColId]: toColTasks }
+      })
+
+      // Update the active task ref so subsequent dragOver events use the new status
+      setActiveTask((prev) =>
+        prev ? { ...prev, status: toColId as TaskStatus } : null
+      )
+    },
+    []
+  )
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      setActiveTask(null)
+
+      if (!over || active.id === over.id) return
+
+      if (active.data.current?.type === "Column") {
+        // Reorder columns
+        const oldIndex = columns.findIndex((c) => c.id === active.id)
+        const newIndex = columns.findIndex((c) => c.id === over.id)
+        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+        const nextColumns = arrayMove(columns, oldIndex, newIndex)
+        setColumns(nextColumns)
+        persistBoard(nextColumns, tasks)
+        return
+      }
+
+      if (active.data.current?.type === "Task") {
+        // Reorder cards within the same column
+        const activeTaskData = active.data.current.task as Task
+        // Task.status holds the column id (the column this card currently belongs to)
+        const colId = activeTaskData.status
+        const colTasks = tasks[colId] ?? []
+        const oldIndex = colTasks.findIndex((t) => t.id === active.id)
+        const newIndex = colTasks.findIndex((t) => t.id === over.id)
+
+        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+          const nextColTasks = arrayMove(colTasks, oldIndex, newIndex)
+          const nextTasks = { ...tasks, [colId]: nextColTasks }
+          setTasks(nextTasks)
+          persistBoard(columns, nextTasks)
+        } else {
+          // Cross-column move already done in handleDragOver — just persist
+          persistBoard(columns, tasks)
+        }
+      }
+    },
+    [columns, tasks, persistBoard]
+  )
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  if (loading) return <KanbanSkeleton />
 
   return (
     <>
       <DndContext
-        id={id}
         sensors={sensors}
         collisionDetection={closestCorners}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDragEnd={onDragEnd}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
       >
-        <div className="scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent flex h-full w-full gap-4 overflow-x-auto px-4 pb-4 pt-1">
-          <SortableContext items={columnsId} strategy={horizontalListSortingStrategy}>
-            {columns.map((col) => (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
+            {columns.map((column) => (
               <SortableColumnWrapper
-                key={col.id}
-                column={col}
+                key={column.id}
+                column={column}
+                tasks={tasks[column.id] ?? []}
                 columns={columns}
-                tasks={tasksByColumn[col.id] || []}
                 onAddCard={addCard}
                 onDeleteCard={deleteCard}
                 onUpdateCard={updateCard}
@@ -511,6 +665,8 @@ export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoard
               />
             ))}
           </SortableContext>
+
+          <AddColumnInline onAdd={addColumn} />
         </div>
 
         {typeof document !== "undefined" &&

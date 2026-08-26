@@ -33,9 +33,12 @@ function useKanbanStats(pipelineId: string | undefined) {
 
   useEffect(() => {
     if (!pipelineId) { setStats({ total: 0, done: 0, progress: 0 }); return }
-    apiClient<{ state: { cards?: { status: string }[] } | null }>(`/kanban/${pipelineId}`)
+    // Board state shape: { columns: Column[], tasks: Record<columnId, Task[]> }
+    // Flatten the tasks map to get a single list for progress calculation.
+    apiClient<{ state: { tasks?: Record<string, { status: string }[]> } | null }>(`/kanban/${pipelineId}`)
       .then((data) => {
-        const cards = data.state?.cards ?? []
+        const tasksByCol = data.state?.tasks ?? {}
+        const cards = Object.values(tasksByCol).flat()
         const total = cards.length
         const done = cards.filter((c) => c.status === "done").length
         setStats({ total, done, progress: total > 0 ? Math.round((done / total) * 100) : 0 })

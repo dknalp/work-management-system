@@ -1,7 +1,11 @@
-node_modules/
-.next/
+# Secrets
 .env.local
-data/
-config/
+.env.*.local
+*.pem
+*.key
+
+# Development artifacts
+node_modules
+.next
 *.log
-.git/
+.DS_Store

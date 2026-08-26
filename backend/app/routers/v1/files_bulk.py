@@ -3,11 +3,11 @@
 import uuid
 
 from fastapi import APIRouter, Depends
-from sqlmodel import Session
+from firebase_admin import firestore
 
-from app.database import get_session
 from app.deps import get_current_user
-from app.models import FileRecord, User
+from app.firebase import get_db
+from app.models import User
 from app.r2 import r2_copy_object
 from app.routers.v1.files_utils import (
     BulkCopyBody,
@@ -28,21 +28,26 @@ router = APIRouter()
 def bulk_move(
     body: BulkMoveBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> BulkResult:
+    """Move a set of files/folders to a new parent directory."""
     succeeded, failed = [], []
+    now = _now()
     for fid in body.ids:
         try:
-            record = _get_record_or_404(fid, current_user, session)
-            new_path = _build_path(body.dest_parent, record.name)
-            record.path = new_path  # type: ignore[assignment]
-            record.parent_path = body.dest_parent  # type: ignore[assignment]
-            record.updated_at = _now()
-            session.add(record)
+            _, data = _get_record_or_404(fid, db)
+            if data.get("owner_id") != current_user.id:
+                failed.append(fid)
+                continue
+            new_path = _build_path(body.dest_parent, data["name"])
+            db.collection("file_records").document(fid).update({
+                "path": new_path,
+                "parent_path": body.dest_parent,
+                "updated_at": now,
+            })
             succeeded.append(fid)
         except Exception:
             failed.append(fid)
-    session.commit()
     return BulkResult(succeeded=succeeded, failed=failed)
 
 
@@ -50,42 +55,46 @@ def bulk_move(
 async def bulk_copy(
     body: BulkCopyBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> BulkResult:
+    """Copy a set of files to a new parent directory."""
     succeeded, failed = [], []
     for fid in body.ids:
         try:
-            record = _get_record_or_404(fid, current_user, session)
-            new_path = _build_path(body.dest_parent, record.name)
-            new_id = uuid.uuid4()
-            new_r2_key: str | None = f"shared/{new_id}"
-            if record.r2_key and record.type == "file":
+            _, data = _get_record_or_404(fid, db)
+            if data.get("owner_id") != current_user.id:
+                failed.append(fid)
+                continue
+            new_id = str(uuid.uuid4())
+            new_r2_key: str | None = None
+
+            if data.get("r2_key") and data.get("type") == "file":
+                new_r2_key = f"shared/{new_id}"
                 if _use_r2():
-                    await r2_copy_object(record.r2_key, new_r2_key)
+                    await r2_copy_object(data["r2_key"], new_r2_key)
                 else:
                     import shutil
-                    src = _local_path(record.r2_key)
+                    src = _local_path(data["r2_key"])
                     dst = _local_path(new_r2_key)
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(src, dst)
-            else:
-                new_r2_key = None
-            new_record = FileRecord(
-                id=new_id,
-                owner_id=current_user.id,
-                name=record.name,
-                path=new_path,
-                parent_path=body.dest_parent,
-                type=record.type,
-                size=record.size,
-                mime_type=record.mime_type,
-                r2_key=new_r2_key,
-            )
-            session.add(new_record)
+
+            now = _now()
+            new_path = _build_path(body.dest_parent, data["name"])
+            db.collection("file_records").document(new_id).set({
+                **data,
+                "path": new_path,
+                "parent_path": body.dest_parent,
+                "r2_key": new_r2_key,
+                "is_deleted": False,
+                "deleted_at": None,
+                "is_starred": False,
+                "created_at": now,
+                "updated_at": now,
+            })
             succeeded.append(fid)
         except Exception:
             failed.append(fid)
-    session.commit()
     return BulkResult(succeeded=succeeded, failed=failed)
 
 
@@ -93,19 +102,23 @@ async def bulk_copy(
 def bulk_trash(
     body: BulkTrashBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> BulkResult:
+    """Soft-delete (trash) a set of files/folders."""
     succeeded, failed = [], []
     now = _now()
     for fid in body.ids:
         try:
-            record = _get_record_or_404(fid, current_user, session)
-            record.is_deleted = True  # type: ignore[assignment]
-            record.deleted_at = now  # type: ignore[assignment]
-            record.updated_at = now
-            session.add(record)
+            _, data = _get_record_or_404(fid, db)
+            if data.get("owner_id") != current_user.id:
+                failed.append(fid)
+                continue
+            db.collection("file_records").document(fid).update({
+                "is_deleted": True,
+                "deleted_at": now,
+                "updated_at": now,
+            })
             succeeded.append(fid)
         except Exception:
             failed.append(fid)
-    session.commit()
     return BulkResult(succeeded=succeeded, failed=failed)

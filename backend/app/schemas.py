@@ -1,15 +1,27 @@
-import uuid
+"""Pydantic request/response schemas for the work-management-system API.
+
+These schemas are the contract between the HTTP layer and the application logic.
+They are separate from the data models in ``models.py``, which represent
+Firestore documents.  Schemas handle input validation and shape API responses.
+
+Note: User IDs are plain strings (Firebase Auth UIDs), not UUIDs.
+"""
+
 from datetime import datetime
-from typing import Literal, Optional, List
-from pydantic import BaseModel, EmailStr, field_validator
+from typing import Any, List, Literal, Optional
+
+from pydantic import AnyHttpUrl, BaseModel, EmailStr, Field, field_validator
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
+    """Request body for ``POST /auth/register``."""
+
     email: EmailStr
     name: str
-    password: str
+    # max_length=128 prevents memory abuse from extremely long password strings
+    password: str = Field(..., max_length=128)
 
     @field_validator("password")
     @classmethod
@@ -26,26 +38,15 @@ class RegisterRequest(BaseModel):
         return v.strip()
 
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class LogoutRequest(BaseModel):
-    refresh_token: str
-
-
 class ForgotPasswordRequest(BaseModel):
+    """Request body for ``POST /auth/forgot-password``."""
     email: EmailStr
 
 
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
+class ChangePasswordRequest(BaseModel):
+    """Request body for ``PATCH /auth/change-password``."""
+    # max_length=128 prevents memory abuse from extremely long password strings
+    new_password: str = Field(..., max_length=128)
 
     @field_validator("new_password")
     @classmethod
@@ -58,17 +59,35 @@ class ResetPasswordRequest(BaseModel):
 # ── User ──────────────────────────────────────────────────────────────────────
 
 class UserResponse(BaseModel):
-    id: uuid.UUID
+    """Serialized user returned by API endpoints."""
+
+    id: str
+    """Firebase Auth UID."""
     email: str
     name: str
-    bio: Optional[str]
-    avatar_url: Optional[str]
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
     is_active: bool
     is_admin: bool
     role: str = "member"
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UpdateProfileRequest(BaseModel):
+    """Request body for ``PATCH /users/me``."""
+
+    name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("Name cannot be empty")
+        return v.strip() if v else v
 
 
 class PermissionsResponse(BaseModel):
@@ -81,6 +100,7 @@ class RolePermissionsMap(BaseModel):
 
 
 class RoleCreate(BaseModel):
+    """Request body for creating a custom role."""
     name: str
     copy_from: Optional[str] = None
 
@@ -93,6 +113,34 @@ class RoleResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Bots / API keys ───────────────────────────────────────────────────────────
+
+class BotCreate(BaseModel):
+    """Request body for ``POST /bots``."""
+    name: str = Field(..., max_length=256)
+    description: Optional[str] = Field(None, max_length=10_000)
+
+
+class BotResponse(BaseModel):
+    """Serialized bot account returned by API endpoints.
+
+    ``full_key`` is populated only on creation and is never stored or returned
+    again after that first response.
+    """
+    id: str
+    name: str
+    description: Optional[str] = None
+    key_prefix: str
+    is_active: bool
+    owner_id: str
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    full_key: Optional[str] = None
+    """Present only on first creation — store it safely, it is never shown again."""
+
+    model_config = {"from_attributes": True}
+
+
 # ── Tasks ─────────────────────────────────────────────────────────────────────
 
 TaskStatus = Literal["todo", "in-progress", "done"]
@@ -100,26 +148,26 @@ TaskPriority = Literal["low", "medium", "high"]
 
 
 class TaskCreate(BaseModel):
-    id: Optional[str] = None
-    title: str
+    # id is intentionally omitted — task IDs are always generated server-side
+    title: str = Field(..., max_length=512)
     status: TaskStatus = "todo"
     priority: TaskPriority = "medium"
     assignees: List[str] = []
     due_date: Optional[str] = None
     tags: Optional[List[str]] = None
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=10_000)
     created_at: Optional[str] = None
     project_id: Optional[str] = None
 
 
 class TaskUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=512)
     status: Optional[TaskStatus] = None
     priority: Optional[TaskPriority] = None
     assignees: Optional[List[str]] = None
     due_date: Optional[str] = None
     tags: Optional[List[str]] = None
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=10_000)
     completed_at: Optional[datetime] = None
     project_id: Optional[str] = None
 
@@ -130,10 +178,10 @@ class TaskResponse(BaseModel):
     status: str
     priority: str
     assignees: List[str] = []
-    due_date: Optional[str]
-    tags: Optional[List[str]]
-    description: Optional[str]
-    completed_at: Optional[datetime]
+    due_date: Optional[str] = None
+    tags: Optional[List[str]] = None
+    description: Optional[str] = None
+    completed_at: Optional[datetime] = None
     project_id: Optional[str] = None
     created_at: str
 
@@ -158,10 +206,10 @@ class ActivityResponse(BaseModel):
     type: str
     task_id: str
     task_title: str
-    detail: Optional[str]
+    detail: Optional[str] = None
     timestamp: str
-    user_id: Optional[str]
-    user_name: Optional[str]
+    user_id: Optional[str] = None
+    user_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -194,9 +242,9 @@ class TeamMemberResponse(BaseModel):
     email: str
     role: str
     status: str
-    avatar: Optional[str]
-    joined_at: str
-    phone: Optional[str]
+    avatar: Optional[str] = None
+    joined_at: Optional[str] = None
+    phone: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -218,185 +266,129 @@ class AnalyticsDailyPoint(BaseModel):
     completed: int
 
 
-class UpdateProfileRequest(BaseModel):
-    name: Optional[str] = None
-    bio: Optional[str] = None
-    avatar_url: Optional[str] = None
+# ── Webhooks ──────────────────────────────────────────────────────────────────
 
-    @field_validator("name")
-    @classmethod
-    def name_not_empty(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and not v.strip():
-            raise ValueError("Name cannot be empty")
-        return v.strip() if v else v
+class WebhookCreate(BaseModel):
+    """Schema for registering a new webhook.
+
+    ``url`` is validated to be an absolute HTTP/HTTPS URL at the Pydantic layer.
+    The dispatcher performs an additional runtime SSRF check (hostname resolution
+    against blocked IP ranges) before each delivery.
+    """
+
+    url: AnyHttpUrl
+    events: List[str]
+    secret: Optional[str] = None
 
 
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
+class WebhookResponse(BaseModel):
+    id: str
+    bot_id: str
+    url: str
+    events: List[str]
+    secret: Optional[str] = None
+    is_active: bool
+    created_at: datetime
 
-    @field_validator("new_password")
-    @classmethod
-    def password_strength(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        return v
+    model_config = {"from_attributes": True}
+
+
+# ── Files ──────────────────────────────────────────────────────────────────────
+
+class FileRecordResponse(BaseModel):
+    """Serialized file record returned by the file API."""
+
+    id: str
+    owner_id: str
+    name: str
+    path: str
+    parent_path: str
+    type: str
+    size: Optional[int] = None
+    mime_type: Optional[str] = None
+    r2_key: Optional[str] = None
+    is_deleted: bool
+    deleted_at: Optional[datetime] = None
+    is_starred: bool
+    color: Optional[str] = None
+    icon_emoji: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FileRenameRequest(BaseModel):
+    new_name: str
+
+
+class FilePatchRequest(BaseModel):
+    """Partial update for file metadata (star, color, icon)."""
+    is_starred: Optional[bool] = None
+    color: Optional[str] = None
+    icon_emoji: Optional[str] = None
+
+
+class BulkMoveRequest(BaseModel):
+    paths: List[str]
+    destination: str
+
+
+class BulkCopyRequest(BaseModel):
+    paths: List[str]
+    destination: str
+
+
+class BulkTrashRequest(BaseModel):
+    paths: List[str]
+
+
+class ShareCreateRequest(BaseModel):
+    file_id: str
+    shared_with_user_id: Optional[str] = None
+    permission_level: str = "view"
+    expires_at: Optional[datetime] = None
+
+
+class ShareResponse(BaseModel):
+    id: str
+    file_id: str
+    owner_id: str
+    shared_with_user_id: Optional[str] = None
+    share_token: Optional[str] = None
+    permission_level: str
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
 
-class PatchUserRole(BaseModel):
-    role: str
-
-
-class AdminCreateUser(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
-    role: str = "member"
-    is_admin: bool = False
-
-    @field_validator("password")
-    @classmethod
-    def password_strength(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        return v
-
-    @field_validator("name")
-    @classmethod
-    def name_not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Name cannot be empty")
-        return v.strip()
-
-
-# ── Bots ──────────────────────────────────────────────────────────────────────
-
-class BotCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-    @field_validator("name")
-    @classmethod
-    def name_not_empty(cls, v: str) -> str:
-        if not v.strip():
-            raise ValueError("Bot name cannot be empty")
-        if len(v.strip()) > 64:
-            raise ValueError("Bot name max 64 characters")
-        return v.strip()
-
-
-class BotUpdate(BaseModel):
+class AdminUserUpdate(BaseModel):
+    """Request body for admin user updates."""
     name: Optional[str] = None
-    description: Optional[str] = None
+    role: Optional[str] = None
+    is_admin: Optional[bool] = None
     is_active: Optional[bool] = None
-
-
-class BotResponse(BaseModel):
-    id: uuid.UUID
-    name: str
-    description: Optional[str]
-    key_prefix: str
-    owner_id: uuid.UUID
-    is_active: bool
-    created_at: datetime
-    last_used_at: Optional[datetime]
-
-    model_config = {"from_attributes": True}
-
-
-class BotCreateResponse(BotResponse):
-    """Returned only on creation — includes the full key (shown once)."""
-    api_key: str
-
-
-# ── Webhooks ──────────────────────────────────────────────────────────────────
-
-VALID_WEBHOOK_EVENTS = {
-    "task.created",
-    "task.updated",
-    "task.deleted",
-    "file.uploaded",
-    "message.received",
-}
-
-
-# ── Chat ──────────────────────────────────────────────────────────────────────
-
-class ChatMessageCreate(BaseModel):
-    text: str
-
-
-class ChatMessageResponse(BaseModel):
-    id: uuid.UUID
-    room_id: str
-    sender_id: str
-    sender_name: str
-    sender_type: str
-    text: str
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class ChatLastMessage(BaseModel):
-    text: str
-    created_at: datetime
-
-
-class ChatContact(BaseModel):
-    id: str
-    name: str
-    type: str       # "user" | "bot"
-    is_active: bool
-    last_message: Optional[ChatLastMessage] = None
-
-
-# ── Webhooks ──────────────────────────────────────────────────────────────────
-
-class WebhookCreate(BaseModel):
-    url: str
-    events: List[str]
-    secret: Optional[str] = None
-
-    @field_validator("events")
-    @classmethod
-    def validate_events(cls, v: List[str]) -> List[str]:
-        for e in v:
-            if e not in VALID_WEBHOOK_EVENTS:
-                raise ValueError(f"Unknown event '{e}'. Valid: {sorted(VALID_WEBHOOK_EVENTS)}")
-        return v
-
-
-class WebhookResponse(BaseModel):
-    id: uuid.UUID
-    bot_id: uuid.UUID
-    url: str
-    events: List[str]
-    is_active: bool
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 # ── Projects ──────────────────────────────────────────────────────────────────
 
 class ProjectCreate(BaseModel):
-    id: Optional[str] = None
-    name: str
+    # id is intentionally omitted — project IDs are always generated server-side
+    name: str = Field(..., max_length=256)
     slug: Optional[str] = None
-    color: str = "blue"
-    emoji: str = "🚀"
+    color: str = Field("#6366f1", max_length=20)
+    emoji: str = Field("📁", max_length=10)
     is_pinned: bool = False
-    is_expanded: bool = False
+    is_expanded: bool = True
 
 
 class ProjectUpdate(BaseModel):
-    name: Optional[str] = None
-    slug: Optional[str] = None
-    color: Optional[str] = None
-    emoji: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=256)
+    color: Optional[str] = Field(None, max_length=20)
+    emoji: Optional[str] = Field(None, max_length=10)
     is_pinned: Optional[bool] = None
     is_expanded: Optional[bool] = None
 
@@ -439,17 +431,58 @@ class PipelineResponse(BaseModel):
 
 class KanbanBoardState(BaseModel):
     pipeline_id: str
-    state: Optional[dict] = None
+    state: Optional[Any] = None
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
 
-# ── Calendar Events ───────────────────────────────────────────────────────────
+# ── User preferences ──────────────────────────────────────────────────────────
+
+class UserPreferences(BaseModel):
+    """Persisted per-user UI/notification preferences stored in Firestore.
+
+    All fields are optional on input so that ``PATCH`` requests can update
+    individual settings without resending the full object.  Defaults here
+    represent the initial state returned when no preferences have been saved.
+    """
+
+    notifications_email: bool = True
+    """Whether the user wants activity updates delivered by e-mail."""
+
+    notifications_push: bool = True
+    """Whether the user wants in-app push notifications."""
+
+    theme: str = "system"
+    """Active color theme.  One of: ``light``, ``dark``, ``system``,
+    ``warm``, ``slate``, ``forest``, ``midnight``."""
+
+    language: str = "en"
+    """Preferred display language (IETF tag, e.g. ``en``, ``tr``)."""
+
+    timezone: str = "UTC"
+    """IANA timezone string, e.g. ``Europe/Istanbul``."""
+
+
+class UserPreferencesPatch(BaseModel):
+    """Request body for ``PATCH /users/me/preferences``.
+
+    All fields are optional — only the provided fields are written to
+    Firestore (merge=True), leaving the rest untouched.
+    """
+
+    notifications_email: Optional[bool] = None
+    notifications_push: Optional[bool] = None
+    theme: Optional[str] = None
+    language: Optional[str] = None
+    timezone: Optional[str] = None
+
+
+# ── Calendar events ───────────────────────────────────────────────────────────
 
 class CalendarEventCreate(BaseModel):
-    id: Optional[str] = None
-    title: str
+    # id is intentionally omitted — event IDs are always generated server-side
+    title: str = Field(..., max_length=512)
     date: str
     time: Optional[str] = None
     priority: str = "medium"
@@ -458,7 +491,7 @@ class CalendarEventCreate(BaseModel):
 
 
 class CalendarEventUpdate(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=512)
     date: Optional[str] = None
     time: Optional[str] = None
     priority: Optional[str] = None
@@ -470,24 +503,10 @@ class CalendarEventResponse(BaseModel):
     id: str
     title: str
     date: str
-    time: Optional[str]
+    time: Optional[str] = None
     priority: str
     remind: bool
-    assignee_names: Optional[List[str]]
+    assignee_names: Optional[List[str]] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-# ── Token responses ───────────────────────────────────────────────────────────
-
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    user: UserResponse
-
-
-class AccessTokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"

@@ -1,237 +1,310 @@
 "use client"
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { apiClient, API_BASE_URL } from "@/lib/api"
+/**
+ * Authentication context — Firebase Auth-based.
+ *
+ * Provides `user`, `loading`, `login`, `logout`, `updateUser` to the app.
+ *
+ * Auth flow:
+ *  - `login(email, password)` → `signInWithEmailAndPassword` (Firebase)
+ *    → `user.getIdToken()` → store in tokenStorage → fetch `/users/me`
+ *  - `logout()` → `signOut(firebaseAuth)` → tokenStorage.clear()
+ *  - Session restore on mount via `onIdTokenChanged` observer:
+ *    Firebase fires this when the SDK loads a cached session, on token
+ *    refresh, or on sign-in/out.  We get the fresh ID token and reload
+ *    the user profile from the backend.
+ *
+ * Cookie sync (for Next.js middleware in proxy.ts):
+ *  - `has_session`  — set when signed in, cleared on logout
+ *  - `is_admin`     — set from /users/me response
+ *  - `user_role`    — set from /users/me response
+ */
+
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
+import {
+  onIdTokenChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User as FirebaseUser,
+} from "firebase/auth"
+import { firebaseAuth } from "@/lib/firebase"
 import { tokenStorage } from "@/lib/auth"
+import { apiClient } from "@/lib/api"
 
-export const MOCK_AUTH = process.env.NEXT_PUBLIC_MOCK_AUTH === "true"
-const MOCK_USER_KEY = "wms:mock_user"
-const MOCK_USERS_KEY = "wms:mock_users"
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-export type User = {
+export interface AuthUser {
   id: string
-  email: string
   name: string
-  bio: string | null
-  avatar_url: string | null
-  is_active: boolean
-  is_admin: boolean
+  email: string
   role: string
+  is_admin: boolean
+  is_active: boolean
+  bio?: string | null
+  avatar_url?: string | null
+  /** Alias for avatar_url — some components use this shorter form. */
+  avatar?: string | null
   created_at: string
 }
 
-const MOCK_USERS_SEED: User[] = [
-  {
-    id: "user-1",
-    email: "admin@workin.app",
-    name: "Admin",
-    bio: null,
-    avatar_url: null,
-    is_active: true,
-    is_admin: true,
-    role: "admin",
-    created_at: "2024-01-01T00:00:00.000Z",
-  },
-  {
-    id: "user-2",
-    email: "demo@workin.app",
-    name: "Demo User",
-    bio: null,
-    avatar_url: null,
-    is_active: true,
-    is_admin: false,
-    role: "member",
-    created_at: "2024-01-01T00:00:00.000Z",
-  },
-  {
-    id: "user-3",
-    email: "yetkili@workin.app",
-    name: "Yetkili Kullanıcı",
-    bio: null,
-    avatar_url: null,
-    is_active: true,
-    is_admin: false,
-    role: "manager",
-    created_at: "2024-02-01T00:00:00.000Z",
-  },
-  {
-    id: "user-4",
-    email: "uye@workin.app",
-    name: "Üye Kullanıcı",
-    bio: null,
-    avatar_url: null,
-    is_active: true,
-    is_admin: false,
-    role: "member",
-    created_at: "2024-03-01T00:00:00.000Z",
-  },
-]
-
-function getMockRegistry(): User[] {
-  if (typeof window === "undefined") return MOCK_USERS_SEED
-  try {
-    const raw = localStorage.getItem(MOCK_USERS_KEY)
-    if (!raw) return MOCK_USERS_SEED
-    const stored: User[] = JSON.parse(raw)
-    // Merge with seed defaults to fill in fields added after initial storage (e.g., role)
-    return stored.map((u) => {
-      const seed = MOCK_USERS_SEED.find((s) => s.id === u.id)
-      return seed ? { ...seed, ...u } : u
-    })
-  } catch {
-    return MOCK_USERS_SEED
-  }
-}
-
-function saveMockRegistry(users: User[]) {
-  localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users))
-}
-
-type AuthContextValue = {
-  user: User | null
+interface AuthContextValue {
+  user: AuthUser | null
+  /** Permissions fetched in parallel with the user profile on every session restore. */
+  permissions: string[] | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
-  updateUser: (data: Partial<User>) => void
+  updateUser: (partial: Partial<AuthUser>) => void
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null)
+// ---------------------------------------------------------------------------
+// Mock auth (when NEXT_PUBLIC_MOCK_AUTH=true)
+// ---------------------------------------------------------------------------
+
+export const MOCK_AUTH = process.env.NEXT_PUBLIC_MOCK_AUTH === "true"
+
+if (MOCK_AUTH && process.env.NODE_ENV === "production") {
+  throw new Error("NEXT_PUBLIC_MOCK_AUTH must not be enabled in production builds.")
+}
+
+const MOCK_USER_KEY = "wms:mock_user"
+const MOCK_ADMIN: AuthUser = {
+  id: "mock-admin",
+  name: "Mock Admin",
+  email: "admin@example.com",
+  role: "admin",
+  is_admin: true,
+  is_active: true,
+  created_at: new Date().toISOString(),
+}
+
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
+
+const AuthContext = createContext<AuthContextValue>({
+  user: null,
+  permissions: null,
+  loading: true,
+  login: async () => {},
+  logout: async () => {},
+  updateUser: () => {},
+})
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [permissions, setPermissions] = useState<string[] | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // ── Cookie helpers ────────────────────────────────────────────────────────
+
+  function _syncRoleCookies(u: AuthUser) {
+    if (typeof document === "undefined") return
+    document.cookie = `is_admin=${u.is_admin ? "1" : "0"}; path=/; max-age=${7 * 86400}; SameSite=Lax; Secure`
+    document.cookie = `user_role=${u.role}; path=/; max-age=${7 * 86400}; SameSite=Lax; Secure`
+  }
+
+  function _clearRoleCookies() {
+    if (typeof document === "undefined") return
+    document.cookie = "is_admin=; path=/; max-age=0; SameSite=Lax; Secure"
+    document.cookie = "user_role=; path=/; max-age=0; SameSite=Lax; Secure"
+  }
+
+  // ── Mock auth mode ────────────────────────────────────────────────────────
+
   useEffect(() => {
-    if (MOCK_AUTH) {
+    if (!MOCK_AUTH) return
+    try {
       const stored = localStorage.getItem(MOCK_USER_KEY)
-      if (stored) {
-        try {
-          const parsed: User = JSON.parse(stored)
-          const seed = MOCK_USERS_SEED.find((s) => s.id === parsed.id)
-          const merged = seed ? { ...seed, ...parsed, role: parsed.role ?? seed.role } : parsed
-          setUser(merged)
-          // Persist merged back so future loads are correct
-          localStorage.setItem(MOCK_USER_KEY, JSON.stringify(merged))
-        } catch { /* ignore */ }
-      }
+      const mockUser: AuthUser = stored ? JSON.parse(stored) : MOCK_ADMIN
+      setUser(mockUser)
+      setPermissions(null)  // mock permissions resolved by PermissionsProvider
+      _syncRoleCookies(mockUser)
+    } catch (err) {
+      console.error("[auth] Failed to load mock user:", err)
+      setUser(MOCK_ADMIN)
+    } finally {
       setLoading(false)
-      return
     }
-    const token = tokenStorage.getAccess()
-    if (!token) { setLoading(false); return }
-    apiClient<User>("/users/me")
-      .then(setUser)
-      .catch(() => tokenStorage.clear())
-      .finally(() => setLoading(false))
   }, [])
+
+  // ── Firebase auth observer ────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (MOCK_AUTH) return
+
+    console.debug("[auth] Subscribing to Firebase onIdTokenChanged")
+
+    const unsubscribe = onIdTokenChanged(
+      firebaseAuth,
+      async (firebaseUser: FirebaseUser | null) => {
+        if (!firebaseUser) {
+          console.debug("[auth] No Firebase session — clearing user state")
+          tokenStorage.clear()
+          _clearRoleCookies()
+          setUser(null)
+          setLoading(false)
+          return
+        }
+
+        try {
+          console.debug("[auth] Firebase user present — fetching ID token")
+          const idToken = await firebaseUser.getIdToken()
+          tokenStorage.setToken(idToken)
+
+          // Fetch profile and permissions in parallel — saves one full round-trip
+          console.debug("[auth] Fetching /api/v1/me and /permissions/my in parallel")
+          const [me, permsData] = await Promise.all([
+            apiClient<AuthUser>("/api/v1/me"),
+            apiClient<{ permissions: string[] }>("/permissions/my").catch(() => ({ permissions: [] })),
+          ])
+          _syncRoleCookies(me)
+          setUser(me)
+          setPermissions(permsData.permissions ?? [])
+          console.debug("[auth] Session restored, role:", me.role)
+        } catch (err) {
+          // Backend unreachable or token rejected — sign out cleanly
+          console.error("[auth] Failed to load user profile after Firebase auth:", err)
+          try {
+            await signOut(firebaseAuth)
+          } catch (signOutErr) {
+            console.error("[auth] signOut also failed:", signOutErr)
+          }
+          tokenStorage.clear()
+          _clearRoleCookies()
+          setUser(null)
+          setPermissions(null)
+        } finally {
+          setLoading(false)
+        }
+      },
+      (err) => {
+        console.error("[auth] onIdTokenChanged error:", err)
+        tokenStorage.clear()
+        _clearRoleCookies()
+        setUser(null)
+        setLoading(false)
+      }
+    )
+
+    return () => {
+      console.debug("[auth] Unsubscribing from Firebase onIdTokenChanged")
+      unsubscribe()
+    }
+  }, [])
+
+  // ── login ─────────────────────────────────────────────────────────────────
 
   const login = useCallback(async (email: string, password: string) => {
     if (MOCK_AUTH) {
-      if (!email.trim()) throw new Error("Email required")
-      const registry = getMockRegistry()
-      const found = registry.find((u) => u.email.toLowerCase() === email.toLowerCase())
-      if (found && !found.is_active) throw new Error("This account has been deactivated.")
-      const mockUser: User = found ?? {
-        id: `user-${Date.now()}`,
-        email,
-        name: email.split("@")[0],
-        bio: null,
-        avatar_url: null,
-        is_active: true,
-        is_admin: false,
-        role: "member",
-        created_at: new Date().toISOString(),
-      }
+      const mockUser = { ...MOCK_ADMIN, email, name: email.split("@")[0] }
       localStorage.setItem(MOCK_USER_KEY, JSON.stringify(mockUser))
-      document.cookie = "has_session=1; path=/; max-age=86400"
-      document.cookie = `is_admin=${mockUser.is_admin ? "1" : "0"}; path=/; max-age=86400`
-      document.cookie = `user_role=${mockUser.role ?? "member"}; path=/; max-age=86400`
       setUser(mockUser)
+      _syncRoleCookies(mockUser)
       return
     }
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "Login failed" }))
-      throw new Error(err.detail ?? "Login failed")
+
+    console.debug("[auth] login() — calling Firebase signInWithEmailAndPassword")
+    let firebaseUser: FirebaseUser
+
+    try {
+      const cred = await signInWithEmailAndPassword(firebaseAuth, email, password)
+      firebaseUser = cred.user
+      console.debug("[auth] Firebase sign-in successful")
+    } catch (err: unknown) {
+      // Map Firebase error codes to friendly messages
+      const code = (err as { code?: string }).code ?? ""
+      console.error("[auth] Firebase sign-in error:", code, err)
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        throw new Error("E-posta veya şifre hatalı.")
+      }
+      if (code === "auth/too-many-requests") {
+        throw new Error("Çok fazla başarısız deneme. Lütfen daha sonra tekrar deneyin.")
+      }
+      if (code === "auth/user-disabled") {
+        throw new Error("Bu hesap devre dışı bırakılmış.")
+      }
+      if (code === "auth/network-request-failed") {
+        throw new Error("Ağ hatası. İnternet bağlantınızı kontrol edin.")
+      }
+      throw new Error("Giriş yapılamadı. Lütfen tekrar deneyin.")
     }
-    const data = await res.json()
-    tokenStorage.setTokens(data.access_token, data.refresh_token)
-    if (data.user?.role) {
-      document.cookie = `user_role=${data.user.role}; path=/; max-age=${7 * 86400}; SameSite=Lax`
+
+    try {
+      const idToken = await firebaseUser.getIdToken()
+      tokenStorage.setToken(idToken)
+      console.debug("[auth] ID token stored — fetching /api/v1/me and /permissions/my in parallel")
+
+      const [me, permsData] = await Promise.all([
+        apiClient<AuthUser>("/api/v1/me"),
+        apiClient<{ permissions: string[] }>("/permissions/my").catch(() => ({ permissions: [] })),
+      ])
+      _syncRoleCookies(me)
+      setUser(me)
+      setPermissions(permsData.permissions ?? [])
+      console.debug("[auth] Login complete, role:", me.role)
+    } catch (err) {
+      console.error("[auth] Failed to load user profile after sign-in:", err)
+      // Sign out from Firebase so we don't leave a dangling session
+      try { await signOut(firebaseAuth) } catch { /* ignore */ }
+      tokenStorage.clear()
+      _clearRoleCookies()
+      throw new Error("Kullanıcı profili yüklenemedi. Lütfen tekrar deneyin.")
     }
-    if (data.user?.is_admin) {
-      document.cookie = `is_admin=1; path=/; max-age=${7 * 86400}; SameSite=Lax`
-    }
-    setUser(data.user)
   }, [])
+
+  // ── logout ────────────────────────────────────────────────────────────────
 
   const logout = useCallback(async () => {
     if (MOCK_AUTH) {
       localStorage.removeItem(MOCK_USER_KEY)
-      document.cookie = "has_session=; path=/; max-age=0"
-      document.cookie = "is_admin=; path=/; max-age=0"
-      document.cookie = "user_role=; path=/; max-age=0"
       setUser(null)
+      _clearRoleCookies()
       return
     }
-    const refresh = tokenStorage.getRefresh()
-    if (refresh) {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refresh }),
-      }).catch(() => {})
+
+    console.debug("[auth] logout() — calling Firebase signOut")
+    try {
+      await signOut(firebaseAuth)
+    } catch (err) {
+      console.error("[auth] Firebase signOut error:", err)
     }
     tokenStorage.clear()
-    document.cookie = "user_role=; path=/; max-age=0"
-    document.cookie = "is_admin=; path=/; max-age=0"
+    _clearRoleCookies()
     setUser(null)
+    setPermissions(null)
+    console.debug("[auth] Logged out")
   }, [])
 
-  const updateUser = useCallback((data: Partial<User>) => {
+  // ── updateUser ────────────────────────────────────────────────────────────
+
+  const updateUser = useCallback((partial: Partial<AuthUser>) => {
     setUser((prev) => {
-      const next = prev ? { ...prev, ...data } : prev
-      if (MOCK_AUTH && next) localStorage.setItem(MOCK_USER_KEY, JSON.stringify(next))
-      return next
+      if (!prev) return prev
+      const updated = { ...prev, ...partial }
+      if (MOCK_AUTH) {
+        try { localStorage.setItem(MOCK_USER_KEY, JSON.stringify(updated)) } catch { /* ignore */ }
+      }
+      _syncRoleCookies(updated)
+      return updated
     })
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, permissions, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider")
-  return ctx
-}
-
-export function useMockUsers() {
-  const { user: currentUser, updateUser } = useAuth()
-  const [mockUsers, setMockUsers] = useState<User[]>(() => getMockRegistry())
-
-  const updateMockUser = useCallback((id: string, patch: Partial<User>) => {
-    const registry = getMockRegistry()
-    const updated = registry.map((u) => (u.id === id ? { ...u, ...patch } : u))
-    saveMockRegistry(updated)
-    setMockUsers(updated)
-    if (currentUser?.id === id) {
-      updateUser(patch)
-      if (patch.is_admin !== undefined) {
-        document.cookie = `is_admin=${patch.is_admin ? "1" : "0"}; path=/; max-age=86400`
-      }
-      if (patch.role !== undefined) {
-        document.cookie = `user_role=${patch.role}; path=/; max-age=86400`
-      }
-    }
-  }, [currentUser, updateUser])
-
-  return { mockUsers, updateMockUser }
+export function useAuth() {
+  return useContext(AuthContext)
 }

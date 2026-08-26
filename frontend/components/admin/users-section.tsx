@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAuth, MOCK_AUTH, type User } from "@/contexts/auth-context"
+import { useAuth, MOCK_AUTH, type AuthUser as User } from "@/contexts/auth-context"
 import { usePermission } from "@/hooks/use-permission"
 import { apiClient } from "@/lib/api"
 import { toast } from "sonner"
@@ -76,6 +76,8 @@ export function UsersSection() {
           email: form.email,
           role: form.role as User["role"],
           is_admin: form.role === "admin",
+          is_active: true,
+          created_at: new Date().toISOString(),
           avatar: null,
         }
         const updated = [...users, newUser]

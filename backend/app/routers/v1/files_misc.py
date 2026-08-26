@@ -1,195 +1,140 @@
-"""Misc routes: quota, zip, search, customize, star, starred, recent for /api/v1/files."""
+"""Miscellaneous file routes for /api/v1/files.
+
+Handles: zip download of multiple files, raw preview, and patch (metadata
+partial update).  These routes did not fit cleanly into the core, trash,
+share, or bulk modules.
+"""
 
 import io
-import tempfile
-import uuid
 import zipfile
-from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from sqlmodel import Session, col, func, select
+from firebase_admin import firestore
 
-from app.database import get_session
 from app.deps import get_current_user
-from app.models import FileAccessLog, FileRecord, User
-from app.r2 import r2_get_object_bytes
+from app.firebase import get_db
+from app.models import User
 from app.routers.v1.files_utils import (
     FileRecordResponse,
-    QuotaResponse,
     ZipBody,
-    _build_path,
+    _assert_owner,
+    _doc_to_response,
     _get_record_or_404,
     _local_path,
     _now,
-    _to_response,
     _use_r2,
 )
 
 router = APIRouter()
 
 
-@router.get("/quota", response_model=QuotaResponse)
-def get_quota(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> QuotaResponse:
-    """Return total used bytes and file count (all users, excluding trash)."""
-    result = session.exec(
-        select(
-            func.coalesce(func.sum(FileRecord.size), 0),
-            func.count(FileRecord.id),
-        ).where(
-            FileRecord.is_deleted == False,  # noqa: E712
-            FileRecord.type == "file",
-        )
-    ).one()
-    used_bytes, file_count = result
-    return QuotaResponse(used_bytes=int(used_bytes), file_count=int(file_count))
-
-
-@router.post("/zip")
-async def download_zip(
+@router.post("/zip-download")
+async def zip_download(
     body: ZipBody,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> StreamingResponse:
-    """Download multiple files as a ZIP archive."""
-    records: list[FileRecord] = []
-    for fid in body.ids:
-        try:
-            uid = uuid.UUID(fid)
-        except ValueError:
-            continue
-        record = session.get(FileRecord, uid)
-        if record and not record.is_deleted:
-            records.append(record)
+    db: firestore.Client = Depends(get_db),
+):
+    """Stream a ZIP archive containing the requested files.
 
-    if not records:
-        raise HTTPException(status_code=400, detail="No valid files selected")
+    R2 mode: downloads each file from R2 and streams the zip.
+    Local mode: reads from disk directly.
+    """
+    if _use_r2():
+        from app.r2 import r2_download_fileobj
 
-    async def _generate():
-        spool = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
-        with zipfile.ZipFile(spool, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for record in records:
-                if record.type == "folder" or not record.r2_key:
-                    continue
-                if _use_r2():
-                    data = await r2_get_object_bytes(record.r2_key)
-                else:
-                    disk_path = _local_path(record.r2_key)
-                    if not disk_path.exists():
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for fid in body.ids:
+                try:
+                    _, data = _get_record_or_404(fid, db)
+                    if data.get("owner_id") != current_user.id:
                         continue
-                    data = disk_path.read_bytes()
-                zf.writestr(record.path, data)
-        spool.seek(0)
-        while chunk := spool.read(1024 * 1024):
-            yield chunk
-        spool.close()
+                    r2_key = data.get("r2_key")
+                    if not r2_key or data.get("type") != "file":
+                        continue
+                    file_bytes = await r2_download_fileobj(r2_key)
+                    zf.writestr(data["name"], file_bytes)
+                except Exception:
+                    continue
 
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=download.zip"},
+        )
+
+    # Local disk mode
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fid in body.ids:
+            try:
+                _, data = _get_record_or_404(fid, db)
+                if data.get("owner_id") != current_user.id:
+                    continue
+                r2_key = data.get("r2_key")
+                if not r2_key or data.get("type") != "file":
+                    continue
+                local = _local_path(r2_key)
+                if local.exists():
+                    zf.write(local, arcname=data["name"])
+            except Exception:
+                continue
+
+    buf.seek(0)
     return StreamingResponse(
-        _generate(),
+        buf,
         media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="files.zip"'},
+        headers={"Content-Disposition": "attachment; filename=download.zip"},
     )
 
 
-@router.get("/search", response_model=list[FileRecordResponse])
-def search_files(
-    q: str = Query(default=""),
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> list[FileRecordResponse]:
-    """Full-text search across file names."""
-    if not q.strip():
-        return []
-    pattern = f"%{q.strip()}%"
-    records = session.exec(
-        select(FileRecord).where(
-            col(FileRecord.name).ilike(pattern),
-            FileRecord.is_deleted == False,  # noqa: E712
-        )
-    ).all()
-    return [_to_response(r) for r in records]
-
-
-class CustomizeBody(BaseModel):
-    color: Optional[str] = None
-    icon_emoji: Optional[str] = None
-
-
-@router.patch("/customize/{file_id}", response_model=FileRecordResponse)
-def customize_file(
-    file_id: str,
-    body: CustomizeBody,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> FileRecordResponse:
-    record = _get_record_or_404(file_id, current_user, session)
-    if body.color is not None:
-        record.color = body.color  # type: ignore[assignment]
-    if body.icon_emoji is not None:
-        record.icon_emoji = body.icon_emoji  # type: ignore[assignment]
-    record.updated_at = _now()
-    session.add(record)
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
-
-
-@router.post("/star/{file_id}", response_model=FileRecordResponse)
-def star_file(
+@router.get("/raw/{file_id}")
+async def raw_preview(
     file_id: str,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
+):
+    """Serve the raw file bytes with the correct Content-Type for browser preview."""
+    _, data = _get_record_or_404(file_id, db)
+    _assert_owner(data, current_user.id)
+    r2_key = data.get("r2_key")
+    if not r2_key or data.get("type") != "file":
+        raise HTTPException(status_code=400, detail="Cannot preview a folder.")
+
+    mime = data.get("mime_type") or "application/octet-stream"
+
+    if _use_r2():
+        from app.r2 import r2_download_fileobj
+        content = await r2_download_fileobj(r2_key)
+        return StreamingResponse(io.BytesIO(content), media_type=mime)
+
+    local = _local_path(r2_key)
+    if not local.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk.")
+
+    return StreamingResponse(
+        open(local, "rb"),
+        media_type=mime,
+    )
+
+
+@router.patch("/{file_id}", response_model=FileRecordResponse)
+def patch_metadata(
+    file_id: str,
+    body: dict = Body(default={}),
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    record = _get_record_or_404(file_id, current_user, session)
-    record.is_starred = not record.is_starred  # type: ignore[assignment]
-    record.updated_at = _now()
-    session.add(record)
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
-
-
-@router.get("/starred", response_model=list[FileRecordResponse])
-def list_starred(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> list[FileRecordResponse]:
-    records = session.exec(
-        select(FileRecord).where(
-            FileRecord.is_starred == True,  # noqa: E712
-            FileRecord.is_deleted == False,  # noqa: E712
-        )
-    ).all()
-    return [_to_response(r) for r in records]
-
-
-@router.get("/recent", response_model=list[FileRecordResponse])
-def list_recent(
-    limit: int = Query(default=20, le=100),
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> list[FileRecordResponse]:
-    """Return recently accessed files for the current user."""
-    logs = session.exec(
-        select(FileAccessLog)
-        .where(FileAccessLog.user_id == current_user.id)
-        .order_by(FileAccessLog.accessed_at.desc())  # type: ignore[union-attr]
-        .limit(limit * 3)
-    ).all()
-    seen: set[uuid.UUID] = set()
-    records: list[FileRecord] = []
-    for log in logs:
-        if log.file_id in seen:
-            continue
-        seen.add(log.file_id)
-        record = session.get(FileRecord, log.file_id)
-        if record and not record.is_deleted:
-            records.append(record)
-        if len(records) >= limit:
-            break
-    return [_to_response(r) for r in records]
+    """Partially update allowed metadata fields: color, icon_emoji, is_starred."""
+    _, data = _get_record_or_404(file_id, db)
+    allowed = {"is_starred", "color", "icon_emoji"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    if not updates:
+        return _doc_to_response(file_id, data)
+    updates["updated_at"] = _now()
+    db.collection("file_records").document(file_id).update(updates)
+    return _doc_to_response(file_id, {**data, **updates})

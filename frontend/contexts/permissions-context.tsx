@@ -36,7 +36,9 @@ function getMockPermissionsForRole(role: string): Permission[] {
 }
 
 export function PermissionsProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
+  // `authPermissions` is pre-fetched in parallel with the user profile by
+  // AuthProvider, so when it is non-null we skip the redundant API call.
+  const { user, permissions: authPermissions } = useAuth()
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [loading, setLoading] = useState(!MOCK_AUTH)
 
@@ -54,6 +56,14 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       return
     }
 
+    // Use the permissions already fetched by AuthProvider if available —
+    // avoids a second /permissions/my round-trip on every session restore.
+    if (authPermissions !== null) {
+      setPermissions(authPermissions as Permission[])
+      setLoading(false)
+      return
+    }
+
     try {
       const data = await apiClient<{ permissions: string[] }>("/permissions/my")
       setPermissions((data.permissions ?? []) as Permission[])
@@ -62,7 +72,7 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, authPermissions])
 
   useEffect(() => {
     if (!MOCK_AUTH) setLoading(true)

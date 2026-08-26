@@ -40,13 +40,13 @@ export function TaskOverviewChart() {
 
   useEffect(() => {
     if (MOCK_AUTH) return
-    apiClient<DailyPoint[]>("/analytics/daily?days=7").then(setApiData).catch(() => {})
+    apiClient<DailyPoint[]>("/api/v1/analytics/daily?days=30").then(setApiData).catch(() => {})
   }, [])
 
-  // Mock/fallback: compute from tasks using completedAt (not createdAt for completed)
+  // Mock/fallback: compute 30 days of data from local tasks (mirrors the real API window)
   const mockData = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(new Date(), 6 - i)
+    return Array.from({ length: 30 }, (_, i) => {
+      const date = subDays(new Date(), 29 - i)
       const key = format(date, "yyyy-MM-dd")
       const label = format(date, "EEE")
       const created = tasks.filter(
@@ -71,7 +71,7 @@ export function TaskOverviewChart() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold">Görev Aktivitesi</CardTitle>
-        <CardDescription>Oluşturulan - tamamlanan — son 7 gün</CardDescription>
+        <CardDescription>Oluşturulan - tamamlanan — son 30 gün</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[200px] w-full">

@@ -48,7 +48,7 @@ export interface QuotaInfo {
 
 export async function listFiles(path = "", showTrash = false): Promise<FileRecord[]> {
   const params = new URLSearchParams({ path, show_trash: String(showTrash) })
-  return apiClient<FileRecord[]>(`/api/v1/files/list?${params}`)
+  return apiClient<FileRecord[]>(`/api/v1/files?${params}`)
 }
 
 export async function searchFiles(q: string, path = "", filters?: SearchFilters): Promise<FileRecord[]> {

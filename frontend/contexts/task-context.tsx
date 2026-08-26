@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
-import { useAuth, type User } from "@/contexts/auth-context"
+import { useAuth, type AuthUser as User } from "@/contexts/auth-context"
 import type { Task } from "@/types/task"
 
 // ── Activity types ────────────────────────────────────────────────────────────

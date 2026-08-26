@@ -2,13 +2,23 @@
 
 export const dynamic = "force-dynamic"
 
+/**
+ * Register page — creates a Firebase Auth account then POSTs to the backend
+ * to create the Firestore user profile document.
+ */
+
 import React, { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { BriefcaseIcon, EyeIcon, EyeOffIcon, LoaderIcon } from "lucide-react"
-import { API_BASE_URL } from "@/lib/api"
-import { MOCK_AUTH, useAuth } from "@/contexts/auth-context"
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth"
+import { firebaseAuth } from "@/lib/firebase"
 import { tokenStorage } from "@/lib/auth"
+import { API_BASE_URL } from "@/lib/api"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -27,22 +37,55 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
+
     try {
+      // 1. Create Firebase Auth account
+      console.debug("[register] Creating Firebase Auth account for:", email)
+      let cred
+      try {
+        cred = await createUserWithEmailAndPassword(firebaseAuth, email, password)
+      } catch (err: unknown) {
+        const code = (err as { code?: string }).code ?? ""
+        console.error("[register] Firebase account creation error:", code, err)
+        if (code === "auth/email-already-in-use") throw new Error("Bu e-posta adresi zaten kullanımda.")
+        if (code === "auth/weak-password") throw new Error("Şifre en az 6 karakter olmalıdır.")
+        if (code === "auth/invalid-email") throw new Error("Geçersiz e-posta adresi.")
+        if (code === "auth/network-request-failed") throw new Error("Ağ hatası. İnternet bağlantınızı kontrol edin.")
+        throw new Error("Hesap oluşturulamadı. Lütfen tekrar deneyin.")
+      }
+
+      // 2. Set display name in Firebase Auth
+      await updateProfile(cred.user, { displayName: name }).catch((err) => {
+        console.warn("[register] Could not set display name:", err)
+      })
+
+      // 3. Get ID token and store it
+      const idToken = await cred.user.getIdToken()
+      tokenStorage.setToken(idToken)
+      console.debug("[register] Firebase account created — creating backend profile")
+
+      // 4. Create Firestore user profile via backend
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ name, email, password }),
       })
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Registration failed" }))
-        throw new Error(err.detail ?? "Registration failed")
+        const err = await res.json().catch(() => ({ detail: "Profil oluşturulamadı" }))
+        console.error("[register] Backend profile creation failed:", err)
+        throw new Error(err.detail ?? "Profil oluşturulamadı")
       }
+
       const data = await res.json()
-      tokenStorage.setTokens(data.access_token, data.refresh_token)
+      console.debug("[register] Backend profile created:", data.user?.email)
       updateUser(data.user)
-      router.replace("/analytics")
+      router.replace("/home")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed")
+      setError(err instanceof Error ? err.message : "Kayıt başarısız oldu")
     } finally {
       setLoading(false)
     }
@@ -98,7 +141,7 @@ export default function RegisterPage() {
               autoComplete="new-password"
               required
               minLength={8}
-              placeholder="Min. 8 characters"
+              placeholder="Min. 8 karakter"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="pr-9"
@@ -107,7 +150,7 @@ export default function RegisterPage() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
             >
               {showPassword ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
             </button>
@@ -124,14 +167,14 @@ export default function RegisterPage() {
           {loading && <LoaderIcon className="mr-2 size-4 animate-spin" />}
           Hesap Oluştur
         </Button>
-      </form>
 
-      <p className="text-center text-sm text-muted-foreground">
-        Zaten hesabınız var mı?{" "}
-        <Link href="/login" className="font-medium text-foreground hover:underline">
-          Giriş yap
-        </Link>
-      </p>
+        <p className="text-center text-sm text-muted-foreground">
+          Zaten hesabınız var mı?{" "}
+          <Link href="/login" className="font-medium text-foreground underline-offset-4 hover:underline">
+            Giriş yapın
+          </Link>
+        </p>
+      </form>
     </div>
   )
 }

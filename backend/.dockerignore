@@ -1,6 +1,22 @@
-.venv/
-__pycache__/
-*.pyc
+# Secrets and credentials — never bake into the image
 .env
-*.db
-.git/
+*.env
+firebase-service-account.json
+*-service-account.json
+*-firebase-adminsdk-*.json
+*.pem
+*.key
+*.p12
+
+# Development artifacts
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+tests/
+*.log
+
+# VCS
+.git
+.gitignore

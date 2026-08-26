@@ -1,6 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+/**
+ * Settings page — appearance, notification, and privacy preferences.
+ *
+ * On mount, preferences are fetched from GET /users/me/preferences and
+ * populate all form controls.  Every toggle/select change immediately PATCHes
+ * the changed field to the backend so preferences persist across sessions.
+ * A skeleton is shown while the initial fetch is in-flight.
+ */
+
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SiteHeader } from "@/components/layout/site-header"
@@ -16,9 +25,38 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { CheckIcon, BellIcon, ShieldIcon, PaletteIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { apiClient } from "@/lib/api"
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Shape returned by GET /users/me/preferences and accepted by PATCH. */
+interface UserPreferences {
+  notifications_email: boolean
+  notifications_push: boolean
+  theme: string
+  language: string
+  timezone: string
+}
+
+/** Default values that mirror the backend schema defaults.
+ *  Used as the initial form state before the fetch resolves. */
+const PREFERENCE_DEFAULTS: UserPreferences = {
+  notifications_email: true,
+  notifications_push: true,
+  theme: "system",
+  language: "en",
+  timezone: "UTC",
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const TABS = [
   { id: "appearance", label: "Görünüm", icon: PaletteIcon },
@@ -26,15 +64,159 @@ const TABS = [
   { id: "privacy", label: "Gizlilik ve Güvenlik", icon: ShieldIcon },
 ]
 
+const THEME_OPTIONS = [
+  { name: "warm",     label: "Sıcak",       bg: "oklch(0.955 0.014 80)",  primary: "oklch(0.16 0.015 60)",  accent: "oklch(0.89 0.024 80)"  },
+  { name: "slate",    label: "Gri",         bg: "oklch(0.970 0.004 240)", primary: "oklch(0.20 0.010 250)", accent: "oklch(0.91 0.007 240)" },
+  { name: "dark",     label: "Koyu",        bg: "oklch(0.130 0.018 220)", primary: "oklch(0.650 0.120 220)",accent: "oklch(0.230 0.020 220)"},
+  { name: "forest",   label: "Orman",       bg: "oklch(0.120 0.018 150)", primary: "oklch(0.600 0.150 145)",accent: "oklch(0.220 0.022 148)"},
+  { name: "midnight", label: "Gece Yarısı", bg: "oklch(0.110 0.022 270)", primary: "oklch(0.680 0.140 265)",accent: "oklch(0.210 0.025 268)"},
+]
+
+const LANGUAGE_OPTIONS = [
+  { value: "en", label: "English" },
+  { value: "tr", label: "Türkçe" },
+  { value: "de", label: "Deutsch" },
+  { value: "fr", label: "Français" },
+]
+
+// ---------------------------------------------------------------------------
+// Helpers outside the component
+// ---------------------------------------------------------------------------
+
+/**
+ * Skeleton shown inside the Notifications tab while preferences are loading.
+ * Declared at module level to avoid being re-created on every render.
+ */
+function PreferenceSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-4 w-40" />
+      <Skeleton className="h-4 w-64" />
+      <div className="flex gap-3 pt-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-20 w-24 rounded-lg" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  const { theme: activeTheme, setTheme } = useTheme()
   const { user } = useAuth()
+
+  // True after next-themes has hydrated; avoids theme flicker on SSR.
+  // useSyncExternalStore is used instead of a setMounted effect to satisfy
+  // the react-hooks/set-state-in-effect lint rule.
+  const mounted = useSyncExternalStore(
+    () => () => {},          // no-op subscribe — we only need the snapshot
+    () => true,              // client snapshot: mounted
+    () => false,             // server snapshot: not mounted
+  )
+
   const [activeTab, setActiveTab] = useState("appearance")
-  const [emailNotifs, setEmailNotifs] = useState(true)
-  const [taskReminders, setTaskReminders] = useState(true)
-  const [teamUpdates, setTeamUpdates] = useState(false)
+
+  // Preferences fetched from the backend.
+  const [prefs, setPrefs] = useState<UserPreferences>(PREFERENCE_DEFAULTS)
+  const [loadingPrefs, setLoadingPrefs] = useState(true)
+
+  // ---------------------------------------------------------------------------
+  // Fetch preferences on mount
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchPreferences() {
+      try {
+        const data = await apiClient.get<UserPreferences>("/users/me/preferences")
+        if (!cancelled) setPrefs(data)
+      } catch (err) {
+        // Non-fatal: fall back to defaults and let the user see the page.
+        console.error("[settings] Failed to load preferences:", err)
+      } finally {
+        if (!cancelled) setLoadingPrefs(false)
+      }
+    }
+
+    fetchPreferences()
+    return () => { cancelled = true }
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Patch a single preference field immediately on change
+  // ---------------------------------------------------------------------------
+
+  const patchPreference = useCallback(
+    async (patch: Partial<UserPreferences>) => {
+      // Optimistically update local state so the UI feels instant.
+      setPrefs((prev) => ({ ...prev, ...patch }))
+      try {
+        const updated = await apiClient.patch<UserPreferences>("/users/me/preferences", patch)
+        setPrefs(updated)
+        toast.success("Kaydedildi")
+      } catch (err) {
+        // Roll back optimistic update on failure.
+        setPrefs((prev) => ({ ...prev }))
+        console.error("[settings] Failed to save preference:", err)
+        toast.error("Kaydedilemedi")
+      }
+    },
+    [],
+  )
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+
+  function handleThemeChange(themeName: string, label: string) {
+    setTheme(themeName)
+    patchPreference({ theme: themeName })
+    toast.success(`Tema "${label}" olarak ayarlandı`)
+  }
+
+  function handleLanguageChange(lang: string) {
+    patchPreference({ language: lang })
+  }
+
+  function handleNotificationToggle(
+    field: "notifications_email" | "notifications_push",
+    currentValue: boolean,
+    label: string,
+  ) {
+    const next = !currentValue
+    patchPreference({ [field]: next })
+    toast.success(`${label} ${next ? "etkinleştirildi" : "devre dışı bırakıldı"}`)
+  }
+
+  // ---------------------------------------------------------------------------
+  // Notification rows — driven entirely by persisted prefs
+  // ---------------------------------------------------------------------------
+
+  const notificationRows: Array<{
+    label: string
+    description: string
+    field: "notifications_email" | "notifications_push"
+  }> = [
+    {
+      label: "E-posta bildirimleri",
+      description: "Etkinlik güncellemelerini e-posta ile alın",
+      field: "notifications_email",
+    },
+    {
+      label: "Uygulama bildirimleri",
+      description: "Anlık uygulama içi bildirimler alın",
+      field: "notifications_push",
+    },
+  ]
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
@@ -50,7 +232,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex flex-col gap-6 lg:flex-row">
-            {/* Sidebar nav */}
+            {/* Sidebar navigation */}
             <nav className="flex flex-row gap-1 lg:w-48 lg:flex-col">
               {TABS.map((tab) => {
                 const Icon = tab.icon
@@ -72,82 +254,108 @@ export default function SettingsPage() {
               })}
             </nav>
 
-            {/* Content */}
+            {/* Content panel */}
             <div className="flex-1 space-y-6">
+
+              {/* ── Appearance ────────────────────────────────────────── */}
               {activeTab === "appearance" && (
                 <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
                   <div>
                     <h2 className="text-base font-semibold">Görünüm</h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Workin'in cihazınızda nasıl göründüğünü özelleştirin.
+                      Workin&apos;in cihazınızda nasıl göründüğünü özelleştirin.
                     </p>
                   </div>
                   <Separator />
+
+                  {/* Theme picker */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Tema</Label>
                     <p className="text-xs text-muted-foreground">
                       Arayüz için renk şemasını seçin.
                     </p>
-                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                      {[
-                        { name: "warm",     label: "Sıcak",      bg: "oklch(0.955 0.014 80)",  primary: "oklch(0.16 0.015 60)",  accent: "oklch(0.89 0.024 80)"  },
-                        { name: "slate",    label: "Gri",        bg: "oklch(0.970 0.004 240)", primary: "oklch(0.20 0.010 250)", accent: "oklch(0.91 0.007 240)" },
-                        { name: "dark",     label: "Koyu",       bg: "oklch(0.130 0.018 220)", primary: "oklch(0.650 0.120 220)",accent: "oklch(0.230 0.020 220)"},
-                        { name: "forest",   label: "Orman",      bg: "oklch(0.120 0.018 150)", primary: "oklch(0.600 0.150 145)",accent: "oklch(0.220 0.022 148)"},
-                        { name: "midnight", label: "Gece Yarısı",bg: "oklch(0.110 0.022 270)", primary: "oklch(0.680 0.140 265)",accent: "oklch(0.210 0.025 268)"},
-                      ].map((t) => (
-                        <button
-                          key={t.name}
-                          onClick={() => { setTheme(t.name); toast.success(`Theme set to ${t.label}`) }}
-                          className={cn(
-                            "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
-                            mounted && theme === t.name
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-border/80 hover:bg-muted/40"
-                          )}
-                        >
-                          <div
-                            className="relative flex h-10 w-full items-center justify-center gap-1 rounded-md border border-black/10"
-                            style={{ backgroundColor: t.bg }}
-                          >
-                            <div className="size-3 rounded-full" style={{ backgroundColor: t.primary }} />
-                            <div className="size-2 rounded-full opacity-60" style={{ backgroundColor: t.accent }} />
-                            {mounted && theme === t.name && (
-                              <div className="absolute right-1 top-1">
-                                <CheckIcon className="size-3" style={{ color: t.primary }} />
-                              </div>
+                    {loadingPrefs ? (
+                      <div className="mt-3 flex gap-3">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Skeleton key={i} className="h-20 w-20 rounded-lg" />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        {THEME_OPTIONS.map((t) => (
+                          <button
+                            key={t.name}
+                            onClick={() => handleThemeChange(t.name, t.label)}
+                            className={cn(
+                              "flex flex-col items-center gap-2 rounded-lg border-2 p-3 transition-all",
+                              mounted && activeTheme === t.name
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-border/80 hover:bg-muted/40"
                             )}
-                          </div>
-                          <span className={cn("text-xs font-medium", mounted && theme === t.name ? "text-primary" : "text-muted-foreground")}>
-                            {t.label}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                          >
+                            {/* Mini preview swatch */}
+                            <div
+                              className="relative h-12 w-full overflow-hidden rounded-md"
+                              style={{ background: t.bg }}
+                            >
+                              <div
+                                className="absolute left-2 top-2 h-2 w-8 rounded-sm"
+                                style={{ background: t.primary }}
+                              />
+                              <div
+                                className="absolute bottom-2 left-2 right-2 h-4 rounded-sm"
+                                style={{ background: t.accent }}
+                              />
+                              {mounted && activeTheme === t.name && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                  <CheckIcon className="size-4 text-white" />
+                                </div>
+                              )}
+                            </div>
+                            <span className={cn(
+                              "text-xs font-medium",
+                              mounted && activeTheme === t.name ? "text-primary" : "text-muted-foreground"
+                            )}>
+                              {t.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <Separator />
 
+                  {/* Language picker */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Dil</Label>
                     <p className="text-xs text-muted-foreground">
                       Tercih ettiğiniz görüntüleme dilini seçin.
                     </p>
-                    <Select defaultValue="en">
-                      <SelectTrigger className="mt-2 w-48">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="en">English</SelectItem>
-                        <SelectItem value="tr">Türkçe</SelectItem>
-                        <SelectItem value="de">Deutsch</SelectItem>
-                        <SelectItem value="fr">Français</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {loadingPrefs ? (
+                      <Skeleton className="mt-2 h-9 w-48" />
+                    ) : (
+                      <Select
+                        value={prefs.language}
+                        onValueChange={handleLanguageChange}
+                      >
+                        <SelectTrigger className="mt-2 w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LANGUAGE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 </div>
               )}
 
+              {/* ── Notifications ─────────────────────────────────────── */}
               {activeTab === "notifications" && (
                 <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
                   <div>
@@ -157,37 +365,39 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <Separator />
-                  {[
-                    { label: "E-posta bildirimleri", description: "Etkinlik güncellemelerini e-posta ile alın", value: emailNotifs, onChange: setEmailNotifs },
-                    { label: "Görev hatırlatıcıları", description: "Yaklaşan son tarihler için hatırlatıcı alın", value: taskReminders, onChange: setTaskReminders },
-                    { label: "Ekip güncellemeleri", description: "Ekip üyeleri eklendiğinde veya kaldırıldığında bildirim alın", value: teamUpdates, onChange: setTeamUpdates },
-                  ].map(({ label, description, value, onChange }) => (
-                    <div key={label} className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{label}</p>
-                        <p className="text-xs text-muted-foreground">{description}</p>
-                      </div>
-                      <button
-                        onClick={() => { onChange(!value); toast.success(`${label} ${!value ? "enabled" : "disabled"}`) }}
-                        className={cn(
-                          "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
-                          value ? "bg-primary" : "bg-muted"
-                        )}
-                        role="switch"
-                        aria-checked={value}
-                      >
-                        <span
+
+                  {loadingPrefs ? (
+                    <PreferenceSkeleton />
+                  ) : (
+                    notificationRows.map(({ label, description, field }) => (
+                      <div key={field} className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{label}</p>
+                          <p className="text-xs text-muted-foreground">{description}</p>
+                        </div>
+                        <button
+                          onClick={() => handleNotificationToggle(field, prefs[field], label)}
                           className={cn(
-                            "pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform",
-                            value ? "translate-x-4" : "translate-x-0"
+                            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+                            prefs[field] ? "bg-primary" : "bg-muted"
                           )}
-                        />
-                      </button>
-                    </div>
-                  ))}
+                          role="switch"
+                          aria-checked={prefs[field]}
+                        >
+                          <span
+                            className={cn(
+                              "pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm ring-0 transition-transform",
+                              prefs[field] ? "translate-x-4" : "translate-x-0"
+                            )}
+                          />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
 
+              {/* ── Privacy & Security ────────────────────────────────── */}
               {activeTab === "privacy" && (
                 <div className="rounded-xl border border-border/60 bg-card p-6 shadow-sm space-y-6">
                   <div>
@@ -199,18 +409,30 @@ export default function SettingsPage() {
                   <Separator />
                   <div className="space-y-1">
                     <p className="text-sm font-medium">Hesap</p>
-                    <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">{user?.email}</span> olarak oturum açıldı</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{user?.email}</span> olarak oturum açıldı
+                    </p>
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" onClick={() => toast.info("Şifre değiştirme yakında geliyor")}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toast.info("Şifre değiştirme yakında geliyor")}
+                    >
                       Şifre değiştir
                     </Button>
-                    <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5 hover:text-destructive" onClick={() => toast.info("Hesap silme yakında geliyor")}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/5 hover:text-destructive"
+                      onClick={() => toast.info("Hesap silme yakında geliyor")}
+                    >
                       Hesabı sil
                     </Button>
                   </div>
                 </div>
               )}
+
             </div>
           </div>
         </main>

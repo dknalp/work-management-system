@@ -1,25 +1,23 @@
-"""Trash, restore, and permanent delete routes for /api/v1/files."""
+"""Trash, restore, and permanent-delete routes for /api/v1/files."""
 
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from firebase_admin import firestore
 
-from app.database import get_session
 from app.deps import get_current_user
-from app.models import FileAccessLog, FileRecord, FileShare, User
+from app.firebase import get_db
+from app.models import User
+from app.r2 import r2_delete_object, r2_delete_objects
 from app.routers.v1.files_utils import (
     FileRecordResponse,
-    _build_path,
-    _cascade_rename,
-    _get_record_or_404,
+    _assert_owner,
+    _doc_to_response,
     _local_path,
     _now,
-    _to_response,
     _use_r2,
 )
-from app.r2 import r2_delete_object, r2_delete_objects
 
 router = APIRouter()
 
@@ -28,125 +26,175 @@ router = APIRouter()
 def trash_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
-    """Move a file or folder to trash (soft-delete)."""
-    record = _get_record_or_404(file_id, current_user, session)
+    """Move a file or folder to trash (soft-delete).
+
+    Also cascades the trash flag to all descendants when the target is a folder.
+    """
+    doc = db.collection("file_records").document(file_id).get()
+    if not doc.exists or (doc.to_dict() or {}).get("is_deleted", False):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    data = doc.to_dict() or {}
+    _assert_owner(data, current_user.id)
     now = _now()
-    record.is_deleted = True  # type: ignore[assignment]
-    record.deleted_at = now  # type: ignore[assignment]
-    record.updated_at = now
-    session.add(record)
 
-    # Cascade to children if folder
-    if record.type == "folder":
-        children = session.exec(
-            select(FileRecord).where(
-                FileRecord.parent_path.startswith(record.path),  # type: ignore[union-attr]
-                FileRecord.is_deleted == False,  # noqa: E712
-            )
-        ).all()
+    db.collection("file_records").document(file_id).update({
+        "is_deleted": True,
+        "deleted_at": now,
+        "updated_at": now,
+    })
+
+    # Cascade to children when trashing a folder
+    if data.get("type") == "folder":
+        prefix = data["path"] + "/"
+        suffix = data["path"] + "0"  # range upper bound
+        children = (
+            db.collection("file_records")
+            .where("path", ">=", prefix)
+            .where("path", "<", suffix)
+            .where("is_deleted", "==", False)
+            .stream()
+        )
+        batch = db.batch()
+        count = 0
         for child in children:
-            child.is_deleted = True  # type: ignore[assignment]
-            child.deleted_at = now  # type: ignore[assignment]
-            child.updated_at = now
-            session.add(child)
+            batch.update(child.reference, {"is_deleted": True, "deleted_at": now, "updated_at": now})
+            count += 1
+            if count >= 499:
+                batch.commit()
+                batch = db.batch()
+                count = 0
+        if count > 0:
+            batch.commit()
 
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
+    updated = {**data, "is_deleted": True, "deleted_at": now, "updated_at": now}
+    return _doc_to_response(file_id, updated)
+
+
+@router.get("/trash", response_model=list[FileRecordResponse])
+def list_trash(
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> list[FileRecordResponse]:
+    """Return all trashed files for the current user."""
+    docs = (
+        db.collection("file_records")
+        .where("owner_id", "==", current_user.id)
+        .where("is_deleted", "==", True)
+        .stream()
+    )
+    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
 
 
 @router.post("/restore/{file_id}", response_model=FileRecordResponse)
 def restore_file(
     file_id: str,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ) -> FileRecordResponse:
     """Restore a trashed file or folder."""
-    try:
-        uid = uuid.UUID(file_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="File not found")
-    record = session.get(FileRecord, uid)
-    if not record:
-        raise HTTPException(status_code=404, detail="File not found")
+    doc = db.collection("file_records").document(file_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="File not found.")
 
-    record.is_deleted = False  # type: ignore[assignment]
-    record.deleted_at = None  # type: ignore[assignment]
-    record.updated_at = _now()
-    session.add(record)
-    session.commit()
-    session.refresh(record)
-    return _to_response(record)
+    data = doc.to_dict() or {}
+    _assert_owner(data, current_user.id)
+    if not data.get("is_deleted", False):
+        raise HTTPException(status_code=400, detail="File is not in trash.")
 
+    now = _now()
+    db.collection("file_records").document(file_id).update({
+        "is_deleted": False,
+        "deleted_at": None,
+        "updated_at": now,
+    })
 
-@router.delete("/permanent/{file_id}")
-async def delete_permanent(
-    file_id: str,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> dict:
-    """Permanently delete a file (removes from storage + DB)."""
-    try:
-        uid = uuid.UUID(file_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="File not found")
-    record = session.get(FileRecord, uid)
-    if not record:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    if record.r2_key:
-        if _use_r2():
-            await r2_delete_object(record.r2_key)
-        else:
-            disk_path = _local_path(record.r2_key)
-            if disk_path.exists():
-                disk_path.unlink()
-
-    # Remove FK-dependent rows before deleting the parent FileRecord to avoid
-    # constraint violations (FileAccessLog and FileShare reference file_records.id).
-    for log in session.exec(select(FileAccessLog).where(FileAccessLog.file_id == record.id)).all():
-        session.delete(log)
-    for share in session.exec(select(FileShare).where(FileShare.file_id == record.id)).all():
-        session.delete(share)
-
-    session.delete(record)
-    session.commit()
-    return {"ok": True}
+    updated = {**data, "is_deleted": False, "deleted_at": None, "updated_at": now}
+    return _doc_to_response(file_id, updated)
 
 
-@router.delete("/empty-trash")
+@router.delete("/empty-trash", status_code=204)
 async def empty_trash(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> dict:
-    """Permanently delete all trashed files."""
-    records = session.exec(
-        select(FileRecord).where(FileRecord.is_deleted == True)  # noqa: E712
-    ).all()
+    db: firestore.Client = Depends(get_db),
+) -> None:
+    """Permanently delete all trashed files for the current user.
 
-    r2_keys = [r.r2_key for r in records if r.r2_key]
+    Deletes storage objects from R2 (or local disk) then removes the
+    Firestore documents in batches.
+    """
+    docs = list(
+        db.collection("file_records")
+        .where("owner_id", "==", current_user.id)
+        .where("is_deleted", "==", True)
+        .stream()
+    )
+
+    # Collect R2 keys for storage cleanup
+    r2_keys = [
+        (doc.to_dict() or {}).get("r2_key")
+        for doc in docs
+        if (doc.to_dict() or {}).get("r2_key")
+    ]
+
     if r2_keys:
-        if _use_r2():
-            await r2_delete_objects(r2_keys)
-        else:
-            for key in r2_keys:
-                p = _local_path(key)
-                if p.exists():
-                    p.unlink()
+        try:
+            if _use_r2():
+                await r2_delete_objects(r2_keys)
+            else:
+                for key in r2_keys:
+                    local = _local_path(key)
+                    if local.exists():
+                        local.unlink()
+        except Exception:
+            pass  # Best-effort; delete Firestore records regardless
 
-    # Delete dependent rows first to avoid FK constraint violations.
-    # FileAccessLog and FileShare both hold a foreign key to file_records.id
-    # without ON DELETE CASCADE, so they must be removed before the parent row.
-    record_ids = [r.id for r in records]
-    for file_id in record_ids:
-        for log in session.exec(select(FileAccessLog).where(FileAccessLog.file_id == file_id)).all():
-            session.delete(log)
-        for share in session.exec(select(FileShare).where(FileShare.file_id == file_id)).all():
-            session.delete(share)
+    # Delete Firestore documents in batches of 500
+    batch = db.batch()
+    count = 0
+    for doc in docs:
+        batch.delete(doc.reference)
+        count += 1
+        if count >= 499:
+            batch.commit()
+            batch = db.batch()
+            count = 0
+    if count > 0:
+        batch.commit()
 
-    for record in records:
-        session.delete(record)
-    session.commit()
-    return {"deleted": len(records)}
+
+@router.delete("/permanent/{file_id}", status_code=204)
+async def delete_permanently(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> None:
+    """Permanently delete a single trashed file and its storage object."""
+    doc = db.collection("file_records").document(file_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    data = doc.to_dict() or {}
+    _assert_owner(data, current_user.id)
+    r2_key = data.get("r2_key")
+
+    if r2_key:
+        try:
+            if _use_r2():
+                await r2_delete_object(r2_key)
+            else:
+                local = _local_path(r2_key)
+                if local.exists():
+                    local.unlink()
+        except Exception:
+            pass
+
+    db.collection("file_records").document(file_id).delete()
+
+    # Also delete associated access logs and share records
+    for log_doc in db.collection("file_access_logs").where("file_id", "==", file_id).stream():
+        log_doc.reference.delete()
+    for share_doc in db.collection("file_shares").where("file_id", "==", file_id).stream():
+        share_doc.reference.delete()

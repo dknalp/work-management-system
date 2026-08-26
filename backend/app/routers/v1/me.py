@@ -28,4 +28,6 @@ def get_me(actor: Actor = Depends(get_current_actor)):
         "is_admin": actor.is_admin,
         "is_active": actor.is_active,
         "created_at": actor.created_at.isoformat(),
+        "bio": actor.bio,
+        "avatar_url": actor.avatar_url,
     }

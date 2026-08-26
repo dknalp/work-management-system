@@ -1,26 +1,43 @@
+"""Kanban board router — persists and retrieves kanban board state per pipeline.
+
+The board state is an opaque JSON blob (columns, cards, order, etc.) stored as
+a single Firestore document keyed by pipeline_id.  There is no schema
+validation of the state blob — the frontend is the authority on its shape.
+"""
+
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, status
-from sqlmodel import Session
+from firebase_admin import firestore
 
-from ..database import get_session
 from ..deps import get_current_user
-from ..models import KanbanBoard, User
+from ..firebase import get_db
+from ..models import User
 from ..schemas import KanbanBoardState
 
-router = APIRouter(prefix="/kanban", tags=["kanban"])
+router = APIRouter(tags=["kanban"])
 
 
 @router.get("/{pipeline_id}", response_model=KanbanBoardState)
 def get_board(
     pipeline_id: str,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ):
-    board = session.get(KanbanBoard, pipeline_id)
-    if not board:
+    """Return the saved kanban board state for the given pipeline.
+
+    Returns an empty state (``state=None``) when no board has been saved yet.
+    """
+    doc = db.collection("kanban_boards").document(pipeline_id).get()
+    if not doc.exists:
         return KanbanBoardState(pipeline_id=pipeline_id, state=None)
-    return KanbanBoardState(pipeline_id=board.pipeline_id, state=board.state, updated_at=board.updated_at)
+
+    data = doc.to_dict() or {}
+    return KanbanBoardState(
+        pipeline_id=pipeline_id,
+        state=data.get("state"),
+        updated_at=data.get("updated_at"),
+    )
 
 
 @router.put("/{pipeline_id}", response_model=KanbanBoardState, status_code=status.HTTP_200_OK)
@@ -28,19 +45,14 @@ def save_board(
     pipeline_id: str,
     body: KanbanBoardState,
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
+    db: firestore.Client = Depends(get_db),
 ):
-    board = session.get(KanbanBoard, pipeline_id)
-    if board:
-        board.state = body.state
-        board.updated_at = datetime.now(timezone.utc)
-    else:
-        board = KanbanBoard(
-            pipeline_id=pipeline_id,
-            state=body.state,
-            updated_at=datetime.now(timezone.utc),
-        )
-    session.add(board)
-    session.commit()
-    session.refresh(board)
-    return KanbanBoardState(pipeline_id=board.pipeline_id, state=board.state, updated_at=board.updated_at)
+    """Persist (upsert) the kanban board state for the given pipeline."""
+    now = datetime.now(timezone.utc)
+    board_data = {
+        "pipeline_id": pipeline_id,
+        "state": body.state,
+        "updated_at": now,
+    }
+    db.collection("kanban_boards").document(pipeline_id).set(board_data)
+    return KanbanBoardState(pipeline_id=pipeline_id, state=body.state, updated_at=now)
