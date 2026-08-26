@@ -21,12 +21,12 @@ export function UpcomingTasks() {
   const upcoming = useMemo(() => {
     const todayStr = new Date().toISOString().slice(0, 10)
     return tasks
-      .filter((t) => t.status !== "done" && t.dueDate)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .filter((t) => t.status !== "done" && t.due_date)
+      .sort((a, b) => a.due_date.localeCompare(b.due_date))
       .slice(0, 6)
       .map((t) => {
-        const isOverdue = t.dueDate < todayStr
-        const parsed = parseISO(t.dueDate)
+        const isOverdue = t.due_date < todayStr
+        const parsed = parseISO(t.due_date)
         let dueDateLabel = format(parsed, "MMM d")
         if (isToday(parsed)) dueDateLabel = "Bugün"
         else if (isTomorrow(parsed)) dueDateLabel = "Yarın"
@@ -93,7 +93,7 @@ export function UpcomingTasks() {
                     "text-xs whitespace-nowrap",
                     task.isOverdue ? "font-medium text-destructive" : "text-muted-foreground"
                   )}>
-                    {task.dueDateLabel}
+                    {task.due_dateLabel}
                   </span>
                 </div>
               </li>

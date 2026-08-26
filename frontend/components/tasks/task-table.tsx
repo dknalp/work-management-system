@@ -167,7 +167,7 @@ export function TaskTable({ initialData, onRowClick, onDelete, onDeleteMany, onS
         row.original.title.toLowerCase().includes(search) ||
         (row.original.assignees ?? []).some((a) => a.toLowerCase().includes(search)) ||
         row.original.id.toLowerCase().includes(search) ||
-        row.original.tags.some((t) => t.toLowerCase().includes(search))
+        (row.original.tags ?? []).some((t) => t.toLowerCase().includes(search))
       )
     },
   })

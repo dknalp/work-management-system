@@ -1,300 +1,478 @@
 "use client"
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { apiClient } from "@/lib/api"
-import { useAuth, type AuthUser as User } from "@/contexts/auth-context"
-import type { Task } from "@/types/task"
+/**
+ * Task context — single source of truth for the tasks feature.
+ *
+ * All state is derived from the backend API (Firestore via FastAPI).
+ * localStorage is NOT used for task data — tasks must survive browser clears
+ * and must be visible across devices.
+ *
+ * The context exposes:
+ *   - tasks            — the canonical list of Task objects
+ *   - loading          — true while the initial fetch is in flight
+ *   - error            — non-null when the last fetch failed
+ *   - createTask       — POST /api/v1/tasks
+ *   - updateTask       — PATCH /api/v1/tasks/:id
+ *   - deleteTask       — DELETE /api/v1/tasks/:id
+ *   - addComment       — POST /api/v1/tasks/:id/comments
+ *   - deleteComment    — DELETE /api/v1/tasks/:id/comments/:commentId
+ *   - addReply         — POST /api/v1/tasks/:id/comments/:commentId/replies
+ *   - addSubTask       — POST /api/v1/tasks/:id/subtasks
+ *   - updateSubTask    — PATCH /api/v1/tasks/:id/subtasks/:subtaskId
+ *   - deleteSubTask    — DELETE /api/v1/tasks/:id/subtasks/:subtaskId
+ *   - logActivity      — POST /api/v1/activity
+ *   - activity         — recent activity log entries fetched from the backend
+ *   - refreshTasks     — re-fetch the full task list from the backend
+ */
 
-// ── Activity types ────────────────────────────────────────────────────────────
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
+import { toast } from "sonner"
+import { apiClient } from "@/lib/api"
+import type { Task, SubTask, Comment, Reply } from "@/types/task"
+import { useAuth } from "./auth-context"
+
+// ── Activity log types ────────────────────────────────────────────────────────
 
 export type ActivityType =
   | "task_created"
-  | "task_completed"
-  | "task_reopened"
-  | "task_status_changed"
-  | "task_deleted"
   | "task_updated"
+  | "task_deleted"
+  | "task_completed"
+  | "comment_added"
+  | "subtask_added"
+  | "subtask_completed"
 
 export type ActivityEntry = {
   id: string
   type: ActivityType
-  taskId: string
-  taskTitle: string
+  task_id?: string
+  task_title?: string
   detail?: string
+  /** ISO datetime string */
   timestamp: string
-  userId?: string | null
-  userName?: string | null
+  user_id: string
+  user_name: string
 }
 
-// ── Internal API types ────────────────────────────────────────────────────────
+// ── Context shape ─────────────────────────────────────────────────────────────
 
-type ApiTask = {
-  id: string
-  title: string
-  status: string
-  priority: string
-  assignees?: string[] | null
-  due_date?: string | null
-  tags?: string[] | null
-  description?: string | null
-  completed_at?: string | null
-  project_id?: string | null
-  created_at: string
-}
-
-type ApiActivity = {
-  id: string
-  type: string
-  task_id: string
-  task_title: string
-  detail?: string | null
-  timestamp: string
-  user_id?: string | null
-  user_name?: string | null
-}
-
-function toApiTask(task: Task) {
-  return {
-    id: task.id,
-    title: task.title,
-    status: task.status,
-    priority: task.priority,
-    assignees: task.assignees ?? [],
-    due_date: task.dueDate || null,
-    tags: task.tags,
-    description: task.description ?? null,
-    completed_at: task.completedAt ?? null,
-    project_id: task.projectId ?? null,
-    created_at: task.createdAt,
-  }
-}
-
-function fromApiTask(t: ApiTask): Task {
-  return {
-    id: t.id,
-    title: t.title,
-    status: t.status as Task["status"],
-    priority: t.priority as Task["priority"],
-    assignees: t.assignees ?? [],
-    dueDate: t.due_date ?? "",
-    tags: t.tags ?? [],
-    description: t.description ?? undefined,
-    completedAt: t.completed_at ?? undefined,
-    projectId: t.project_id ?? undefined,
-    createdAt: t.created_at,
-  }
-}
-
-function fromApiActivity(a: ApiActivity): ActivityEntry {
-  return {
-    id: a.id,
-    type: a.type as ActivityType,
-    taskId: a.task_id,
-    taskTitle: a.task_title,
-    detail: a.detail ?? undefined,
-    timestamp: a.timestamp,
-    userId: a.user_id ?? null,
-    userName: a.user_name ?? null,
-  }
-}
-
-async function pushActivity(
-  type: ActivityType,
-  task: Pick<Task, "id" | "title">,
-  user: User | null,
-  detail?: string
-) {
-  await apiClient("/api/v1/activity", {
-    method: "POST",
-    body: JSON.stringify({
-      id: crypto.randomUUID(),
-      type,
-      task_id: task.id,
-      task_title: task.title,
-      detail: detail ?? null,
-      timestamp: new Date().toISOString(),
-      user_id: user?.id ?? null,
-      user_name: user?.name ?? null,
-    }),
-  }).catch(() => {})
-}
-
-// ── Context value ─────────────────────────────────────────────────────────────
-
-interface TaskContextValue {
+type TaskContextValue = {
   tasks: Task[]
-  loading: boolean
-  addTask: (task: Task) => void
-  updateTask: (id: string, updates: Partial<Task>) => void
-  deleteTask: (id: string) => void
-  deleteTasks: (ids: string[]) => void
   activity: ActivityEntry[]
-  refreshActivity: () => void
+  loading: boolean
+  error: string | null
+
+  /** Re-fetch the full task list from the backend. */
+  refreshTasks: () => Promise<void>
+
+  /** Create a new task.  Returns the created task on success, null on failure. */
+  createTask: (
+    data: Omit<Task, "id" | "created_at" | "sub_tasks" | "comments">
+  ) => Promise<Task | null>
+
+  /** Update fields on an existing task.  Returns the updated task on success. */
+  updateTask: (
+    id: string,
+    data: Partial<Omit<Task, "id" | "created_at">>
+  ) => Promise<Task | null>
+
+  /** Permanently delete a task. */
+  deleteTask: (id: string) => Promise<boolean>
+
+  /** Add a comment to a task.  Returns the new comment on success. */
+  addComment: (taskId: string, body: string) => Promise<Comment | null>
+
+  /** Delete a comment. */
+  deleteComment: (taskId: string, commentId: string) => Promise<boolean>
+
+  /** Add a reply to a comment. */
+  addReply: (
+    taskId: string,
+    commentId: string,
+    body: string
+  ) => Promise<Reply | null>
+
+  /** Add a sub-task checklist item. */
+  addSubTask: (taskId: string, title: string) => Promise<SubTask | null>
+
+  /** Update a sub-task (title or completion state). */
+  updateSubTask: (
+    taskId: string,
+    subtaskId: string,
+    data: Partial<Pick<SubTask, "title" | "completed">>
+  ) => Promise<SubTask | null>
+
+  /** Delete a sub-task. */
+  deleteSubTask: (taskId: string, subtaskId: string) => Promise<boolean>
+
+  /** Write an activity log entry to the backend. */
+  logActivity: (
+    data: Pick<ActivityEntry, "type" | "task_id" | "task_title" | "detail">
+  ) => Promise<void>
 }
+
+// ── Context ───────────────────────────────────────────────────────────────────
 
 const TaskContext = createContext<TaskContextValue | null>(null)
+
+export function useTasks(): TaskContextValue {
+  const ctx = useContext(TaskContext)
+  if (!ctx) {
+    throw new Error("useTasks must be used inside <TaskProvider>")
+  }
+  return ctx
+}
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
+
   const [tasks, setTasks] = useState<Task[]>([])
   const [activity, setActivity] = useState<ActivityEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const fetchTasks = useCallback(async () => {
+  // ── Fetch tasks from backend ───────────────────────────────────────────────
+
+  const refreshTasks = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const data = await apiClient<ApiTask[]>("/api/v1/tasks")
-      setTasks(data.map(fromApiTask))
-    } catch {
-      // keep previous state on error
+      const raw = await apiClient<Task[]>("/api/v1/tasks")
+      // Normalise array fields that may be absent on legacy Firestore documents.
+      // Every component that consumes tasks relies on these being real arrays.
+      const data = raw.map((t) => ({
+        ...t,
+        tags: t.tags ?? [],
+        assignees: t.assignees ?? [],
+        sub_tasks: t.sub_tasks ?? [],
+        comments: t.comments ?? [],
+      }))
+      setTasks(data)
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to load tasks"
+      setError(message)
+      // Do not toast here — the calling page will show an error state if needed.
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const fetchActivity = useCallback(async () => {
+  // ── Fetch activity log from backend ───────────────────────────────────────
+
+  const refreshActivity = useCallback(async () => {
     try {
-      const data = await apiClient<ApiActivity[]>("/api/v1/activity?limit=200")
-      setActivity(data.map(fromApiActivity))
+      const data = await apiClient<ActivityEntry[]>("/api/v1/activity")
+      setActivity(data)
     } catch {
-      // keep previous state on error
+      // Activity is non-critical; silently ignore fetch failures.
     }
   }, [])
 
+  // ── Initial load — only fetch when a user is authenticated ─────────────────
+  // Clearing tasks/activity on logout is intentional; this is not a cascading update.
   useEffect(() => {
-    fetchTasks()
-    fetchActivity()
-  }, [fetchTasks, fetchActivity])
+    if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTasks([])
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActivity([])
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false)
+      return
+    }
+    refreshTasks()
+    refreshActivity()
+  }, [user, refreshTasks, refreshActivity])
 
-  const addTask = useCallback(
-    async (task: Task) => {
+  // ── CRUD operations ────────────────────────────────────────────────────────
+
+  const createTask = useCallback(
+    async (
+      data: Omit<Task, "id" | "created_at" | "sub_tasks" | "comments">
+    ): Promise<Task | null> => {
       try {
-        const created = await apiClient<ApiTask>("/api/v1/tasks", {
+        const created = await apiClient<Task>("/api/v1/tasks", {
           method: "POST",
-          body: JSON.stringify(toApiTask(task)),
+          body: JSON.stringify(data),
         })
-        setTasks((prev) => [fromApiTask(created), ...prev])
-        await pushActivity("task_created", task, user)
-        setActivity((prev) => [
-          {
-            id: crypto.randomUUID(),
-            type: "task_created" as ActivityType,
-            taskId: task.id,
-            taskTitle: task.title,
-            timestamp: new Date().toISOString(),
-            userId: user?.id ?? null,
-            userName: user?.name ?? null,
-          },
-          ...prev,
-        ])
-      } catch {
-        fetchTasks()
+        setTasks((prev) => [created, ...prev])
+        return created
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to create task"
+        toast.error(message)
+        return null
       }
     },
-    [user, fetchTasks]
+    []
   )
 
   const updateTask = useCallback(
-    async (id: string, updates: Partial<Task>) => {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
-      )
-
-      const apiUpdates: Record<string, unknown> = {}
-      if (updates.title !== undefined) apiUpdates.title = updates.title
-      if (updates.status !== undefined) apiUpdates.status = updates.status
-      if (updates.priority !== undefined) apiUpdates.priority = updates.priority
-      if (updates.assignees !== undefined) apiUpdates.assignees = updates.assignees
-      if (updates.dueDate !== undefined) apiUpdates.due_date = updates.dueDate || null
-      if (updates.tags !== undefined) apiUpdates.tags = updates.tags
-      if (updates.description !== undefined) apiUpdates.description = updates.description
-      if (updates.projectId !== undefined) apiUpdates.project_id = updates.projectId ?? null
-
+    async (
+      id: string,
+      data: Partial<Omit<Task, "id" | "created_at">>
+    ): Promise<Task | null> => {
       try {
-        await apiClient<ApiTask>(`/api/v1/tasks/${id}`, {
+        const updated = await apiClient<Task>(`/api/v1/tasks/${id}`, {
           method: "PATCH",
-          body: JSON.stringify(apiUpdates),
+          body: JSON.stringify(data),
         })
-
-        const currentTask = tasks.find((t) => t.id === id)
-        if (currentTask) {
-          let actType: ActivityType = "task_updated"
-          let detail: string | undefined
-          if (updates.status !== undefined && updates.status !== currentTask.status) {
-            if (updates.status === "done") actType = "task_completed"
-            else if (currentTask.status === "done") actType = "task_reopened"
-            else {
-              actType = "task_status_changed"
-              detail = `${currentTask.status} → ${updates.status}`
-            }
-          }
-          await pushActivity(actType, { id, title: currentTask.title }, user, detail)
-          await fetchActivity()
-        }
-      } catch {
-        fetchTasks()
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? updated : t))
+        )
+        return updated
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to update task"
+        toast.error(message)
+        return null
       }
     },
-    [tasks, user, fetchTasks, fetchActivity]
+    []
   )
 
-  const deleteTask = useCallback(
-    async (id: string) => {
-      const task = tasks.find((t) => t.id === id)
+  const deleteTask = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      await apiClient(`/api/v1/tasks/${id}`, { method: "DELETE" })
       setTasks((prev) => prev.filter((t) => t.id !== id))
+      return true
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to delete task"
+      toast.error(message)
+      return false
+    }
+  }, [])
+
+  // ── Comments ───────────────────────────────────────────────────────────────
+
+  const addComment = useCallback(
+    async (taskId: string, body: string): Promise<Comment | null> => {
       try {
-        await apiClient(`/api/v1/tasks/${id}`, { method: "DELETE" })
-        if (task) {
-          await pushActivity("task_deleted", task, user)
-          await fetchActivity()
-        }
-      } catch {
-        fetchTasks()
+        const comment = await apiClient<Comment>(
+          `/api/v1/tasks/${taskId}/comments`,
+          { method: "POST", body: JSON.stringify({ body }) }
+        )
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId
+              ? { ...t, comments: [...(t.comments ?? []), comment] }
+              : t
+          )
+        )
+        return comment
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to add comment"
+        toast.error(message)
+        return null
       }
     },
-    [tasks, user, fetchTasks, fetchActivity]
+    []
   )
 
-  const deleteTasks = useCallback(
-    async (ids: string[]) => {
-      const toDelete = tasks.filter((t) => ids.includes(t.id))
-      setTasks((prev) => prev.filter((t) => !ids.includes(t.id)))
+  const deleteComment = useCallback(
+    async (taskId: string, commentId: string): Promise<boolean> => {
       try {
-        await Promise.all(
-          ids.map((id) => apiClient(`/api/v1/tasks/${id}`, { method: "DELETE" }))
+        await apiClient(`/api/v1/tasks/${taskId}/comments/${commentId}`, {
+          method: "DELETE",
+        })
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  comments: (t.comments ?? []).filter(
+                    (c) => c.id !== commentId
+                  ),
+                }
+              : t
+          )
         )
-        await Promise.all(
-          toDelete.map((task) => pushActivity("task_deleted", task, user))
-        )
-        await fetchActivity()
-      } catch {
-        fetchTasks()
+        return true
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to delete comment"
+        toast.error(message)
+        return false
       }
     },
-    [tasks, user, fetchTasks, fetchActivity]
+    []
   )
 
-  return (
-    <TaskContext.Provider
-      value={{
-        tasks,
-        loading,
-        addTask,
-        updateTask,
-        deleteTask,
-        deleteTasks,
-        activity,
-        refreshActivity: fetchActivity,
-      }}
-    >
-      {children}
-    </TaskContext.Provider>
+  const addReply = useCallback(
+    async (
+      taskId: string,
+      commentId: string,
+      body: string
+    ): Promise<Reply | null> => {
+      try {
+        const reply = await apiClient<Reply>(
+          `/api/v1/tasks/${taskId}/comments/${commentId}/replies`,
+          { method: "POST", body: JSON.stringify({ body }) }
+        )
+        setTasks((prev) =>
+          prev.map((t) => {
+            if (t.id !== taskId) return t
+            return {
+              ...t,
+              comments: (t.comments ?? []).map((c) =>
+                c.id === commentId
+                  ? { ...c, replies: [...(c.replies ?? []), reply] }
+                  : c
+              ),
+            }
+          })
+        )
+        return reply
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to add reply"
+        toast.error(message)
+        return null
+      }
+    },
+    []
   )
-}
 
-export function useTasks() {
-  const ctx = useContext(TaskContext)
-  if (!ctx) throw new Error("useTasks must be used inside TaskProvider")
-  return ctx
+  // ── Sub-tasks ──────────────────────────────────────────────────────────────
+
+  const addSubTask = useCallback(
+    async (taskId: string, title: string): Promise<SubTask | null> => {
+      try {
+        const subtask = await apiClient<SubTask>(
+          `/api/v1/tasks/${taskId}/subtasks`,
+          { method: "POST", body: JSON.stringify({ title }) }
+        )
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId
+              ? { ...t, sub_tasks: [...(t.sub_tasks ?? []), subtask] }
+              : t
+          )
+        )
+        return subtask
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to add sub-task"
+        toast.error(message)
+        return null
+      }
+    },
+    []
+  )
+
+  const updateSubTask = useCallback(
+    async (
+      taskId: string,
+      subtaskId: string,
+      data: Partial<Pick<SubTask, "title" | "completed">>
+    ): Promise<SubTask | null> => {
+      try {
+        const updated = await apiClient<SubTask>(
+          `/api/v1/tasks/${taskId}/subtasks/${subtaskId}`,
+          { method: "PATCH", body: JSON.stringify(data) }
+        )
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  sub_tasks: (t.sub_tasks ?? []).map((s) =>
+                    s.id === subtaskId ? updated : s
+                  ),
+                }
+              : t
+          )
+        )
+        return updated
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to update sub-task"
+        toast.error(message)
+        return null
+      }
+    },
+    []
+  )
+
+  const deleteSubTask = useCallback(
+    async (taskId: string, subtaskId: string): Promise<boolean> => {
+      try {
+        await apiClient(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, {
+          method: "DELETE",
+        })
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  sub_tasks: (t.sub_tasks ?? []).filter(
+                    (s) => s.id !== subtaskId
+                  ),
+                }
+              : t
+          )
+        )
+        return true
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to delete sub-task"
+        toast.error(message)
+        return false
+      }
+    },
+    []
+  )
+
+  // ── Activity log ───────────────────────────────────────────────────────────
+
+  const logActivity = useCallback(
+    async (
+      data: Pick<ActivityEntry, "type" | "task_id" | "task_title" | "detail">
+    ): Promise<void> => {
+      try {
+        const entry = await apiClient<ActivityEntry>("/api/v1/activity", {
+          method: "POST",
+          body: JSON.stringify(data),
+        })
+        setActivity((prev) => [entry, ...prev].slice(0, 100))
+      } catch {
+        // Activity logging is non-critical — never fail the main operation
+        // due to an activity write failure.
+      }
+    },
+    []
+  )
+
+  // ── Context value ──────────────────────────────────────────────────────────
+
+  const value: TaskContextValue = {
+    tasks,
+    activity,
+    loading,
+    error,
+    refreshTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    addComment,
+    deleteComment,
+    addReply,
+    addSubTask,
+    updateSubTask,
+    deleteSubTask,
+    logActivity,
+  }
+
+  return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>
 }

@@ -19,7 +19,7 @@ from ..deps import _user_cache, get_current_user
 from ..firebase import get_db
 from ..models import User
 from ..r2 import r2_upload_fileobj
-from ..schemas import UpdateProfileRequest, UserResponse
+from ..schemas import UpdateProfileRequest, UserPreferences, UserPreferencesPatch, UserResponse
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -199,3 +199,63 @@ async def upload_avatar(
     _user_cache.pop(current_user.id, None)
 
     return {"avatar_url": avatar_url}
+
+
+# ---------------------------------------------------------------------------
+# User preferences
+# ---------------------------------------------------------------------------
+
+
+@router.get("/me/preferences", response_model=UserPreferences)
+def get_preferences(
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> UserPreferences:
+    """Return the authenticated user's persisted UI/notification preferences.
+
+    When the user has never saved preferences, returns the default values
+    defined in ``UserPreferences`` so the frontend can render a consistent
+    initial state.
+
+    Args:
+        current_user: Authenticated user resolved from the Bearer token.
+        db: Firestore client dependency.
+
+    Returns:
+        The user's preferences with defaults applied to any missing fields.
+    """
+    doc = db.collection("user_preferences").document(current_user.id).get()
+    if not doc.exists:
+        return UserPreferences()
+    data = doc.to_dict() or {}
+    return UserPreferences(**{k: v for k, v in data.items() if k in UserPreferences.model_fields})
+
+
+@router.patch("/me/preferences", response_model=UserPreferences)
+def update_preferences(
+    body: UserPreferencesPatch,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> UserPreferences:
+    """Partially update the authenticated user's preferences.
+
+    Only the fields present in the request body are written; all others are
+    left unchanged (Firestore merge=True). Returns the full updated preferences
+    object with defaults applied to any fields not yet stored.
+
+    Args:
+        body: Partial preferences to apply (only set fields are written).
+        current_user: Authenticated user resolved from the Bearer token.
+        db: Firestore client dependency.
+
+    Returns:
+        The full preferences object after the update.
+    """
+    patch = body.model_dump(exclude_unset=True)
+    if patch:
+        db.collection("user_preferences").document(current_user.id).set(patch, merge=True)
+
+    # Re-read to return the canonical merged state.
+    doc = db.collection("user_preferences").document(current_user.id).get()
+    data = doc.to_dict() or {}
+    return UserPreferences(**{k: v for k, v in data.items() if k in UserPreferences.model_fields})

@@ -27,7 +27,7 @@ export function TodaysTasks() {
 
   const today = format(new Date(), "yyyy-MM-dd")
   const todaysTasks = tasks
-    .filter((t) => t.dueDate?.startsWith(today))
+    .filter((t) => t.due_date?.startsWith(today))
     .sort((a, b) => {
       if (a.status === "done" && b.status !== "done") return 1
       if (a.status !== "done" && b.status === "done") return -1
@@ -41,7 +41,7 @@ export function TodaysTasks() {
   function toggleTask(id: string, currentStatus: string) {
     updateTask(id, {
       status: currentStatus === "done" ? "todo" : "done",
-      ...(currentStatus !== "done" ? { completedAt: new Date().toISOString() } : {}),
+      ...(currentStatus !== "done" ? { completed_at: new Date().toISOString() } : {}),
     })
   }
 

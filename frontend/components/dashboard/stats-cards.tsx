@@ -23,7 +23,14 @@ export function StatsCards() {
 
   useEffect(() => {
     if (MOCK_AUTH) return
-    apiClient<ApiStats>("/api/v1/analytics/summary").then(setApiStats).catch(() => {})
+    // Non-critical: if the analytics summary fails, fall back to derived stats
+    // computed from the task context.  No toast here — the derived numbers are
+    // a reasonable substitute and the user does not need to know about the failure.
+    apiClient<ApiStats>("/api/v1/analytics/summary")
+      .then(setApiStats)
+      .catch((err: unknown) => {
+        console.warn("[StatsCards] analytics summary unavailable:", err)
+      })
   }, [])
 
   const mockStats = useMemo(() => {
@@ -32,7 +39,7 @@ export function StatsCards() {
     const done = tasks.filter((t) => t.status === "done").length
     const inProgress = tasks.filter((t) => t.status === "in-progress").length
     const overdue = tasks.filter(
-      (t) => t.status !== "done" && t.dueDate && isAfter(today, parseISO(t.dueDate))
+      (t) => t.status !== "done" && t.due_date && isAfter(today, parseISO(t.due_date))
     ).length
     const completionRate = total > 0 ? Math.round((done / total) * 100) : 0
     return { total, done, inProgress, overdue, completionRate }

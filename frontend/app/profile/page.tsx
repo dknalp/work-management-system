@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
-import { tokenStorage } from "@/lib/auth"
+import { apiClient } from "@/lib/api"
 
 /** Accepted MIME types for avatar uploads (must match backend validation). */
 const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/gif"
@@ -67,24 +67,15 @@ export default function ProfilePage() {
     const formData = new FormData()
     formData.append("file", file)
 
-    const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3052").replace(/\/$/, "")
-    const token = tokenStorage.getAccess()
-
     setAvatarUploading(true)
     try {
-      const res = await fetch(`${apiBase}/users/me/avatar`, {
+      // apiClient handles Authorization headers and automatic token refresh on
+      // 401 — a raw fetch() would silently fail when the Firebase ID token expires.
+      // Do not set Content-Type manually; the browser adds it with the multipart boundary.
+      const data = await apiClient<{ avatar_url: string }>("/users/me/avatar", {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       })
-
-      if (!res.ok) {
-        const payload = await res.json().catch(() => ({ detail: "Upload failed." }))
-        toast.error(payload.detail ?? "Avatar upload failed.")
-        return
-      }
-
-      const data: { avatar_url: string } = await res.json()
       updateUser({ avatar_url: data.avatar_url })
       toast.success("Avatar updated.")
     } catch {

@@ -88,9 +88,9 @@ export function KanbanCard({
   const [editTitle, setEditTitle] = useState(task.title)
   const [editDescription, setEditDescription] = useState(task.description ?? "")
   const [editPriority, setEditPriority] = useState<Task["priority"]>(task.priority)
-  const [editTagsInput, setEditTagsInput] = useState(task.tags.join(", "))
+  const [editTagsInput, setEditTagsInput] = useState((task.tags ?? []).join(", "))
   const [editAssignees, setEditAssignees] = useState<string[]>(task.assignees ?? [])
-  const [editDueDate, setEditDueDate] = useState(task.dueDate ?? "")
+  const [editDueDate, setEditDueDate] = useState(task.due_date ?? "")
   const [assigneeOpen, setAssigneeOpen] = useState(false)
 
   const {
@@ -121,9 +121,9 @@ export function KanbanCard({
     setEditTitle(task.title)
     setEditDescription(task.description ?? "")
     setEditPriority(task.priority)
-    setEditTagsInput(task.tags.join(", "))
+    setEditTagsInput((task.tags ?? []).join(", "))
     setEditAssignees(task.assignees ?? [])
-    setEditDueDate(task.dueDate ?? "")
+    setEditDueDate(task.due_date ?? "")
     setDetailOpen(true)
   }
 
@@ -138,7 +138,7 @@ export function KanbanCard({
       tags,
       description: editDescription,
       assignees: editAssignees,
-      dueDate: editDueDate,
+      due_date: editDueDate,
     })
     setDetailOpen(false)
   }
@@ -158,8 +158,8 @@ export function KanbanCard({
   const firstAssignee = assignees[0] ?? null
   const assigneeInitials = firstAssignee ? getInitials(firstAssignee) : null
 
-  const dueDateDisplay = task.dueDate
-    ? new Date(task.dueDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
+  const dueDateDisplay = task.due_date
+    ? new Date(task.due_date).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
     : null
 
   if (isDragging) {
@@ -211,9 +211,9 @@ export function KanbanCard({
                 {task.title}
               </p>
 
-              {task.tags.length > 0 && (
+              {(task.tags ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {task.tags.map((tag) => (
+                  {(task.tags ?? []).map((tag) => (
                     <Badge
                       key={tag}
                       variant="secondary"

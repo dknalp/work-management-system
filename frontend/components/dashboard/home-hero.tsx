@@ -36,13 +36,13 @@ export function HomeHero() {
   const firstName = user?.name?.split(" ")[0] ?? "Kullanıcı"
   const today = time ? format(new Date(), "yyyy-MM-dd") : ""
 
-  const todaysTasks = tasks.filter((t) => t.dueDate?.startsWith(today))
+  const todaysTasks = tasks.filter((t) => t.due_date?.startsWith(today))
   const completedToday = todaysTasks.filter((t) => t.status === "done").length
   const overdueCount = tasks.filter(
     (t) =>
       t.status !== "done" &&
-      t.dueDate &&
-      t.dueDate < today
+      t.due_date &&
+      t.due_date < today
   ).length
 
   return (

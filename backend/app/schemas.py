@@ -147,8 +147,70 @@ TaskStatus = Literal["todo", "in-progress", "done"]
 TaskPriority = Literal["low", "medium", "high"]
 
 
+# ── Task sub-document schemas ──────────────────────────────────────────────────
+
+class SubTaskCreate(BaseModel):
+    """Request body for adding a sub-task to a task."""
+    title: str = Field(..., max_length=512)
+
+
+class SubTaskUpdate(BaseModel):
+    """Request body for updating a sub-task."""
+    title: Optional[str] = Field(None, max_length=512)
+    completed: Optional[bool] = None
+
+
+class SubTaskResponse(BaseModel):
+    """Serialized sub-task returned by the API."""
+    id: str
+    title: str
+    completed: bool
+
+    model_config = {"from_attributes": True}
+
+
+class ReplyCreate(BaseModel):
+    """Request body for adding a reply to a comment."""
+    body: str = Field(..., max_length=10_000)
+
+
+class ReplyResponse(BaseModel):
+    """Serialized comment reply returned by the API."""
+    id: str
+    author_id: str
+    author_name: str
+    author_avatar: Optional[str] = None
+    body: str
+    created_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class CommentCreate(BaseModel):
+    """Request body for adding a comment to a task."""
+    body: str = Field(..., max_length=10_000)
+
+
+class CommentResponse(BaseModel):
+    """Serialized comment returned by the API, including its replies."""
+    id: str
+    author_id: str
+    author_name: str
+    author_avatar: Optional[str] = None
+    body: str
+    created_at: str
+    replies: List["ReplyResponse"] = []
+
+    model_config = {"from_attributes": True}
+
+
+# ── Task CRUD schemas ─────────────────────────────────────────────────────────
+
 class TaskCreate(BaseModel):
-    # id is intentionally omitted — task IDs are always generated server-side
+    """Request body for ``POST /api/v1/tasks``.
+
+    Task IDs are always generated server-side; do not pass an ``id`` field.
+    """
     title: str = Field(..., max_length=512)
     status: TaskStatus = "todo"
     priority: TaskPriority = "medium"
@@ -161,6 +223,7 @@ class TaskCreate(BaseModel):
 
 
 class TaskUpdate(BaseModel):
+    """Request body for ``PATCH /api/v1/tasks/{task_id}``."""
     title: Optional[str] = Field(None, max_length=512)
     status: Optional[TaskStatus] = None
     priority: Optional[TaskPriority] = None
@@ -168,11 +231,13 @@ class TaskUpdate(BaseModel):
     due_date: Optional[str] = None
     tags: Optional[List[str]] = None
     description: Optional[str] = Field(None, max_length=10_000)
-    completed_at: Optional[datetime] = None
+    completed_at: Optional[str] = None
+    """ISO datetime string — supply when status changes to 'done'."""
     project_id: Optional[str] = None
 
 
 class TaskResponse(BaseModel):
+    """Full task document returned by the API."""
     id: str
     title: str
     status: str
@@ -181,9 +246,12 @@ class TaskResponse(BaseModel):
     due_date: Optional[str] = None
     tags: Optional[List[str]] = None
     description: Optional[str] = None
-    completed_at: Optional[datetime] = None
+    completed_at: Optional[str] = None
+    updated_at: Optional[str] = None
     project_id: Optional[str] = None
     created_at: str
+    sub_tasks: List[SubTaskResponse] = []
+    comments: List[CommentResponse] = []
 
     model_config = {"from_attributes": True}
 

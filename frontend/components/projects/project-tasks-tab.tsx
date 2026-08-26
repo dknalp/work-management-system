@@ -1,5 +1,7 @@
 "use client"
 
+/** Displays and manages tasks scoped to a specific project. */
+
 import { useMemo, useState } from "react"
 import { TaskTable } from "@/components/tasks/task-table"
 import { QuickAddTask } from "@/components/tasks/quick-add-task"
@@ -9,17 +11,31 @@ import { Task } from "@/types/task"
 import { toast } from "sonner"
 
 export function ProjectTasksTab({ projectId }: { projectId: string }) {
-  const { tasks, addTask, updateTask, deleteTask, deleteTasks } = useTasks()
+  const { tasks, createTask, updateTask, deleteTask } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
+  /** Tasks that belong to this project. */
   const projectTasks = useMemo(
-    () => tasks.filter((t) => t.projectId === projectId),
+    () => tasks.filter((t) => t.project_id === projectId),
     [tasks, projectId]
   )
 
-  function handleAdd(task: Task) {
-    addTask({ ...task, projectId })
-    toast.success("Görev oluşturuldu", { description: task.title })
+  async function handleAdd(task: Task) {
+    const created = await createTask({
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      assignees: task.assignees ?? [],
+      due_date: task.due_date,
+      tags: task.tags ?? [],
+      description: task.description,
+      project_id: projectId,
+    })
+    if (created) toast.success("Görev oluşturuldu", { description: created.title })
+  }
+
+  async function deleteMany(ids: string[]) {
+    await Promise.all(ids.map((id) => deleteTask(id)))
   }
 
   return (
@@ -30,7 +46,7 @@ export function ProjectTasksTab({ projectId }: { projectId: string }) {
           initialData={projectTasks}
           onRowClick={(task) => setSelectedTask(task)}
           onDelete={deleteTask}
-          onDeleteMany={deleteTasks}
+          onDeleteMany={deleteMany}
           onStatusChange={(id, status) => updateTask(id, { status })}
         />
       </div>

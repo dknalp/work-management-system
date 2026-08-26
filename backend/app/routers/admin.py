@@ -174,3 +174,45 @@ def update_user(
 
     data = {**(doc.to_dict() or {}), **updates}
     return _doc_to_user_response(user_id, data)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: str,
+    admin: User = Depends(get_current_admin),
+    db: firestore.Client = Depends(get_db),
+):
+    """Permanently delete a user account.
+
+    Removes the Firebase Auth record and the Firestore user document.
+    Also removes the corresponding team_member document if one exists.
+    Admins cannot delete their own account.
+
+    Args:
+        user_id: The UID of the user to delete.
+        admin: The currently authenticated admin user (injected dependency).
+        db: Firestore client (injected dependency).
+
+    Raises:
+        400 if the admin attempts to delete their own account.
+        404 if no user with the given UID exists in Firestore.
+    """
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account.",
+        )
+
+    doc_ref = db.collection("users").document(user_id)
+    if not doc_ref.get().exists:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    # Delete Firebase Auth record; ignore the error if the auth record is already gone.
+    try:
+        fb_auth.delete_user(user_id)
+    except fb_auth.UserNotFoundError:
+        pass
+
+    # Remove Firestore documents.
+    doc_ref.delete()
+    db.collection("team_members").document(user_id).delete()

@@ -302,12 +302,12 @@ export function createColumns(
       },
     },
     {
-      accessorKey: "dueDate",
+      accessorKey: "due_date",
       header: ({ column }) => (
         <SortableHeader column={column} label="Son Tarih" />
       ),
       cell: ({ row }) => {
-        const raw = row.original.dueDate
+        const raw = row.original.due_date
         if (!raw) return <span className="text-sm text-muted-foreground">—</span>
         const date = new Date(raw)
         if (isNaN(date.getTime())) return <span className="text-sm text-muted-foreground">—</span>
@@ -326,12 +326,12 @@ export function createColumns(
       },
     },
     {
-      accessorKey: "createdAt",
+      accessorKey: "created_at",
       header: ({ column }) => (
         <SortableHeader column={column} label="Oluşturulma" />
       ),
       cell: ({ row }) => {
-        const raw = row.original.createdAt
+        const raw = row.original.created_at
         if (!raw) return <span className="text-sm text-muted-foreground">—</span>
         const date = new Date(raw)
         if (isNaN(date.getTime())) return <span className="text-sm text-muted-foreground">—</span>
@@ -346,7 +346,7 @@ export function createColumns(
       accessorKey: "tags",
       header: "Etiketler",
       cell: ({ row }) => {
-        const tags = row.original.tags
+        const tags = row.original.tags ?? []
         const visible = tags.slice(0, 2)
         const overflow = tags.length - 2
         return (

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SiteHeader } from "@/components/layout/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -15,15 +15,25 @@ import { toast } from "sonner"
 
 export default function TasksPage() {
   const canView = usePermission("tasks:view")
-  const { tasks, addTask, updateTask, deleteTask, deleteTasks } = useTasks()
+  const { tasks, loading, createTask, updateTask, deleteTask } = useTasks()
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => { setMounted(true) }, [])
+  /** Delete multiple tasks in sequence. */
+  const deleteMany = async (ids: string[]) => {
+    await Promise.all(ids.map((id) => deleteTask(id)))
+  }
 
-  const handleAdd = (task: Task) => {
-    addTask(task)
-    toast.success("Görev oluşturuldu", { description: task.title })
+  const handleAdd = async (task: Task) => {
+    const created = await createTask({
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      assignees: task.assignees ?? [],
+      due_date: task.due_date,
+      tags: task.tags ?? [],
+      description: task.description,
+    })
+    if (created) toast.success("Görev oluşturuldu", { description: created.title })
   }
 
   if (!canView) return (
@@ -51,7 +61,7 @@ export default function TasksPage() {
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
             <div className="mb-6">
               <h1 className="text-2xl font-semibold tracking-tight">Görevler</h1>
-              {mounted && <p className="text-sm text-muted-foreground mt-1">{tasks.length} görev</p>}
+              {!loading && <p className="text-sm text-muted-foreground mt-1">{tasks.length} görev</p>}
             </div>
             <div className="mb-6">
               <QuickAddTask onAdd={handleAdd} />
@@ -60,7 +70,7 @@ export default function TasksPage() {
               initialData={tasks}
               onRowClick={(task) => setSelectedTask(task)}
               onDelete={deleteTask}
-              onDeleteMany={deleteTasks}
+              onDeleteMany={deleteMany}
               onStatusChange={(id, status) => updateTask(id, { status })}
             />
           </div>

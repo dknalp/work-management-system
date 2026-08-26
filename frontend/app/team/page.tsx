@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SiteHeader } from "@/components/layout/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -38,62 +38,112 @@ import { toast } from "sonner"
 import { useTeam, TeamMember } from "@/contexts/team-context"
 import { usePermission } from "@/hooks/use-permission"
 import { AccessDenied } from "@/components/auth/access-denied"
+import { apiClient } from "@/lib/api"
+import { createDefaultAgent } from "@/types/agent"
+import { useRouter } from "next/navigation"
+import { MOCK_AUTH } from "@/contexts/auth-context"
 
 // Re-export for backward compat
 export type { TeamMember }
 
 type ViewMode = "grid" | "table"
 
-interface AIAgent {
+/** Minimal shape of an agent config as returned by GET /api/v1/agents. */
+interface AgentSummary {
   id: string
   name: string
-  description: string
+  status: string
+  config: { description?: string }
 }
 
 export default function TeamPage() {
   const canView = usePermission("team:view")
   const canManage = usePermission("team:manage")
   const { members, addMember, updateMember, deleteMember } = useTeam()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null)
 
-  // AI Agents state (mock, no backend)
-  const [agents, setAgents] = useState<AIAgent[]>([
-    { id: "1", name: "Support Bot", description: "Handles customer support queries automatically." },
-  ])
+  // ── AI Agents — backend-persisted via /api/v1/agents ────────────────────
+  const [agents, setAgents] = useState<AgentSummary[]>([])
+  const [agentsLoading, setAgentsLoading] = useState(true)
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false)
   const [newAgentName, setNewAgentName] = useState("")
   const [newAgentDescription, setNewAgentDescription] = useState("")
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false)
 
   // Delete agent confirmation
-  const [deletingAgent, setDeletingAgent] = useState<AIAgent | null>(null)
+  const [deletingAgent, setDeletingAgent] = useState<AgentSummary | null>(null)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState("")
+  const [isDeletingAgent, setIsDeletingAgent] = useState(false)
 
-  function handleCreateAgent() {
-    if (!newAgentName.trim()) return
-    setAgents((prev) => [
-      ...prev,
-      { id: Date.now().toString(), name: newAgentName.trim(), description: newAgentDescription.trim() },
-    ])
-    setNewAgentName("")
-    setNewAgentDescription("")
-    setIsAgentDialogOpen(false)
+  // Load agents from backend on mount.
+  // In mock auth mode there is no Firebase token, so backend calls would fail with 401.
+  // We skip the fetch and show an empty list instead.
+  useEffect(() => {
+    if (MOCK_AUTH) {
+      setAgentsLoading(false)
+      return
+    }
+    let cancelled = false
+    apiClient.get<AgentSummary[]>("/api/v1/agents")
+      .then((data) => { if (!cancelled) setAgents(data ?? []) })
+      .catch((err: unknown) => { console.warn("[TeamPage] agents load failed:", err) })
+      .finally(() => { if (!cancelled) setAgentsLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  /** Create agent: POST to backend first, then navigate to builder with the real Firestore ID. */
+  async function handleCreateAgent() {
+    const name = newAgentName.trim()
+    if (!name) return
+    if (MOCK_AUTH) {
+      toast.error("Ajan oluşturmak için gerçek kimlik doğrulama gerekli.")
+      return
+    }
+    setIsCreatingAgent(true)
+    try {
+      const created = await apiClient.post<AgentSummary>("/api/v1/agents", {
+        name,
+        status: "draft",
+        // Store a full default AIAgent config so the builder has something to load.
+        config: createDefaultAgent("", name, newAgentDescription.trim()),
+      })
+      setAgents((prev) => [created, ...prev])
+      setNewAgentName("")
+      setNewAgentDescription("")
+      setIsAgentDialogOpen(false)
+      // Navigate to the builder with the real Firestore document ID.
+      router.push(`/agent-builder/${created.id}`)
+    } catch {
+      toast.error("Ajan oluşturulamadı. Lütfen tekrar deneyin.")
+    } finally {
+      setIsCreatingAgent(false)
+    }
   }
 
-  function handleRequestDeleteAgent(agent: AIAgent) {
+  function handleRequestDeleteAgent(agent: AgentSummary) {
     setDeletingAgent(agent)
     setDeleteConfirmInput("")
   }
 
-  function handleConfirmDeleteAgent() {
+  async function handleConfirmDeleteAgent() {
     if (!deletingAgent || deleteConfirmInput !== deletingAgent.name) return
-    setAgents((prev) => prev.filter((a) => a.id !== deletingAgent.id))
-    toast.success("Agent silindi", { description: `${deletingAgent.name} kaldırıldı.` })
-    setDeletingAgent(null)
-    setDeleteConfirmInput("")
+    setIsDeletingAgent(true)
+    try {
+      await apiClient.delete(`/api/v1/agents/${deletingAgent.id}`)
+      setAgents((prev) => prev.filter((a) => a.id !== deletingAgent.id))
+      toast.success("Agent silindi", { description: `${deletingAgent.name} kaldırıldı.` })
+      setDeletingAgent(null)
+      setDeleteConfirmInput("")
+    } catch {
+      toast.error("Ajan silinemedi. Lütfen tekrar deneyin.")
+    } finally {
+      setIsDeletingAgent(false)
+    }
   }
 
   function handleCancelDeleteAgent() {
@@ -323,7 +373,12 @@ export default function TeamPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-              {agents.map((agent) => (
+              {agentsLoading ? (
+                <p className="col-span-full text-sm text-muted-foreground text-center py-4">Yükleniyor…</p>
+              ) : agents.length === 0 ? (
+                <p className="col-span-full text-sm text-muted-foreground text-center py-4">Henüz ajan yok.</p>
+              ) : null}
+              {!agentsLoading && agents.map((agent) => (
                 <div
                   key={agent.id}
                   className="group relative flex flex-col items-center gap-3 rounded-2xl border border-border/50 bg-card/60 p-6 text-center backdrop-blur-sm transition-shadow hover:shadow-md"
@@ -348,8 +403,8 @@ export default function TeamPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold">{agent.name}</p>
-                    {agent.description && (
-                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{agent.description}</p>
+                    {agent.config?.description && (
+                      <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{agent.config.description}</p>
                     )}
                   </div>
                 </div>
@@ -411,7 +466,7 @@ export default function TeamPage() {
               <Button
                 variant="destructive"
                 onClick={handleConfirmDeleteAgent}
-                disabled={deleteConfirmInput !== deletingAgent?.name}
+                disabled={deleteConfirmInput !== deletingAgent?.name || isDeletingAgent}
               >
                 Delete
               </Button>
@@ -452,9 +507,9 @@ export default function TeamPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAgentDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateAgent} disabled={!newAgentName.trim()}>
+              <Button onClick={handleCreateAgent} disabled={!newAgentName.trim() || isCreatingAgent}>
                 <PlusIcon className="size-4" />
-                Create Agent
+                {isCreatingAgent ? "Oluşturuluyor…" : "Oluştur"}
               </Button>
             </DialogFooter>
           </DialogContent>

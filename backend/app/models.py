@@ -1,51 +1,40 @@
-"""Data models for the work-management-system backend.
+"""
+Pydantic models that mirror Firestore document schemas.
 
-These are plain Pydantic ``BaseModel`` classes used for serializing and
-deserializing Firestore documents.  There is no SQLAlchemy/SQLModel here —
-Firestore is schemaless so no table definitions are needed.
+Each class maps one-to-one to a Firestore collection.  These models are used
+for reading documents out of Firestore (via dict → model) and as the canonical
+type definitions shared across routers.
 
-Each class corresponds to a Firestore collection of the same (lowercase,
-underscore-separated) name:
-  User            → users/
-  Task            → tasks/
-  ActivityLog     → activity_logs/
-  TeamMember      → team_members/
-  BotAccount      → bot_accounts/
-  Webhook         → webhooks/
-  ChatMessage     → chat_messages/
-  Project         → projects/
-  Pipeline        → pipelines/
-  KanbanBoard     → kanban_boards/
-  CalendarEvent   → calendar_events/
-  FileRecord      → file_records/
-  FileAccessLog   → file_access_logs/
-  FileShare       → file_shares/
-  CustomRole      → custom_roles/
-  RolePermission  → role_permissions/
+Ownership rule: this module only defines data shapes.  Business logic,
+validation rules, and Firestore query construction live in the routers.
 """
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
 # ── Users ──────────────────────────────────────────────────────────────────────
 
 class User(BaseModel):
-    """Represents an authenticated user.  The document ID is the Firebase Auth UID."""
+    """An authenticated application user.  Document ID is the Firebase UID."""
 
     id: str
-    """Firebase Auth UID — serves as the document ID in Firestore."""
-    name: str
+    """Firebase UID — also the Firestore document ID."""
     email: str
+    name: str
     role: str = "member"
-    """One of 'admin', 'manager', 'member', or any custom role name."""
+    """One of 'admin', 'manager', 'member'."""
     is_admin: bool = False
     is_active: bool = True
+    created_at: Optional[datetime] = None
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    access_token: Optional[str] = None
+    """Hashed backend access token — never returned to clients."""
+    refresh_token: Optional[str] = None
+    """Hashed backend refresh token — never returned to clients."""
 
     model_config = {"from_attributes": True}
 
@@ -78,10 +67,56 @@ class RolePermission(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Task sub-documents ─────────────────────────────────────────────────────────
+
+class SubTask(BaseModel):
+    """A checklist item nested inside a Task."""
+
+    id: str
+    title: str
+    completed: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class Reply(BaseModel):
+    """A reply nested inside a Comment."""
+
+    id: str
+    author_id: str
+    author_name: str
+    author_avatar: Optional[str] = None
+    body: str
+    created_at: str
+    """ISO datetime string."""
+
+    model_config = {"from_attributes": True}
+
+
+class Comment(BaseModel):
+    """A comment thread entry nested inside a Task."""
+
+    id: str
+    author_id: str
+    author_name: str
+    author_avatar: Optional[str] = None
+    body: str
+    created_at: str
+    """ISO datetime string."""
+    replies: List[Reply] = Field(default_factory=list)
+
+    model_config = {"from_attributes": True}
+
+
 # ── Tasks ──────────────────────────────────────────────────────────────────────
 
 class Task(BaseModel):
-    """A work task. Document ID is the task's string ID (e.g. 'TASK-001')."""
+    """A work task. Document ID is a UUID string.
+
+    assignees is the canonical plural field.  The legacy ``assignee`` scalar
+    field (singular) is intentionally absent — any existing Firestore documents
+    that still carry ``assignee`` must be read via the router's dict normalizer.
+    """
 
     id: str
     title: str
@@ -90,14 +125,23 @@ class Task(BaseModel):
     """One of 'todo', 'in-progress', 'done'."""
     priority: str = "medium"
     """One of 'low', 'medium', 'high'."""
-    assignee: Optional[str] = None
+    assignees: List[str] = Field(default_factory=list)
+    """List of Firebase UIDs or display names assigned to this task."""
     due_date: Optional[str] = None
     """ISO date string 'YYYY-MM-DD'."""
     tags: List[str] = Field(default_factory=list)
     created_at: Optional[str] = None
-    """ISO date string 'YYYY-MM-DD' — used in analytics daily breakdown."""
-    completed_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    """ISO date string or datetime string — used in analytics daily breakdown."""
+    completed_at: Optional[str] = None
+    """ISO datetime string — set when status transitions to 'done'."""
+    updated_at: Optional[str] = None
+    """ISO datetime string — updated on every mutation."""
+    project_id: Optional[str] = None
+    """ID of the parent Project, if any."""
+    sub_tasks: List[SubTask] = Field(default_factory=list)
+    """Checklist items.  Stored as an embedded array in the Task document."""
+    comments: List[Comment] = Field(default_factory=list)
+    """Comment thread.  Stored as an embedded array in the Task document."""
 
     model_config = {"from_attributes": True}
 
@@ -214,113 +258,39 @@ class Project(BaseModel):
 # ── Pipelines ──────────────────────────────────────────────────────────────────
 
 class Pipeline(BaseModel):
-    """A pipeline belonging to a project. Document ID is a string."""
+    """A pipeline within a project. Document ID is a UUID string."""
 
     id: str
     project_id: str
     name: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
 
 # ── Kanban boards ──────────────────────────────────────────────────────────────
 
-class KanbanBoard(BaseModel):
-    """Persisted kanban board state for a pipeline. Document ID is pipeline_id."""
-
-    pipeline_id: str
-    state: Optional[Any] = None
-    """Arbitrary JSON state blob (columns, cards, order, etc.)."""
-    updated_at: Optional[datetime] = None
-
-    model_config = {"from_attributes": True}
-
-
-# ── Calendar events ────────────────────────────────────────────────────────────
-
-class CalendarEvent(BaseModel):
-    """A calendar event owned by a user. Document ID is a string."""
+class KanbanColumn(BaseModel):
+    """A column in a kanban board."""
 
     id: str
     title: str
-    date: str
-    """ISO date string 'YYYY-MM-DD'."""
-    time: Optional[str] = None
-    priority: str = "medium"
-    remind: bool = False
-    assignee_names: List[str] = Field(default_factory=list)
-    owner_id: str
-    """Firebase UID of the owning user."""
-    created_at: datetime
-    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
 
-# ── File records ───────────────────────────────────────────────────────────────
+class KanbanBoard(BaseModel):
+    """Persisted kanban board state for a pipeline.
 
-class FileRecord(BaseModel):
-    """Metadata for an uploaded file or folder. Document ID is a UUID string.
-
-    The actual file bytes live in Cloudflare R2 (or local disk) under the
-    ``r2_key``.  This record is the database representation only.
+    Document ID is the pipeline_id.  The tasks dict maps column_id → list of
+    Task IDs (strings pointing to tasks/{id} documents in Firestore).
     """
 
-    id: str
-    """UUID string — used as the Firestore document ID."""
-    owner_id: str
-    """Firebase UID of the uploading user."""
-    name: str
-    path: str
-    """Full virtual path (e.g. 'docs/reports/q1.pdf')."""
-    parent_path: str
-    """Parent directory path (e.g. 'docs/reports')."""
-    type: str
-    """'file' or 'folder'."""
-    size: Optional[int] = None
-    """File size in bytes — None for folders."""
-    mime_type: Optional[str] = None
-    r2_key: Optional[str] = None
-    """Storage key in R2 (or local disk).  None for folders."""
-    is_deleted: bool = False
-    deleted_at: Optional[datetime] = None
-    is_starred: bool = False
-    color: Optional[str] = None
-    icon_emoji: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-# ── File access logs ───────────────────────────────────────────────────────────
-
-class FileAccessLog(BaseModel):
-    """Records each time a file is accessed (download / preview). Document ID is UUID."""
-
-    id: str
-    file_id: str
-    user_id: str
-    action: str
-    """'download' or 'preview'."""
-    accessed_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-# ── File shares ────────────────────────────────────────────────────────────────
-
-class FileShare(BaseModel):
-    """A share record granting another user (or anyone with a link) access to a file."""
-
-    id: str
-    file_id: str
-    owner_id: str
-    shared_with_user_id: Optional[str] = None
-    share_token: Optional[str] = None
-    permission_level: str = "view"
-    expires_at: Optional[datetime] = None
-    created_at: datetime
+    pipeline_id: str
+    columns: List[KanbanColumn] = Field(default_factory=list)
+    task_order: dict = Field(default_factory=dict)
+    """Maps column_id → ordered list of task IDs."""
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

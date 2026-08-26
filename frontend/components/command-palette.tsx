@@ -96,7 +96,7 @@ export function CommandPalette() {
                 <Icon className="mr-2 size-4 text-muted-foreground" />
                 <span className="flex-1 truncate">{task.title}</span>
                 {(task.assignees ?? []).length > 0 && (
-                  <span className="ml-2 text-xs text-muted-foreground">{task.assignees.join(", ")}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{(task.assignees ?? []).join(", ")}</span>
                 )}
               </CommandItem>
             )

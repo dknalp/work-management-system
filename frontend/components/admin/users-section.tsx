@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useAuth, MOCK_AUTH, type AuthUser as User } from "@/contexts/auth-context"
+import { useAuth, type AuthUser as User } from "@/contexts/auth-context"
 import { usePermission } from "@/hooks/use-permission"
 import { apiClient } from "@/lib/api"
 import { toast } from "sonner"
@@ -49,13 +49,8 @@ export function UsersSection() {
   const loadUsers = React.useCallback(async () => {
     setLoading(true)
     try {
-      if (MOCK_AUTH) {
-        const stored = localStorage.getItem("wms:mock_users")
-        setUsers(stored ? JSON.parse(stored) : [])
-      } else {
-        const data = await apiClient.get<User[]>("/admin/users")
-        setUsers(data)
-      }
+      const data = await apiClient.get<User[]>("/admin/users")
+      setUsers(data)
     } catch {
       toast.error("Kullanıcılar yüklenemedi")
     } finally {
@@ -69,26 +64,9 @@ export function UsersSection() {
     e.preventDefault()
     setCreating(true)
     try {
-      if (MOCK_AUTH) {
-        const newUser: User = {
-          id: crypto.randomUUID(),
-          name: form.name,
-          email: form.email,
-          role: form.role as User["role"],
-          is_admin: form.role === "admin",
-          is_active: true,
-          created_at: new Date().toISOString(),
-          avatar: null,
-        }
-        const updated = [...users, newUser]
-        setUsers(updated)
-        localStorage.setItem("wms:mock_users", JSON.stringify(updated))
-        toast.success("Kullanıcı oluşturuldu")
-      } else {
-        await apiClient.post("/admin/users", form)
-        toast.success("Kullanıcı oluşturuldu")
-        await loadUsers()
-      }
+      await apiClient.post("/admin/users", form)
+      toast.success("Kullanıcı oluşturuldu")
+      await loadUsers()
       setForm(EMPTY_FORM)
       setDialogOpen(false)
     } catch (err) {
@@ -100,14 +78,8 @@ export function UsersSection() {
 
   const handleDelete = async (userId: string) => {
     try {
-      if (MOCK_AUTH) {
-        const updated = users.filter((u) => u.id !== userId)
-        setUsers(updated)
-        localStorage.setItem("wms:mock_users", JSON.stringify(updated))
-      } else {
-        await apiClient.delete(`/admin/users/${userId}`)
-        await loadUsers()
-      }
+      await apiClient.delete(`/admin/users/${userId}`)
+      await loadUsers()
       toast.success("Kullanıcı silindi")
     } catch {
       toast.error("Silme başarısız")
@@ -116,14 +88,8 @@ export function UsersSection() {
 
   const handleRoleChange = async (userId: string, role: string) => {
     try {
-      if (MOCK_AUTH) {
-        const updated = users.map((u) => u.id === userId ? { ...u, role: role as User["role"], is_admin: role === "admin" } : u)
-        setUsers(updated)
-        localStorage.setItem("wms:mock_users", JSON.stringify(updated))
-      } else {
-        await apiClient.patch(`/admin/users/${userId}`, { role })
-        await loadUsers()
-      }
+      await apiClient.patch(`/admin/users/${userId}`, { role })
+      await loadUsers()
       const label = ROLE_LABELS[role] ?? role
       toast.success(`Rol güncellendi: ${label}`)
     } catch {

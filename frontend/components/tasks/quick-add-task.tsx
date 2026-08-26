@@ -60,10 +60,11 @@ export function QuickAddTask({ onAdd }: QuickAddTaskProps) {
       status,
       priority,
       assignees,
-      dueDate,
+      due_date: dueDate,
       tags: [],
-      subTasks: pendingSubTasks,
-      createdAt: new Date().toISOString(),
+      sub_tasks: pendingSubTasks,
+      created_at: new Date().toISOString(),
+      comments: [],
       description,
     });
     setTitle("");

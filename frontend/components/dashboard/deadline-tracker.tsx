@@ -51,21 +51,21 @@ export function DeadlineTracker() {
   const overdue = tasks.filter(
     (t) =>
       t.status !== "done" &&
-      t.dueDate &&
-      isBefore(parseISO(t.dueDate), today)
+      t.due_date &&
+      isBefore(parseISO(t.due_date), today)
   )
 
   const upcoming = tasks.filter(
     (t) =>
       t.status !== "done" &&
-      t.dueDate &&
-      !isBefore(parseISO(t.dueDate), today) &&
-      !isAfter(parseISO(t.dueDate), in7Days)
+      t.due_date &&
+      !isBefore(parseISO(t.due_date), today) &&
+      !isAfter(parseISO(t.due_date), in7Days)
   )
 
   const allDeadlines = [
-    ...overdue.sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
-    ...upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    ...overdue.sort((a, b) => a.due_date.localeCompare(b.due_date)),
+    ...upcoming.sort((a, b) => a.due_date.localeCompare(b.due_date)),
   ]
 
   if (allDeadlines.length === 0) return null
@@ -82,7 +82,7 @@ export function DeadlineTracker() {
 
       <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scroll-smooth">
         {allDeadlines.map((task) => {
-          const parsedDate = parseISO(task.dueDate)
+          const parsedDate = parseISO(task.due_date)
           const daysLeft = differenceInCalendarDays(parsedDate, today)
           const formattedDate = format(parsedDate, "d MMM", { locale: tr })
 
@@ -117,9 +117,9 @@ export function DeadlineTracker() {
                   <span>{formattedDate}</span>
                 </div>
 
-                {task.assignees.length > 0 && (
+                {(task.assignees ?? []).length > 0 && (
                   <div className="flex -space-x-1.5">
-                    {task.assignees.slice(0, 3).map((name, i) => (
+                    {(task.assignees ?? []).slice(0, 3).map((name, i) => (
                       <div
                         key={i}
                         title={name}
@@ -128,9 +128,9 @@ export function DeadlineTracker() {
                         {getInitials(name)}
                       </div>
                     ))}
-                    {task.assignees.length > 3 && (
+                    {(task.assignees ?? []).length > 3 && (
                       <div className="flex size-6 items-center justify-center rounded-full bg-muted ring-2 ring-card text-[9px] font-bold text-muted-foreground">
-                        +{task.assignees.length - 3}
+                        +{(task.assignees ?? []).length - 3}
                       </div>
                     )}
                   </div>

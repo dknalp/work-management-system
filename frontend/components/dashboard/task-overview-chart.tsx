@@ -40,7 +40,12 @@ export function TaskOverviewChart() {
 
   useEffect(() => {
     if (MOCK_AUTH) return
-    apiClient<DailyPoint[]>("/api/v1/analytics/daily?days=30").then(setApiData).catch(() => {})
+    // Non-critical: falls back to locally-derived data from the task context.
+    apiClient<DailyPoint[]>("/api/v1/analytics/daily?days=30")
+      .then(setApiData)
+      .catch((err: unknown) => {
+        console.warn("[TaskOverviewChart] analytics data unavailable:", err)
+      })
   }, [])
 
   // Mock/fallback: compute 30 days of data from local tasks (mirrors the real API window)
@@ -50,10 +55,10 @@ export function TaskOverviewChart() {
       const key = format(date, "yyyy-MM-dd")
       const label = format(date, "EEE")
       const created = tasks.filter(
-        (t) => t.createdAt && format(new Date(t.createdAt), "yyyy-MM-dd") === key
+        (t) => t.created_at && format(new Date(t.created_at), "yyyy-MM-dd") === key
       ).length
       const completed = tasks.filter(
-        (t) => t.completedAt && format(new Date(t.completedAt), "yyyy-MM-dd") === key
+        (t) => t.completed_at && format(new Date(t.completed_at), "yyyy-MM-dd") === key
       ).length
       return { label, created, completed }
     })

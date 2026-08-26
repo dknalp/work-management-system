@@ -62,8 +62,8 @@ export function EditTaskDialog({
       setStatus(task.status)
       setPriority(task.priority)
       setAssignees(task.assignees ?? [])
-      setDueDate(task.dueDate)
-      setTags(task.tags)
+      setDueDate(task.due_date ?? "")
+      setTags(task.tags ?? [])
       setErrors({})
     }
   }, [task])
@@ -83,7 +83,7 @@ export function EditTaskDialog({
       status,
       priority,
       assignees,
-      dueDate,
+      due_date: dueDate,
       tags,
     })
     onOpenChange(false)

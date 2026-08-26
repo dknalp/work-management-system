@@ -22,32 +22,34 @@ interface CreateTaskDialogProps {
 }
 
 export function CreateTaskDialog({ open, onOpenChange }: CreateTaskDialogProps) {
-  const { addTask } = useTasks()
+  const { createTask } = useTasks()
   const { members } = useTeam()
   const [title, setTitle] = useState("")
   const [assignee, setAssignee] = useState("")
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium")
   const [dueDate, setDueDate] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit() {
-    if (!title.trim()) return
-    const task: Task = {
-      id: `task-${Date.now()}`,
+  async function handleSubmit() {
+    if (!title.trim() || submitting) return
+    setSubmitting(true)
+    const created = await createTask({
       title: title.trim(),
       status: "todo",
       priority,
       assignees: assignee ? [assignee] : [],
-      dueDate: dueDate || "",
+      due_date: dueDate || undefined,
       tags: [],
-      createdAt: new Date().toISOString(),
+    })
+    setSubmitting(false)
+    if (created) {
+      toast.success("Görev oluşturuldu", { description: created.title })
+      setTitle("")
+      setAssignee("")
+      setPriority("medium")
+      setDueDate("")
+      onOpenChange(false)
     }
-    addTask(task)
-    toast.success("Görev oluşturuldu", { description: task.title })
-    setTitle("")
-    setAssignee("")
-    setPriority("medium")
-    setDueDate("")
-    onOpenChange(false)
   }
 
   return (

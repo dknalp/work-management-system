@@ -86,9 +86,9 @@ export function TaskDetailModal({
       status: task.status,
       priority: task.priority,
       assignees: [...(task.assignees ?? [])],
-      dueDate: task.dueDate,
+      due_date: task.due_date,
       description: task.description ?? "",
-      tags: [...task.tags],
+      tags: [...(task.tags ?? [])],
     })
     setIsEditing(true)
   }
@@ -123,7 +123,7 @@ export function TaskDetailModal({
     if (!task) return
     const updated: Task = {
       ...task,
-      subTasks: (task.subTasks ?? []).map((st) =>
+      sub_tasks: (task.sub_tasks ?? []).map((st) =>
         st.id === id ? { ...st, completed: !st.completed } : st
       ),
     }
@@ -134,7 +134,7 @@ export function TaskDetailModal({
     if (!task) return
     const updated: Task = {
       ...task,
-      subTasks: (task.subTasks ?? []).filter((st) => st.id !== id),
+      sub_tasks: (task.sub_tasks ?? []).filter((st) => st.id !== id),
     }
     onTaskChange(updated)
   }
@@ -149,7 +149,7 @@ export function TaskDetailModal({
     }
     const updated: Task = {
       ...task,
-      subTasks: [...(task.subTasks ?? []), newSub],
+      sub_tasks: [...(task.sub_tasks ?? []), newSub],
     }
     onTaskChange(updated)
     setNewSubTaskTitle("")
@@ -163,9 +163,10 @@ export function TaskDetailModal({
         ...(task.comments ?? []),
         {
           id: crypto.randomUUID(),
-          authorName: user?.name ?? "You",
+          author_id: user?.id ?? "",
+          author_name: user?.name ?? "You",
           body: commentInput.trim(),
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
           replies: [],
         },
       ],
@@ -183,9 +184,10 @@ export function TaskDetailModal({
               ...(c.replies ?? []),
               {
                 id: crypto.randomUUID(),
-                authorName: user?.name ?? "You",
+                author_id: user?.id ?? "",
+                author_name: user?.name ?? "You",
                 body: replyInput.trim(),
-                createdAt: new Date().toISOString(),
+                created_at: new Date().toISOString(),
               },
             ],
           }
@@ -320,9 +322,9 @@ export function TaskDetailModal({
                       <p className="text-xs text-muted-foreground mb-1">Son tarih</p>
                       <Input
                         type="date"
-                        value={draft.dueDate ?? ""}
+                        value={draft.due_date ?? ""}
                         onChange={(e) =>
-                          setDraft((d) => ({ ...d, dueDate: e.target.value }))
+                          setDraft((d) => ({ ...d, due_date: e.target.value }))
                         }
                         className="h-8 text-sm"
                       />
@@ -405,12 +407,12 @@ export function TaskDetailModal({
                       {(task.assignees ?? []).length > 0 ? (task.assignees ?? []).join(", ") : "—"}
                     </span>
                     <span className="text-muted-foreground">Son tarih</span>
-                    <span className="text-foreground">{task.dueDate}</span>
+                    <span className="text-foreground">{task.due_date}</span>
                   </div>
 
-                  {task.tags.length > 0 && (
+                  {(task.tags ?? []).length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                      {task.tags.map((tag) => (
+                      {(task.tags ?? []).map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-xs">
                           {tag}
                         </Badge>
@@ -443,17 +445,17 @@ export function TaskDetailModal({
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-2">
                   Alt görevler
-                  {task.subTasks && task.subTasks.length > 0 && (
+                  {task.sub_tasks && task.sub_tasks.length > 0 && (
                     <span className="ml-1 text-xs font-normal">
-                      ({task.subTasks.filter((s) => s.completed).length}/
-                      {task.subTasks.length})
+                      ({task.sub_tasks.filter((s) => s.completed).length}/
+                      {task.sub_tasks.length})
                     </span>
                   )}
                 </p>
 
-                {task.subTasks && task.subTasks.length > 0 && (
+                {task.sub_tasks && task.sub_tasks.length > 0 && (
                   <ul className="space-y-1.5 mb-3">
-                    {(showAllSubTasks ? task.subTasks : task.subTasks.slice(0, 3)).map((st) => (
+                    {(showAllSubTasks ? task.sub_tasks : task.sub_tasks.slice(0, 3)).map((st) => (
                       <li key={st.id} className="flex items-center gap-2 group">
                         <Checkbox
                           id={`st-${st.id}`}
@@ -483,12 +485,12 @@ export function TaskDetailModal({
                   </ul>
                 )}
 
-                {(task?.subTasks ?? []).length > 3 && !showAllSubTasks && (
+                {(task?.sub_tasks ?? []).length > 3 && !showAllSubTasks && (
                   <button
                     onClick={() => setShowAllSubTasks(true)}
                     className="mt-1 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    Tümünü göster ({task.subTasks!.length}) alt görev →
+                    Tümünü göster ({task.sub_tasks!.length}) alt görev →
                   </button>
                 )}
 
@@ -522,7 +524,7 @@ export function TaskDetailModal({
                 {(task?.comments ?? []).length > 0 && (
                   <div className="space-y-3 mb-2">
                     {(task?.comments ?? []).slice(0, 3).map((comment) => {
-                      const initials = comment.authorName
+                      const initials = comment.author_name
                         .split(" ")
                         .map((w) => w[0])
                         .join("")
@@ -536,9 +538,9 @@ export function TaskDetailModal({
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-baseline gap-2">
-                                <span className="text-sm font-medium">{comment.authorName}</span>
+                                <span className="text-sm font-medium">{comment.author_name}</span>
                                 <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                                 </span>
                               </div>
                               <p className="text-sm mt-0.5">{comment.body}</p>
@@ -578,7 +580,7 @@ export function TaskDetailModal({
                               {(comment.replies ?? []).length > 0 && (
                                 <div className="mt-2 pl-3 border-l border-border space-y-2">
                                   {(comment.replies ?? []).map((reply) => {
-                                    const replyInitials = reply.authorName
+                                    const replyInitials = reply.author_name
                                       .split(" ")
                                       .map((w) => w[0])
                                       .join("")
@@ -591,9 +593,9 @@ export function TaskDetailModal({
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-baseline gap-2">
-                                            <span className="text-xs font-medium">{reply.authorName}</span>
+                                            <span className="text-xs font-medium">{reply.author_name}</span>
                                             <span className="text-xs text-muted-foreground">
-                                              {formatDistanceToNow(new Date(reply.createdAt), { addSuffix: true })}
+                                              {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
                                             </span>
                                           </div>
                                           <p className="text-xs mt-0.5">{reply.body}</p>
@@ -654,9 +656,9 @@ export function TaskDetailModal({
         open={showAllSubTasks}
         onOpenChange={setShowAllSubTasks}
         taskTitle={task?.title ?? ""}
-        subTasks={task?.subTasks ?? []}
+        sub_tasks={task?.sub_tasks ?? []}
         onSubTasksChange={(updated) => {
-          if (task) onTaskChange({ ...task, subTasks: updated })
+          if (task) onTaskChange({ ...task, sub_tasks: updated })
         }}
       />
       <CommentsModal

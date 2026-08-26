@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, use } from "react"
+import React, { useState, use, useEffect } from "react"
 import Link from "next/link"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { SiteHeader } from "@/components/layout/site-header"
@@ -27,8 +27,7 @@ import {
   ChevronRightIcon,
   GlobeIcon,
   CodeIcon,
-  FileTextIcon,
-  MailIcon,
+    MailIcon,
   CalendarIcon,
   ZapIcon,
   DatabaseIcon,
@@ -50,16 +49,7 @@ import {
   createDefaultAgent,
 } from "@/types/agent"
 import { cn } from "@/lib/utils"
-
-// ─── Mock agent store (in-memory, replaced by backend later) ────────────────
-const MOCK_AGENTS: Record<string, AIAgent> = {
-  "1": createDefaultAgent("1", "Support Bot", "Handles customer support queries automatically."),
-}
-
-function getAgent(id: string): AIAgent {
-  if (MOCK_AGENTS[id]) return MOCK_AGENTS[id]
-  return createDefaultAgent(id, `Agent ${id}`, "")
-}
+import { apiClient } from "@/lib/api"
 
 // ─── Tool metadata ────────────────────────────────────────────────────────────
 const TOOL_ICONS: Record<string, React.ElementType> = {
@@ -108,8 +98,41 @@ function parseCronHuman(expr: string): string {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function AgentBuilderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [agent, setAgent] = useState<AIAgent>(() => getAgent(id))
+
+  // Start with a default agent; the real config loads from the backend on mount.
+  const [agent, setAgent] = useState<AIAgent>(() => createDefaultAgent(id, `Agent ${id}`, ""))
+  const [pageLoading, setPageLoading] = useState(true)
+  const [pageError, setPageError] = useState<string | null>(null)
   const [domainInput, setDomainInput] = useState("")
+
+  // Load the persisted agent config from the backend on first render.
+  useEffect(() => {
+    let cancelled = false
+    async function loadAgent() {
+      try {
+        const response = await apiClient.get<{ id: string; name: string; status: string; config: AIAgent }>(`/api/v1/agents/${id}`)
+        if (!cancelled && response?.config) {
+          // The backend stores the full AIAgent payload under ``config``.
+          setAgent({ ...response.config, id: response.id })
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          // 404 → the agent was deleted or never existed; show a not-found screen.
+          // Any other error → generic failure message.
+          const is404 = (err as { status?: number })?.status === 404
+          setPageError(
+            is404
+              ? "Bu ajan bulunamadı. Silinmiş olabilir."
+              : "Ajan yüklenemedi. Lütfen sayfayı yenileyin."
+          )
+        }
+      } finally {
+        if (!cancelled) setPageLoading(false)
+      }
+    }
+    loadAgent()
+    return () => { cancelled = true }
+  }, [id])
 
   function update<K extends keyof AIAgent>(key: K, value: AIAgent[K]) {
     setAgent((prev) => ({ ...prev, [key]: value }))
@@ -149,15 +172,75 @@ export default function AgentBuilderPage({ params }: { params: Promise<{ id: str
     }))
   }
 
-  function handleSave() {
-    MOCK_AGENTS[id] = agent
-    toast.success("Agent saved", { description: `${agent.name} has been updated.` })
+  /** Persist the current agent config to Firestore via PATCH.
+ *
+ * The document is always created by the team page before the user arrives here,
+ * so PATCH is the only valid operation.  A 404 means the agent was deleted
+ * externally — in that case we surface the error and do not recreate the doc
+ * under the wrong ID.
+ */
+  async function handleSave() {
+    try {
+      await apiClient.patch(`/api/v1/agents/${id}`, {
+        name: agent.name,
+        status: agent.status,
+        config: agent,
+      })
+      toast.success("Ajan kaydedildi", { description: `${agent.name} güncellendi.` })
+    } catch {
+      toast.error("Ajan kaydedilemedi. Lütfen tekrar deneyin.")
+    }
   }
 
   const statusColor: Record<string, string> = {
     active: "bg-emerald-500/15 text-emerald-600 border-emerald-500/20",
     inactive: "bg-muted text-muted-foreground border-border/40",
     draft: "bg-amber-500/15 text-amber-600 border-amber-500/20",
+  }
+
+  if (pageLoading) {
+    return (
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 64)",
+            "--header-height": "calc(var(--spacing) * 14)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset>
+          <SiteHeader />
+          <div className="flex flex-1 items-center justify-center text-muted-foreground">
+            Yükleniyor…
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    )
+  }
+
+  if (pageError) {
+    return (
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 64)",
+            "--header-height": "calc(var(--spacing) * 14)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset>
+          <SiteHeader />
+          <div className="flex flex-1 flex-col items-center justify-center gap-4">
+            <p className="text-destructive text-sm">{pageError}</p>
+            <Link href="/team" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+              Takım sayfasına dön
+            </Link>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    )
   }
 
   return (

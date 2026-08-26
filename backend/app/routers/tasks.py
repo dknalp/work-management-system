@@ -26,19 +26,33 @@ def _is_admin(user: User) -> bool:
 
 
 def _doc_to_response(doc_id: str, data: dict) -> TaskResponse:
-    """Convert a Firestore task document dict to a ``TaskResponse``."""
+    """Convert a Firestore task document dict to a ``TaskResponse``.
+
+    Handles the legacy ``assignee`` scalar field that predates the current
+    ``assignees`` list — any document that still carries the old shape is
+    normalised transparently.
+    """
+    # Normalise legacy scalar assignee → list.
+    assignees = data.get("assignees")
+    if assignees is None:
+        legacy = data.get("assignee")
+        assignees = [legacy] if legacy else []
+
     return TaskResponse(
         id=doc_id,
         title=data.get("title", ""),
         status=data.get("status", "todo"),
         priority=data.get("priority", "medium"),
-        assignees=data.get("assignees", []),
+        assignees=assignees,
         due_date=data.get("due_date"),
         tags=data.get("tags"),
         description=data.get("description"),
         completed_at=data.get("completed_at"),
+        updated_at=data.get("updated_at"),
         project_id=data.get("project_id"),
         created_at=data.get("created_at", ""),
+        sub_tasks=data.get("sub_tasks", []),
+        comments=data.get("comments", []),
     )
 
 

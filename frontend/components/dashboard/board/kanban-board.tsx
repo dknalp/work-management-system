@@ -1,6 +1,38 @@
 "use client"
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
+/**
+ * KanbanBoard component — the unified task management board.
+ *
+ * This is the single implementation of the kanban board.  It uses real Task
+ * objects from the task context (Firestore-backed) rather than maintaining a
+ * separate local task store.
+ *
+ * Board state (columns + task ordering) is persisted to the backend via
+ * ``PUT /kanban/:pipelineId``.  The stored blob contains only:
+ *   - columns: Column[]           — the column definitions
+ *   - task_order: Record<columnId, string[]>  — ordered task IDs per column
+ *
+ * The actual task data (title, priority, assignees, etc.) always comes from
+ * the task context.  The board is just a view with drag-drop ordering.
+ *
+ * When a task is created from the board:
+ *   1. A real task is created in Firestore via the task context.
+ *   2. The task ID is appended to the correct column in task_order.
+ *   3. The board state is saved.
+ *
+ * When a task is deleted from the board:
+ *   1. The real task is deleted from Firestore via the task context.
+ *   2. The task ID is removed from task_order.
+ *   3. The board state is saved.
+ */
+
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react"
 import {
   DndContext,
   DragOverlay,
@@ -10,8 +42,6 @@ import {
   DragStartEvent,
   DragOverEvent,
   DragEndEvent,
-  defaultDropAnimationSideEffects,
-  DropAnimation,
   closestCorners,
 } from "@dnd-kit/core"
 import {
@@ -23,10 +53,17 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { createPortal } from "react-dom"
 import { KanbanColumn, Column } from "./kanban-column"
-import { KanbanCard, Task } from "./kanban-card"
-import { TaskStatus } from "@/types/task"
+import { KanbanCard } from "./kanban-card"
+import { Task, TaskStatus } from "@/types/task"
 import { toast } from "sonner"
-import { GripVertical, MoreHorizontal, Pencil, Trash2, Check, X } from "lucide-react"
+import {
+  GripVertical,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Check,
+  X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -49,6 +86,22 @@ import {
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useTasks } from "@/contexts/task-context"
+
+// ── Board state shape stored in Firestore via /kanban/:pipelineId ─────────────
+
+/**
+ * What we persist to the kanban backend endpoint.
+ * task_order maps columnId → ordered array of task IDs.
+ * This replaces the old embedded-task-objects approach.
+ */
+interface PersistedBoardState {
+  columns: Column[]
+  /** Maps column ID → ordered list of Firestore task IDs. */
+  task_order: Record<string, string[]>
+}
+
+// ── Default columns when no pipeline is bound ────────────────────────────────
 
 const defaultColumns: Column[] = [
   { id: "todo", title: "Yapılacak" },
@@ -56,303 +109,180 @@ const defaultColumns: Column[] = [
   { id: "done", title: "Tamamlandı" },
 ]
 
+// ── Props ─────────────────────────────────────────────────────────────────────
+
 interface KanbanBoardProps {
-  onAddColumn?: (addColumnFn: (title: string) => void) => void
-  storageKey?: string
+  /** If provided, board state is persisted to the backend under this pipeline ID. */
   pipelineId?: string
+  /** Callback that exposes the addColumn function to the parent. */
+  onAddColumn?: (addColumnFn: (title: string) => void) => void
 }
 
-// ─── Sortable column wrapper with rename + delete controls ───────────────────
+// ── Draggable column header ───────────────────────────────────────────────────
 
-function SortableColumnWrapper({
+function SortableColumnHeader({
   column,
-  tasks,
-  columns,
-  onAddCard,
-  onDeleteCard,
-  onUpdateCard,
-  onDuplicateCard,
   onRename,
   onDelete,
+  disabled,
 }: {
   column: Column
-  tasks: Task[]
-  columns: Column[]
-  onAddCard: (columnId: string, title: string) => void
-  onDeleteCard: (taskId: string) => void
-  onUpdateCard: (taskId: string, updates: Partial<Task>) => void
-  onDuplicateCard: (taskId: string) => void
-  onRename: (id: string, newTitle: string) => void
+  onRename: (id: string, title: string) => void
   onDelete: (id: string) => void
+  disabled: boolean
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: `col-drag-${column.id}`, data: { type: "ColumnDrag" } })
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
   const [editing, setEditing] = useState(false)
-  const [editValue, setEditValue] = useState(column.title)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [draft, setDraft] = useState(column.title)
 
-  useEffect(() => {
-    if (editing) {
-      setEditValue(column.title)
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }
-  }, [editing, column.title])
-
-  const commitRename = () => {
-    const trimmed = editValue.trim()
+  function commit() {
+    const trimmed = draft.trim()
     if (trimmed && trimmed !== column.title) onRename(column.id, trimmed)
     setEditing(false)
   }
 
-  const cancelRename = () => {
-    setEditing(false)
-  }
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: column.id, data: { type: "Column" } })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  }
-
-  const colHeaderSlot = (
-    <div className="flex items-center gap-1 mb-3">
-      {/* drag handle */}
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground transition-colors shrink-0 -ml-1"
-        tabIndex={-1}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1 mb-2 min-w-0">
+      {!disabled && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-0.5 rounded"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      )}
       {editing ? (
         <div className="flex items-center gap-1 flex-1 min-w-0">
           <Input
-            ref={inputRef}
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            autoFocus
+            className="h-7 text-sm font-medium"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") commitRename()
-              if (e.key === "Escape") cancelRename()
+              if (e.key === "Enter") commit()
+              if (e.key === "Escape") {
+                setDraft(column.title)
+                setEditing(false)
+              }
             }}
-            className="h-6 text-sm font-semibold px-1.5 py-0 flex-1"
           />
-          <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={commitRename}>
-            <Check className="h-3 w-3 text-green-500" />
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={commit}>
+            <Check className="h-3.5 w-3.5" />
           </Button>
-          <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={cancelRename}>
-            <X className="h-3 w-3 text-muted-foreground" />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => {
+              setDraft(column.title)
+              setEditing(false)
+            }}
+          >
+            <X className="h-3.5 w-3.5" />
           </Button>
         </div>
       ) : (
-        <div className="flex items-center justify-between flex-1 min-w-0 group/header">
-          <span
-            className="font-semibold text-sm truncate cursor-default select-none"
-            onDoubleClick={() => !isDragging && setEditing(true)}
-          >
-            {column.title}
-          </span>
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-xs text-muted-foreground">({tasks.length})</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 opacity-0 group-hover/header:opacity-100 transition-opacity"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => setEditing(true)}>
-                  <Pencil className="h-3.5 w-3.5 mr-2" />
-                  Yeniden Adlandır
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => onDelete(column.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-2" />
-                  Sütunu Sil
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
+        <>
+          <span className="text-sm font-medium flex-1 truncate">{column.title}</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditing(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Yeniden Adlandır
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => onDelete(column.id)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Sil
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
       )}
     </div>
   )
-
-  return (
-    <div ref={setNodeRef} style={style} className="w-72 shrink-0 flex flex-col">
-      <KanbanColumn
-        column={column}
-        tasks={tasks}
-        columns={columns}
-        onAddCard={onAddCard}
-        onDeleteCard={onDeleteCard}
-        onUpdateCard={onUpdateCard}
-        onDuplicateCard={onDuplicateCard}
-        headerSlot={colHeaderSlot}
-      />
-    </div>
-  )
 }
 
-// ─── Add column inline form ───────────────────────────────────────────────────
+// ── Main board component ──────────────────────────────────────────────────────
 
-function AddColumnInline({ onAdd }: { onAdd: (title: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const [value, setValue] = useState("")
-  const inputRef = useRef<HTMLInputElement>(null)
+export function KanbanBoard({ pipelineId, onAddColumn }: KanbanBoardProps) {
+  const {
+    tasks: allTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    logActivity,
+  } = useTasks()
 
-  const commit = () => {
-    const trimmed = value.trim()
-    if (trimmed) {
-      onAdd(trimmed)
-      setValue("")
-      setOpen(false)
-    }
-  }
-
-  useEffect(() => {
-    if (open) {
-      // Use setTimeout to allow the render to complete before focusing
-      const id = setTimeout(() => inputRef.current?.focus(), 0)
-      return () => clearTimeout(id)
-    }
-  }, [open])
-
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className={cn(
-          "w-72 shrink-0 flex items-center gap-2 px-4 py-3 rounded-2xl",
-          "border-2 border-dashed border-border/40 text-muted-foreground text-sm",
-          "hover:border-border hover:text-foreground transition-colors"
-        )}
-      >
-        + Sütun Ekle
-      </button>
-    )
-  }
-
-  return (
-    <div className="w-72 shrink-0 rounded-2xl border border-border/50 bg-muted/30 p-4 flex flex-col gap-2">
-      <Input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit()
-          if (e.key === "Escape") { setOpen(false); setValue("") }
-        }}
-        placeholder="Sütun başlığı…"
-        className="h-8 text-sm"
-      />
-      <div className="flex gap-2">
-        <Button size="sm" className="h-7 px-3 text-xs flex-1" onClick={commit} disabled={!value.trim()}>
-          Ekle
-        </Button>
-        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setOpen(false); setValue("") }}>
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Loading skeleton ────────────────────────────────────────────────────────
-
-function KanbanSkeleton() {
-  return (
-    <div className="flex gap-4 overflow-x-auto">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="w-72 shrink-0 flex flex-col gap-3 rounded-2xl border border-border/50 bg-muted/30 p-4">
-          <Skeleton className="h-6 w-3/4 rounded-md" />
-          {[1, 2, 3].map((j) => (
-            <Skeleton key={j} className="h-24 w-full rounded-xl" />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Drag overlay animation ──────────────────────────────────────────────────
-
-const dropAnimation: DropAnimation = {
-  sideEffects: defaultDropAnimationSideEffects({
-    styles: { active: { opacity: "0.5" } },
-  }),
-}
-
-// ─── Board state shape persisted to / loaded from the backend blob ───────────
-
-interface PersistedBoardState {
-  columns: Column[]
-  tasks: Record<string, Task[]>
-}
-
-// ─── KanbanBoard ─────────────────────────────────────────────────────────────
-
-export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoardProps) {
-  // ── State ─────────────────────────────────────────────────────────────────
-
+  // columns is the ordered list of column definitions.
   const [columns, setColumns] = useState<Column[]>(defaultColumns)
-  const [tasks, setTasks] = useState<Record<string, Task[]>>({})
-  const [activeTask, setActiveTask] = useState<Task | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  // task_order maps columnId → ordered array of task IDs from Firestore.
+  const [taskOrder, setTaskOrder] = useState<Record<string, string[]>>(
+    () => Object.fromEntries(defaultColumns.map((c) => [c.id, []]))
+  )
+
+  // Start in loading state — board data is always fetched asynchronously on mount.
   const [loading, setLoading] = useState(!!pipelineId)
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [activeColumn, setActiveColumn] = useState<Column | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  // Guards the createPortal call — document.body is undefined during SSR/prerender.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  // Debounce ref for board persistence — we persist 800ms after the last change.
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedRef = useRef<PersistedBoardState | null>(null)
+
+  // ── Board persistence ────────────────────────────────────────────────────────
 
   /**
-   * Ref to the last-committed board state used for optimistic-revert on save failure.
-   * We snapshot before every write so a failed PUT can restore the previous state.
-   */
-  const lastSavedRef = useRef<PersistedBoardState>({ columns: defaultColumns, tasks: {} })
-
-  // ── Backend persistence helpers ──────────────────────────────────────────
-
-  /**
-   * Persists the current board state to `PUT /kanban/{pipelineId}`.
-   * Called after every mutation when `pipelineId` is set.
-   * On failure, reverts to the last saved snapshot and shows a toast.
+   * Persist the board state to the backend.  Skips the write when pipelineId
+   * is absent — the board still works locally, it just won't survive a reload.
    */
   const persistBoard = useCallback(
-    async (nextColumns: Column[], nextTasks: Record<string, Task[]>) => {
+    (nextColumns: Column[], nextOrder: Record<string, string[]>) => {
       if (!pipelineId) return
 
-      const snapshot = lastSavedRef.current
-      lastSavedRef.current = { columns: nextColumns, tasks: nextTasks }
-
-      try {
-        const state: PersistedBoardState = { columns: nextColumns, tasks: nextTasks }
-        await apiClient.put(`/kanban/${pipelineId}`, { pipeline_id: pipelineId, state })
-      } catch {
-        // Revert to the last successfully saved state
-        setColumns(snapshot.columns)
-        setTasks(snapshot.tasks)
-        lastSavedRef.current = snapshot
-        toast.error("Pano kaydedilemedi. Değişiklikler geri alındı.")
+      const state: PersistedBoardState = {
+        columns: nextColumns,
+        task_order: nextOrder,
       }
+
+      if (persistTimer.current) clearTimeout(persistTimer.current)
+      persistTimer.current = setTimeout(async () => {
+        try {
+          await apiClient.put(`/kanban/${pipelineId}`, {
+            pipeline_id: pipelineId,
+            state,
+          })
+          lastSavedRef.current = state
+        } catch {
+          toast.error("Pano kaydedilemedi.")
+        }
+      }, 800)
     },
     [pipelineId]
   )
 
-  // ── Load board from backend on mount (when pipelineId is provided) ────────
+  // ── Load board state on mount ────────────────────────────────────────────────
 
   useEffect(() => {
     if (!pipelineId) return
@@ -362,9 +292,35 @@ export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoard
         const response = await apiClient.get<{ state: PersistedBoardState | null }>(
           `/kanban/${pipelineId}`
         )
-        if (response?.state?.columns && response.state.tasks) {
+
+        if (response?.state?.columns) {
           setColumns(response.state.columns)
-          setTasks(response.state.tasks)
+
+          // Migrate old board state: old format stored task objects under ``tasks``,
+          // new format stores task IDs under ``task_order``.
+          const savedState = response.state as Record<string, unknown>
+          if (savedState.task_order) {
+            setTaskOrder(savedState.task_order)
+          } else if (savedState.tasks) {
+            // Legacy migration: extract IDs from embedded task objects.
+            const migratedOrder: Record<string, string[]> = {}
+            for (const [colId, colTasks] of Object.entries(
+              savedState.tasks as Record<string, Array<{ id: string }>>
+            )) {
+              migratedOrder[colId] = (colTasks ?? []).map((t) => t.id)
+            }
+            setTaskOrder(migratedOrder)
+            // Immediately persist the migrated format so we don't do this again.
+            const migrated: PersistedBoardState = {
+              columns: response.state.columns,
+              task_order: migratedOrder,
+            }
+            await apiClient.put(`/kanban/${pipelineId}`, {
+              pipeline_id: pipelineId,
+              state: migrated,
+            })
+          }
+
           lastSavedRef.current = response.state
         }
       } catch {
@@ -377,175 +333,185 @@ export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoard
     loadBoard()
   }, [pipelineId])
 
-  // Expose addColumn to the parent via callback ref
+  // ── Derived: tasks organised by column ──────────────────────────────────────
+
+  /**
+   * Build a map of columnId → Task[] using the task_order IDs and the real
+   * Task objects from the task context.  Tasks that exist in the context but
+   * are not in any column order are placed in the column whose ID matches
+   * their status field (auto-placement for tasks created outside the board).
+   */
+  const tasksById = useMemo(
+    () => new Map(allTasks.map((t) => [t.id, t])),
+    [allTasks]
+  )
+
+  const tasksByColumn = useMemo<Record<string, Task[]>>(() => {
+    const result: Record<string, Task[]> = {}
+
+    // Populate from task_order first (respects manual ordering).
+    for (const col of columns) {
+      const ids = taskOrder[col.id] ?? []
+      result[col.id] = ids
+        .map((id) => tasksById.get(id))
+        .filter((t): t is Task => t !== undefined)
+    }
+
+    // Auto-place tasks that exist in Firestore but aren't in any column order.
+    const placedIds = new Set(
+      columns.flatMap((c) => taskOrder[c.id] ?? [])
+    )
+    for (const task of allTasks) {
+      if (placedIds.has(task.id)) continue
+      // Find the column whose ID matches the task's status.
+      const targetColId =
+        columns.find((c) => c.id === task.status)?.id ?? columns[0]?.id
+      if (!targetColId) continue
+      result[targetColId] = [...(result[targetColId] ?? []), task]
+    }
+
+    return result
+  }, [columns, taskOrder, tasksById, allTasks])
+
+  // ── addColumn (exposed to parent via onAddColumn) ──────────────────────────
+
   const addColumn = useCallback(
     (title: string) => {
       const newCol: Column = { id: crypto.randomUUID(), title }
       const nextColumns = [...columns, newCol]
-      const nextTasks = { ...tasks, [newCol.id]: [] }
+      const nextOrder = { ...taskOrder, [newCol.id]: [] }
       setColumns(nextColumns)
-      setTasks(nextTasks)
-      persistBoard(nextColumns, nextTasks)
+      setTaskOrder(nextOrder)
+      persistBoard(nextColumns, nextOrder)
     },
-    [columns, tasks, persistBoard]
+    [columns, taskOrder, persistBoard]
   )
 
   useEffect(() => {
     onAddColumn?.(addColumn)
   }, [onAddColumn, addColumn])
 
-  // ── DnD sensors ──────────────────────────────────────────────────────────
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  )
-
-  // ── Derived data ─────────────────────────────────────────────────────────
-
-  const columnIds = useMemo(() => columns.map((c) => c.id), [columns])
-
-  const deleteTargetColumn = useMemo(
-    () => columns.find((c) => c.id === deleteTarget) ?? null,
-    [columns, deleteTarget]
-  )
-
-  const deleteTargetTaskCount = useMemo(
-    () => (deleteTarget ? (tasks[deleteTarget]?.length ?? 0) : 0),
-    [tasks, deleteTarget]
-  )
-
-  const hasOtherColumns = columns.length > 1
-
-  // ── Column operations ────────────────────────────────────────────────────
+  // ── Column operations ────────────────────────────────────────────────────────
 
   const renameColumn = useCallback(
     (id: string, newTitle: string) => {
-      const nextColumns = columns.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
+      const nextColumns = columns.map((c) =>
+        c.id === id ? { ...c, title: newTitle } : c
+      )
       setColumns(nextColumns)
-      persistBoard(nextColumns, tasks)
+      persistBoard(nextColumns, taskOrder)
     },
-    [columns, tasks, persistBoard]
+    [columns, taskOrder, persistBoard]
   )
 
   const requestDeleteColumn = useCallback((id: string) => {
     setDeleteTarget(id)
   }, [])
 
-  const confirmDeleteColumn = useCallback(() => {
+  const confirmDeleteColumn = useCallback(async () => {
     if (!deleteTarget) return
 
-    const targetTasks = tasks[deleteTarget] ?? []
+    const idsInColumn = taskOrder[deleteTarget] ?? []
     const otherColumns = columns.filter((c) => c.id !== deleteTarget)
 
-    let nextTasks: Record<string, Task[]>
+    // Move orphaned task IDs to the first remaining column.
+    const nextOrder = { ...taskOrder }
+    delete nextOrder[deleteTarget]
 
-    if (targetTasks.length > 0 && otherColumns.length > 0) {
-      // Move orphaned cards to the first remaining column
+    if (idsInColumn.length > 0 && otherColumns.length > 0) {
       const firstColId = otherColumns[0].id
-      nextTasks = {
-        ...tasks,
-        [firstColId]: [...(tasks[firstColId] ?? []), ...targetTasks],
-      }
-      delete nextTasks[deleteTarget]
-    } else {
-      nextTasks = { ...tasks }
-      delete nextTasks[deleteTarget]
+      nextOrder[firstColId] = [...(nextOrder[firstColId] ?? []), ...idsInColumn]
     }
 
     setColumns(otherColumns)
-    setTasks(nextTasks)
+    setTaskOrder(nextOrder)
     setDeleteTarget(null)
-    persistBoard(otherColumns, nextTasks)
-  }, [deleteTarget, columns, tasks, persistBoard])
+    persistBoard(otherColumns, nextOrder)
+  }, [deleteTarget, columns, taskOrder, persistBoard])
 
-  // ── Card operations ──────────────────────────────────────────────────────
+  // ── Card operations ──────────────────────────────────────────────────────────
 
   const addCard = useCallback(
-    (columnId: string, title: string) => {
-      const newTask: Task = {
-        id: crypto.randomUUID(),
+    async (columnId: string, title: string) => {
+      // Map the column ID to a task status — if the column ID is a known status
+      // value, use it directly.  Otherwise default to "todo".
+      const statusMap: Record<string, TaskStatus> = {
+        todo: "todo",
+        "in-progress": "in-progress",
+        done: "done",
+      }
+      const status: TaskStatus = statusMap[columnId] ?? "todo"
+
+      const created = await createTask({
         title,
-        status: columnId as TaskStatus,
+        status,
         priority: "medium",
-        tags: [],
         assignees: [],
-        dueDate: "",
-        description: "",
-        createdAt: new Date().toISOString().slice(0, 10),
+        tags: [],
+        project_id: undefined,
+      })
+
+      if (!created) return // createTask already toasted the error.
+
+      const nextOrder = {
+        ...taskOrder,
+        [columnId]: [...(taskOrder[columnId] ?? []), created.id],
       }
-      const nextTasks = {
-        ...tasks,
-        [columnId]: [...(tasks[columnId] ?? []), newTask],
-      }
-      setTasks(nextTasks)
-      persistBoard(columns, nextTasks)
+      setTaskOrder(nextOrder)
+      persistBoard(columns, nextOrder)
+
+      logActivity({
+        type: "task_created",
+        task_id: created.id,
+        task_title: created.title,
+        detail: `Added to column "${columns.find((c) => c.id === columnId)?.title ?? columnId}"`,
+      })
     },
-    [tasks, columns, persistBoard]
+    [columns, taskOrder, persistBoard, createTask, logActivity]
   )
 
   const deleteCard = useCallback(
-    (taskId: string) => {
-      const nextTasks = Object.fromEntries(
-        Object.entries(tasks).map(([colId, colTasks]) => [
+    async (taskId: string) => {
+      const success = await deleteTask(taskId)
+      if (!success) return
+
+      const nextOrder = Object.fromEntries(
+        Object.entries(taskOrder).map(([colId, ids]) => [
           colId,
-          colTasks.filter((t) => t.id !== taskId),
+          ids.filter((id) => id !== taskId),
         ])
       )
-      setTasks(nextTasks)
-      persistBoard(columns, nextTasks)
+      setTaskOrder(nextOrder)
+      persistBoard(columns, nextOrder)
     },
-    [tasks, columns, persistBoard]
+    [taskOrder, columns, persistBoard, deleteTask]
   )
 
   const updateCard = useCallback(
-    (taskId: string, updates: Partial<Task>) => {
-      const nextTasks = Object.fromEntries(
-        Object.entries(tasks).map(([colId, colTasks]) => [
-          colId,
-          colTasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
-        ])
-      )
-      setTasks(nextTasks)
-      persistBoard(columns, nextTasks)
+    async (taskId: string, data: Partial<Task>) => {
+      await updateTask(taskId, data)
+      // No need to update taskOrder — the task ID stays the same.
     },
-    [tasks, columns, persistBoard]
+    [updateTask]
   )
 
-  const duplicateCard = useCallback(
-    (taskId: string) => {
-      let sourceColId: string | null = null
-      let sourceTask: Task | null = null
+  // ── DnD sensors ──────────────────────────────────────────────────────────────
 
-      for (const [colId, colTasks] of Object.entries(tasks)) {
-        const found = colTasks.find((t) => t.id === taskId)
-        if (found) {
-          sourceColId = colId
-          sourceTask = found
-          break
-        }
-      }
-
-      if (!sourceTask || !sourceColId) return
-
-      const duplicate: Task = { ...sourceTask, id: crypto.randomUUID() }
-      const nextTasks = {
-        ...tasks,
-        [sourceColId]: [...(tasks[sourceColId] ?? []), duplicate],
-      }
-      setTasks(nextTasks)
-      persistBoard(columns, nextTasks)
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, columns, persistBoard]
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
 
-  // ── DnD handlers ─────────────────────────────────────────────────────────
+  const columnIds = useMemo(() => columns.map((c) => c.id), [columns])
+
+  // ── Drag handlers ────────────────────────────────────────────────────────────
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
-      const { active } = event
-      if (active.data.current?.type === "Task") {
-        setActiveTask(active.data.current.task as Task)
+      const type = event.active.data.current?.type as string | undefined
+      if (type === "Task") {
+        setActiveTask(event.active.data.current?.task as Task)
+      } else if (type === "Column") {
+        setActiveColumn(event.active.data.current?.column as Column)
       }
     },
     []
@@ -554,90 +520,162 @@ export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoard
   const handleDragOver = useCallback(
     (event: DragOverEvent) => {
       const { active, over } = event
-      if (!over || active.id === over.id) return
-      if (active.data.current?.type !== "Task") return
+      if (!over) return
 
-      const activeTask = active.data.current.task as Task
-      const overType = over.data.current?.type
+      const activeType = active.data.current?.type as string
+      const overType = over.data.current?.type as string
 
-      // Determine the target column id
+      if (activeType !== "Task") return
+
+      const activeTaskObj = active.data.current?.task as Task
+
       let toColId: string
       if (overType === "Column") {
         toColId = over.id as string
       } else if (overType === "Task") {
         const overTask = over.data.current?.task as Task
-        toColId = overTask.columnId
+        // Find which column this task belongs to.
+        toColId =
+          Object.entries(taskOrder).find(([, ids]) =>
+            ids.includes(overTask.id)
+          )?.[0] ?? activeTaskObj.status
       } else {
         return
       }
 
-      if (activeTask.status === toColId) return
+      const fromColId =
+        Object.entries(taskOrder).find(([, ids]) =>
+          ids.includes(activeTaskObj.id)
+        )?.[0] ?? activeTaskObj.status
 
-      // Move card across columns in local state (live preview during drag)
-      setTasks((prev) => {
-        const fromColId = activeTask.status
-        const fromColTasks = (prev[fromColId] ?? []).filter(
-          (t) => t.id !== activeTask.id
+      if (fromColId === toColId) return
+
+      setTaskOrder((prev) => {
+        const fromIds = (prev[fromColId] ?? []).filter(
+          (id) => id !== activeTaskObj.id
         )
-        const toColTasks = [
-          ...(prev[toColId] ?? []),
-          { ...activeTask, status: toColId as TaskStatus },
-        ]
-        return { ...prev, [fromColId]: fromColTasks, [toColId]: toColTasks }
+        const toIds = [...(prev[toColId] ?? []), activeTaskObj.id]
+        return { ...prev, [fromColId]: fromIds, [toColId]: toIds }
       })
-
-      // Update the active task ref so subsequent dragOver events use the new status
-      setActiveTask((prev) =>
-        prev ? { ...prev, status: toColId as TaskStatus } : null
-      )
     },
-    []
+    [taskOrder]
   )
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event
       setActiveTask(null)
+      setActiveColumn(null)
 
-      if (!over || active.id === over.id) return
+      if (!over) return
 
-      if (active.data.current?.type === "Column") {
-        // Reorder columns
-        const oldIndex = columns.findIndex((c) => c.id === active.id)
-        const newIndex = columns.findIndex((c) => c.id === over.id)
-        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
-        const nextColumns = arrayMove(columns, oldIndex, newIndex)
-        setColumns(nextColumns)
-        persistBoard(nextColumns, tasks)
+      const activeType = active.data.current?.type as string
+      const overType = over.data.current?.type as string
+
+      // ── Column reorder ──
+      if (activeType === "Column" && overType === "Column") {
+        const fromIdx = columns.findIndex((c) => c.id === active.id)
+        const toIdx = columns.findIndex((c) => c.id === over.id)
+        if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+          const nextColumns = arrayMove(columns, fromIdx, toIdx)
+          setColumns(nextColumns)
+          persistBoard(nextColumns, taskOrder)
+        }
         return
       }
 
-      if (active.data.current?.type === "Task") {
-        // Reorder cards within the same column
-        const activeTaskData = active.data.current.task as Task
-        // Task.status holds the column id (the column this card currently belongs to)
-        const colId = activeTaskData.status
-        const colTasks = tasks[colId] ?? []
-        const oldIndex = colTasks.findIndex((t) => t.id === active.id)
-        const newIndex = colTasks.findIndex((t) => t.id === over.id)
+      // ── Task reorder within or across columns ──
+      if (activeType === "Task") {
+        const activeTaskObj = active.data.current?.task as Task
 
-        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-          const nextColTasks = arrayMove(colTasks, oldIndex, newIndex)
-          const nextTasks = { ...tasks, [colId]: nextColTasks }
-          setTasks(nextTasks)
-          persistBoard(columns, nextTasks)
+        let toColId: string
+        if (overType === "Column") {
+          toColId = over.id as string
+        } else if (overType === "Task") {
+          const overTask = over.data.current?.task as Task
+          toColId =
+            Object.entries(taskOrder).find(([, ids]) =>
+              ids.includes(overTask.id)
+            )?.[0] ?? activeTaskObj.status
         } else {
-          // Cross-column move already done in handleDragOver — just persist
-          persistBoard(columns, tasks)
+          return
         }
+
+        const fromColId =
+          Object.entries(taskOrder).find(([, ids]) =>
+            ids.includes(activeTaskObj.id)
+          )?.[0] ?? activeTaskObj.status
+
+        // If moving across columns, update the task's status in Firestore.
+        if (fromColId !== toColId) {
+          const statusMap: Record<string, TaskStatus> = {
+            todo: "todo",
+            "in-progress": "in-progress",
+            done: "done",
+          }
+          const newStatus = statusMap[toColId] ?? "todo"
+          updateTask(activeTaskObj.id, { status: newStatus })
+          logActivity({
+            type: "task_updated",
+            task_id: activeTaskObj.id,
+            task_title: activeTaskObj.title,
+            detail: `Moved to "${columns.find((c) => c.id === toColId)?.title ?? toColId}"`,
+          })
+        }
+
+        // Reorder within column if dropping on another task.
+        if (overType === "Task" && fromColId === toColId) {
+          const overTask = over.data.current?.task as Task
+          const colIds = taskOrder[fromColId] ?? []
+          const fromIdx = colIds.indexOf(activeTaskObj.id)
+          const toIdx = colIds.indexOf(overTask.id)
+          if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+            const nextIds = arrayMove(colIds, fromIdx, toIdx)
+            const nextOrder = { ...taskOrder, [fromColId]: nextIds }
+            setTaskOrder(nextOrder)
+            persistBoard(columns, nextOrder)
+            return
+          }
+        }
+
+        persistBoard(columns, taskOrder)
       }
     },
-    [columns, tasks, persistBoard]
+    [columns, taskOrder, persistBoard, updateTask, logActivity]
   )
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Delete confirmation dialog data ──────────────────────────────────────────
 
-  if (loading) return <KanbanSkeleton />
+  const deleteTargetColumn = useMemo(
+    () => columns.find((c) => c.id === deleteTarget) ?? null,
+    [columns, deleteTarget]
+  )
+
+  const deleteTargetTaskCount = useMemo(
+    () => (deleteTarget ? (taskOrder[deleteTarget]?.length ?? 0) : 0),
+    [taskOrder, deleteTarget]
+  )
+
+  const hasOtherColumns = columns.length > 1
+
+  // ── Loading skeleton ──────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex gap-4 p-4 overflow-x-auto">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="w-72 shrink-0 space-y-3">
+            <Skeleton className="h-8 w-32" />
+            {[1, 2, 3].map((j) => (
+              <Skeleton key={j} className="h-24 w-full rounded-xl" />
+            ))}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <>
@@ -648,48 +686,70 @@ export function KanbanBoard({ onAddColumn, storageKey, pipelineId }: KanbanBoard
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-4 p-4 overflow-x-auto min-h-full items-start">
           <SortableContext items={columnIds} strategy={horizontalListSortingStrategy}>
-            {columns.map((column) => (
-              <SortableColumnWrapper
-                key={column.id}
-                column={column}
-                tasks={tasks[column.id] ?? []}
+            {columns.map((col) => (
+              <KanbanColumn
+                key={col.id}
+                column={col}
                 columns={columns}
-                onAddCard={addCard}
+                tasks={tasksByColumn[col.id] ?? []}
+                headerSlot={
+                  <SortableColumnHeader
+                    column={col}
+                    onRename={renameColumn}
+                    onDelete={requestDeleteColumn}
+                    disabled={columns.length <= 1}
+                  />
+                }
+                onAddCard={(colId, title) => addCard(colId, title)}
                 onDeleteCard={deleteCard}
                 onUpdateCard={updateCard}
-                onDuplicateCard={duplicateCard}
-                onRename={renameColumn}
-                onDelete={requestDeleteColumn}
               />
             ))}
           </SortableContext>
-
-          <AddColumnInline onAdd={addColumn} />
         </div>
 
-        {typeof document !== "undefined" &&
-          createPortal(
-            <DragOverlay dropAnimation={dropAnimation}>
-              {activeTask ? <KanbanCard task={activeTask} isOverlay /> : null}
-            </DragOverlay>,
-            document.body
-          )}
+        {mounted && createPortal(
+          <DragOverlay>
+            {activeTask && (
+              <KanbanCard
+                task={activeTask}
+                isDragOverlay
+              />
+            )}
+          </DragOverlay>,
+          document.body
+        )}
       </DndContext>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      {/* Delete column confirmation dialog */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sütunu Sil</AlertDialogTitle>
+            <AlertDialogTitle>Sütunu sil</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{deleteTargetColumn?.title}</strong> sütununu silmek istediğinizden emin misiniz?
-              {deleteTargetTaskCount > 0 && (
-                <span className="block mt-1">
-                  {hasOtherColumns
-                    ? `Bu sütundaki ${deleteTargetTaskCount} kart ilk sütuna taşınacak.`
-                    : `Bu sütundaki ${deleteTargetTaskCount} kart silinecek.`}
-                </span>
+              {deleteTargetTaskCount > 0 ? (
+                hasOtherColumns ? (
+                  <>
+                    <strong>{deleteTargetColumn?.title}</strong> sütununda{" "}
+                    {deleteTargetTaskCount} görev var. Bu görevler ilk sütuna
+                    taşınacak.
+                  </>
+                ) : (
+                  <>
+                    Bu tek sütundur ve {deleteTargetTaskCount} görev içeriyor.
+                    Silerek görevlerin sütun bilgisini kaldırmış olursunuz.
+                  </>
+                )
+              ) : (
+                <>
+                  <strong>{deleteTargetColumn?.title}</strong> sütununu silmek
+                  istediğinizden emin misiniz?
+                </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

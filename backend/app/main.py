@@ -47,6 +47,7 @@ from .routers import (
 )
 from .routers.v1 import (
     activity as v1_activity,
+    agent_configs as v1_agent_configs,
     analytics as v1_analytics,
     chat as v1_chat,
     files_bulk,
@@ -124,6 +125,7 @@ app.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
 # v1 versioned API
 _V1 = "/api/v1"
 app.include_router(v1_me.router, prefix=_V1)
+app.include_router(v1_agent_configs.router, prefix=_V1)
 app.include_router(v1_tasks.router, prefix=_V1)
 app.include_router(v1_team.router, prefix=_V1)
 app.include_router(v1_activity.router, prefix=_V1)
@@ -200,7 +202,7 @@ _SEED_TASKS: list[dict[str, Any]] = [
         "description": "Initialize the Git repository and configure CI/CD pipeline.",
         "status": "done",
         "priority": "high",
-        "assignee": "Alice Johnson",
+        "assignees": ["Alice Johnson"],
         "due_date": "2025-01-15",
         "tags": ["setup", "devops"],
     },
@@ -210,7 +212,7 @@ _SEED_TASKS: list[dict[str, Any]] = [
         "description": "Create the initial entity-relationship diagram.",
         "status": "done",
         "priority": "high",
-        "assignee": "Bob Smith",
+        "assignees": ["Bob Smith"],
         "due_date": "2025-01-20",
         "tags": ["design", "database"],
     },
@@ -220,7 +222,7 @@ _SEED_TASKS: list[dict[str, Any]] = [
         "description": "Build login, registration, and JWT token management.",
         "status": "in-progress",
         "priority": "high",
-        "assignee": "Carol Davis",
+        "assignees": ["Carol Davis"],
         "due_date": "2025-02-01",
         "tags": ["auth", "backend"],
     },
@@ -230,7 +232,7 @@ _SEED_TASKS: list[dict[str, Any]] = [
         "description": "Build the main dashboard with KPI cards and charts.",
         "status": "in-progress",
         "priority": "medium",
-        "assignee": "Dave Wilson",
+        "assignees": ["Dave Wilson"],
         "due_date": "2025-02-10",
         "tags": ["frontend", "ui"],
     },
@@ -240,7 +242,7 @@ _SEED_TASKS: list[dict[str, Any]] = [
         "description": "Document all REST endpoints using OpenAPI spec.",
         "status": "todo",
         "priority": "medium",
-        "assignee": "Eve Martinez",
+        "assignees": ["Eve Martinez"],
         "due_date": "2025-02-15",
         "tags": ["documentation"],
     },
@@ -250,7 +252,7 @@ _SEED_TASKS: list[dict[str, Any]] = [
         "description": "Profile the backend and optimize slow database queries.",
         "status": "todo",
         "priority": "low",
-        "assignee": "Frank Brown",
+        "assignees": ["Frank Brown"],
         "due_date": "2025-03-01",
         "tags": ["performance", "backend"],
     },
@@ -261,7 +263,9 @@ def _seed_initial_tasks(db: firestore.Client) -> None:
     """Seed initial task documents into Firestore on first run.
 
     Uses ``create()`` semantics so this is idempotent — re-running the
-    application will never overwrite modified tasks.
+    application will never overwrite modified tasks.  Each seed document is
+    written with the full canonical schema so the router's normalizer never
+    has to fill in defaults for seed data.
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     col = db.collection("tasks")
@@ -273,6 +277,8 @@ def _seed_initial_tasks(db: firestore.Client) -> None:
                 "created_at": today,
                 "completed_at": None,
                 "updated_at": None,
+                "sub_tasks": [],
+                "comments": [],
             })
 
 

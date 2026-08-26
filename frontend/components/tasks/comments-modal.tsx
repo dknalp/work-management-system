@@ -44,9 +44,10 @@ export function CommentsModal({
       ...comments,
       {
         id: crypto.randomUUID(),
-        authorName: user?.name ?? "You",
+        author_id: user?.id ?? "",
+        author_name: user?.name ?? "You",
         body: commentInput.trim(),
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
         replies: [],
       },
     ])
@@ -59,9 +60,10 @@ export function CommentsModal({
       if (c.id !== commentId) return c
       const newReply: Reply = {
         id: crypto.randomUUID(),
-        authorName: user?.name ?? "You",
+        author_id: user?.id ?? "",
+        author_name: user?.name ?? "You",
         body: replyInput.trim(),
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       }
       return { ...c, replies: [...(c.replies ?? []), newReply] }
     })
@@ -111,13 +113,13 @@ export function CommentsModal({
             comments.map((c) => (
               <div key={c.id} className="flex gap-3">
                 <div className="size-7 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                  {getInitials(c.authorName)}
+                  {getInitials(c.author_name)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-medium">{c.authorName}</span>
+                    <span className="text-sm font-medium">{c.author_name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                     </span>
                   </div>
                   <p className="text-sm mt-0.5">{c.body}</p>
@@ -146,13 +148,13 @@ export function CommentsModal({
                       {(c.replies ?? []).map((r) => (
                         <div key={r.id} className="flex gap-3">
                           <div className="size-7 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                            {getInitials(r.authorName)}
+                            {getInitials(r.author_name)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2">
-                              <span className="text-sm font-medium">{r.authorName}</span>
+                              <span className="text-sm font-medium">{r.author_name}</span>
                               <span className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(new Date(r.createdAt), {
+                                {formatDistanceToNow(new Date(r.created_at), {
                                   addSuffix: true,
                                 })}
                               </span>
