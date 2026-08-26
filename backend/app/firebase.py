@@ -13,6 +13,7 @@ Usage:
     db = get_db()                  # FastAPI dependency or direct call
 """
 
+import base64
 import json
 import logging
 import os
@@ -79,6 +80,23 @@ def initialize_firebase() -> None:
         except Exception as exc:
             raise RuntimeError(
                 f"Firebase initialization failed loading key file '{path}': {exc}"
+            ) from exc
+
+    # Base64-encoded JSON (preferred for env panels that mangle multi-line values)
+    # Detected when the value doesn't start with '{' — base64 never starts with '{'.
+    if not raw.strip().startswith("{"):
+        logger.info("Attempting to decode FIREBASE_SERVICE_ACCOUNT_JSON as base64")
+        try:
+            raw = base64.b64decode(raw.strip()).decode("utf-8")
+            logger.info("Successfully decoded base64 Firebase credentials")
+        except Exception as exc:
+            raise RuntimeError(
+                "FIREBASE_SERVICE_ACCOUNT_JSON does not look like a file path, "
+                "valid JSON, or valid base64. Please set it to either:\n"
+                "  1. A file path to the service account JSON\n"
+                "  2. The raw JSON content (starting with '{')\n"
+                "  3. The base64-encoded JSON (run: base64 -w0 firebase-service-account.json)\n"
+                f"Decode error: {exc}"
             ) from exc
 
     # Inline JSON string
