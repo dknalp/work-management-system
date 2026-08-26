@@ -656,7 +656,7 @@ export function TaskDetailModal({
         open={showAllSubTasks}
         onOpenChange={setShowAllSubTasks}
         taskTitle={task?.title ?? ""}
-        sub_tasks={task?.sub_tasks ?? []}
+        subTasks={task?.sub_tasks ?? []}
         onSubTasksChange={(updated) => {
           if (task) onTaskChange({ ...task, sub_tasks: updated })
         }}

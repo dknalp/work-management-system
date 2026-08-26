@@ -17,7 +17,7 @@ interface SubtasksModalProps {
   onSubTasksChange: (subTasks: SubTask[]) => void
 }
 
-export function SubtasksModal({ open, onOpenChange, taskTitle, subTasks, onSubTasksChange }: SubtasksModalProps) {
+export function SubtasksModal({ open, onOpenChange, taskTitle, subTasks = [], onSubTasksChange }: SubtasksModalProps) {
   const [newSubTaskInput, setNewSubTaskInput] = useState("")
 
   const completedCount = subTasks.filter(st => st.completed).length
