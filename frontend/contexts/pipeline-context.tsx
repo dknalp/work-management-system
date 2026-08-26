@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { Pipeline } from "@/types/pipeline"
 import { apiClient } from "@/lib/api"
+import { useAuth } from "./auth-context"
 
 type ApiPipeline = {
   id: string
@@ -33,6 +34,7 @@ interface PipelineContextValue {
 const PipelineContext = createContext<PipelineContextValue | null>(null)
 
 export function PipelineProvider({ children }: { children: React.ReactNode }) {
+  const { loading: authLoading } = useAuth()
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [loading, setLoading] = useState(true)
   const pipelinesRef = useRef<Pipeline[]>([])
@@ -46,15 +48,18 @@ export function PipelineProvider({ children }: { children: React.ReactNode }) {
       const data = await apiClient<ApiPipeline[]>("/pipelines")
       setPipelines(data.map(fromApi))
     } catch {
-      // keep previous state
+      // keep previous state on error
     } finally {
       setLoading(false)
     }
   }, [])
 
+  // Wait for Firebase auth to resolve before fetching — avoids a 401 race
+  // where the token is not yet stored when the context first mounts.
   useEffect(() => {
+    if (authLoading) return
     fetchPipelines()
-  }, [fetchPipelines])
+  }, [authLoading, fetchPipelines])
 
   const createPipeline = useCallback(async (projectId: string, name: string): Promise<Pipeline> => {
     const created = await apiClient<ApiPipeline>("/pipelines", {

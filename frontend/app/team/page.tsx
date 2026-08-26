@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -69,7 +70,8 @@ export default function TeamPage() {
 
   // ── AI Agents — backend-persisted via /api/v1/agents ────────────────────
   const [agents, setAgents] = useState<AgentSummary[]>([])
-  const [agentsLoading, setAgentsLoading] = useState(true)
+  // In mock auth mode we never fetch from the backend so there is nothing to load.
+  const [agentsLoading, setAgentsLoading] = useState(!MOCK_AUTH)
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false)
   const [newAgentName, setNewAgentName] = useState("")
   const [newAgentDescription, setNewAgentDescription] = useState("")
@@ -82,12 +84,9 @@ export default function TeamPage() {
 
   // Load agents from backend on mount.
   // In mock auth mode there is no Firebase token, so backend calls would fail with 401.
-  // We skip the fetch and show an empty list instead.
+  // We skip the fetch entirely (agentsLoading is initialized to false in that case).
   useEffect(() => {
-    if (MOCK_AUTH) {
-      setAgentsLoading(false)
-      return
-    }
+    if (MOCK_AUTH) return
     let cancelled = false
     apiClient.get<AgentSummary[]>("/api/v1/agents")
       .then((data) => { if (!cancelled) setAgents(data ?? []) })
@@ -451,6 +450,9 @@ export default function TeamPage() {
                 <Trash2Icon className="size-5" />
                 Delete AI Agent
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                Confirm deletion of this AI agent by typing its name.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <p className="text-sm text-muted-foreground">
@@ -486,6 +488,9 @@ export default function TeamPage() {
                 <BotIcon className="size-5 text-primary" />
                 New AI Agent
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                Create a new AI agent with a name and description.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">

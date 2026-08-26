@@ -50,6 +50,7 @@ import {
 } from "@/types/agent"
 import { cn } from "@/lib/utils"
 import { apiClient } from "@/lib/api"
+import { MOCK_AUTH } from "@/contexts/auth-context"
 
 // ─── Tool metadata ────────────────────────────────────────────────────────────
 const TOOL_ICONS: Record<string, React.ElementType> = {
@@ -101,12 +102,17 @@ export default function AgentBuilderPage({ params }: { params: Promise<{ id: str
 
   // Start with a default agent; the real config loads from the backend on mount.
   const [agent, setAgent] = useState<AIAgent>(() => createDefaultAgent(id, `Agent ${id}`, ""))
-  const [pageLoading, setPageLoading] = useState(true)
+  // In mock auth mode we skip the backend fetch so there is nothing to wait for.
+  const [pageLoading, setPageLoading] = useState(!MOCK_AUTH)
   const [pageError, setPageError] = useState<string | null>(null)
   const [domainInput, setDomainInput] = useState("")
 
   // Load the persisted agent config from the backend on first render.
+  // In mock auth mode there is no Firebase token — skip the fetch and work with the
+  // local default state only (changes will not be persisted).
+  // pageLoading is initialized to false in mock mode so the loading screen never shows.
   useEffect(() => {
+    if (MOCK_AUTH) return
     let cancelled = false
     async function loadAgent() {
       try {
@@ -178,8 +184,15 @@ export default function AgentBuilderPage({ params }: { params: Promise<{ id: str
  * so PATCH is the only valid operation.  A 404 means the agent was deleted
  * externally — in that case we surface the error and do not recreate the doc
  * under the wrong ID.
+ *
+ * In mock auth mode (no Firebase token) the call is skipped and the user is
+ * notified that persistence is unavailable.
  */
   async function handleSave() {
+    if (MOCK_AUTH) {
+      toast.warning("Mock kimlik doğrulama aktif — değişiklikler kaydedilemez.")
+      return
+    }
     try {
       await apiClient.patch(`/api/v1/agents/${id}`, {
         name: agent.name,
@@ -257,6 +270,14 @@ export default function AgentBuilderPage({ params }: { params: Promise<{ id: str
         <SiteHeader />
         <main className="flex flex-1 flex-col overflow-auto bg-background/50">
           <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 md:px-8">
+
+            {/* Mock auth banner — shown when NEXT_PUBLIC_MOCK_AUTH=true */}
+            {MOCK_AUTH && (
+              <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">
+                <strong>Mock kimlik doğrulama aktif.</strong> Bu modda ajan değişiklikleri kaydedilemez.
+                Kalıcı kayıt için gerçek Firebase kimlik doğrulaması gereklidir.
+              </div>
+            )}
 
             {/* Breadcrumb */}
             <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">

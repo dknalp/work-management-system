@@ -21,8 +21,7 @@ type ChatMessage = {
   created_at: string
 }
 
-type Contact = {
-  id: string
+type Contact = {id: string
   name: string
   type: "user" | "bot"
   is_active: boolean
@@ -81,7 +80,7 @@ export function ChatWidget() {
     if (!open || !user?.id) return
     const token = tokenStorage.getAccess()
     if (!token) return
-    fetch(`${API_BASE}/api/v1/messages/contacts`, {
+    fetch(`${API_BASE}/api/v1/chat/contacts`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => (r.ok ? r.json() : []))
@@ -132,7 +131,7 @@ export function ChatWidget() {
     const roomId = makeRoomId(user.id, contact.id)
     markChatRead(contact.id, roomId)
 
-    const ws = new WebSocket(`${WS_BASE}/api/v1/ws/chat/${roomId}?token=${token}`)
+    const ws = new WebSocket(`${WS_BASE}/api/v1/chat/${roomId}/ws?token=${token}`)
     wsRef.current = ws
 
     ws.onmessage = (event) => {

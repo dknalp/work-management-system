@@ -61,6 +61,36 @@ _manager = _ChatManager()
 # REST endpoints
 # ---------------------------------------------------------------------------
 
+@router.get("/contacts")
+def list_contacts(
+    actor: Actor = Depends(get_current_actor),
+    db: firestore.Client = Depends(get_db),
+) -> list[dict]:
+    """Return all active users the caller can open a DM conversation with.
+
+    Returns every user record except the caller themselves, so the chat widget
+    can populate its contacts list.  The caller's own UID is derived from the
+    Actor dependency (works for both Firebase users and bot API keys).
+    """
+    caller_id = str(actor.id)
+    docs = db.collection("users").where("is_active", "==", True).stream()
+    contacts = []
+    for doc in docs:
+        if doc.id == caller_id:
+            continue
+        d = doc.to_dict() or {}
+        contacts.append(
+            {
+                "id": doc.id,
+                "name": d.get("name", ""),
+                "email": d.get("email", ""),
+                "avatar_url": d.get("avatar_url"),
+                "role": d.get("role", "member"),
+            }
+        )
+    return contacts
+
+
 @router.get("/{room_id}/messages")
 def get_messages(
     room_id: str,

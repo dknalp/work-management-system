@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
+import { useAuth } from "./auth-context"
 
 export type TeamMember = {
   id: string
@@ -50,6 +51,7 @@ interface TeamContextValue {
 const TeamContext = createContext<TeamContextValue | null>(null)
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
+  const { loading: authLoading } = useAuth()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -64,9 +66,12 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Wait for Firebase auth to resolve before fetching — avoids a 401 race
+  // where the token is not yet stored when the context first mounts.
   useEffect(() => {
+    if (authLoading) return
     fetchMembers()
-  }, [fetchMembers])
+  }, [authLoading, fetchMembers])
 
   const addMember = useCallback(
     async (member: TeamMember) => {

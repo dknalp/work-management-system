@@ -107,16 +107,24 @@ app.add_middleware(
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 
-# Legacy (non-versioned) routers
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(users.router, prefix="/users", tags=["users"])
-app.include_router(admin.router, prefix="/admin", tags=["admin"])
-app.include_router(bots.router, prefix="/bots", tags=["bots"])
-app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
-app.include_router(activity.router, prefix="/activity", tags=["activity"])
-app.include_router(team.router, prefix="/team", tags=["team"])
-app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
-app.include_router(permissions.router, prefix="/permissions", tags=["permissions"])
+# Legacy (non-versioned) routers.
+#
+# IMPORTANT: routers that declare their own prefix via APIRouter(prefix=...)
+# must NOT receive an extra prefix= here — FastAPI concatenates both, which
+# would produce doubled paths (e.g. /users/users/me).  Routers WITHOUT a
+# self-declared prefix (auth, permissions, projects, pipelines, kanban,
+# calendar) still require the prefix= argument here.
+#
+# Self-prefixed routers (no prefix= in include_router):
+app.include_router(auth.router, prefix="/auth", tags=["auth"])     # auth has no self-prefix
+app.include_router(users.router, tags=["users"])                   # self-prefix: /users
+app.include_router(admin.router, tags=["admin"])                   # self-prefix: /admin
+app.include_router(bots.router, tags=["bots"])                     # self-prefix: /admin/bots
+app.include_router(tasks.router, tags=["tasks"])                   # self-prefix: /tasks  (legacy)
+app.include_router(activity.router, tags=["activity"])             # self-prefix: /activity (legacy)
+app.include_router(team.router, tags=["team"])                     # self-prefix: /team  (legacy)
+app.include_router(analytics.router, tags=["analytics"])           # self-prefix: /analytics (legacy)
+app.include_router(permissions.router, prefix="/permissions", tags=["permissions"])  # no self-prefix
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(pipelines.router, prefix="/pipelines", tags=["pipelines"])
 app.include_router(kanban.router, prefix="/kanban", tags=["kanban"])

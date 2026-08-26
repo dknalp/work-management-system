@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { Project, ProjectColor } from "@/types/project"
 import { apiClient } from "@/lib/api"
+import { useAuth } from "./auth-context"
 
 type ApiProject = {
   id: string
@@ -55,6 +56,7 @@ function slugify(name: string): string {
 }
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
+  const { loading: authLoading } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -70,9 +72,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Wait for Firebase auth to resolve before fetching — avoids a 401 race
+  // where the token is not yet stored when the context first mounts.
   useEffect(() => {
+    if (authLoading) return
     fetchProjects()
-  }, [fetchProjects])
+  }, [authLoading, fetchProjects])
 
   const createProject = useCallback(async (name: string, emoji: string, color: ProjectColor): Promise<Project> => {
     const slug = slugify(name) || "proje"

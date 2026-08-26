@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
+import { useAuth } from "./auth-context"
 
 export type CalendarEvent = {
   id: string
@@ -51,6 +52,7 @@ type CalendarContextValue = {
 const CalendarContext = createContext<CalendarContextValue | null>(null)
 
 export function CalendarProvider({ children }: { children: React.ReactNode }) {
+  const { loading: authLoading } = useAuth()
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -59,15 +61,18 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
       const data = await apiClient<ApiEvent[]>("/calendar")
       setEvents(data.map(fromApi))
     } catch {
-      // keep previous state
+      // keep previous state on error
     } finally {
       setLoading(false)
     }
   }, [])
 
+  // Wait for Firebase auth to resolve before fetching — avoids a 401 race
+  // where the token is not yet stored when the context first mounts.
   useEffect(() => {
+    if (authLoading) return
     fetchEvents()
-  }, [fetchEvents])
+  }, [authLoading, fetchEvents])
 
   const addEvent = useCallback(async (event: Omit<CalendarEvent, "createdAt">) => {
     const created = await apiClient<ApiEvent>("/calendar", {

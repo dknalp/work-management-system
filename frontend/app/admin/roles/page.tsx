@@ -111,8 +111,8 @@ function useAdminData() {
     }
     try {
       const [rolesData, permsData] = await Promise.all([
-        apiClient<RoleResponse[]>("/admin/roles"),
-        apiClient<{ role: string; permissions: string[] }[]>("/admin/permissions"),
+        apiClient<RoleResponse[]>("/permissions/admin/roles"),
+        apiClient<{ role: string; permissions: string[] }[]>("/permissions/admin/permissions"),
       ])
       setRoles(rolesData)
       const map: Record<string, Permission[]> = {}
@@ -160,7 +160,7 @@ export default function RolesPage() {
         localStorage.setItem("wms:role_permissions", JSON.stringify(permsMap))
         toast.success("İzinler kaydedildi")
       } else {
-        await apiClient("/admin/permissions", {
+        await apiClient("/permissions/admin/permissions", {
           method: "PUT",
           body: JSON.stringify(
             Object.entries(permsMap).map(([role, perms]) => ({ role, permissions: perms }))
@@ -195,7 +195,7 @@ export default function RolesPage() {
         setPermsMap((prev) => ({ ...prev, [name]: sourcePerms }))
         setRoles((prev) => [...prev, newRole])
       } else {
-        await apiClient("/admin/roles", {
+        await apiClient("/permissions/admin/roles", {
           method: "POST",
           body: JSON.stringify({ name, copy_from: copyFrom !== "none" ? copyFrom : null }),
         })
@@ -225,7 +225,7 @@ export default function RolesPage() {
           return next
         })
       } else {
-        await apiClient(`/admin/roles/${name}`, { method: "DELETE" })
+        await apiClient(`/permissions/admin/roles/${name}`, { method: "DELETE" })
         await reload()
       }
       toast.success(`"${name}" rolü silindi`)

@@ -1,0 +1,550 @@
+{
+  "generated": "2026-08-26",
+  "stack": {
+    "frontend": "Next.js 16 App Router (TypeScript)",
+    "backend": "FastAPI (Python)",
+    "database": "Firestore (Firebase Admin SDK)",
+    "auth": "Firebase Authentication",
+    "file_storage": "Cloudflare R2 or local disk",
+    "state_management": "React Context (no Zustand/Redux/TanStack Query)",
+    "websocket": "FastAPI WebSocket (chat + notifications)"
+  },
+  "features": [
+    {
+      "id": "auth",
+      "name": "Authentication",
+      "status": "working",
+      "persistence": "Firebase Auth + Firestore users/{uid}",
+      "frontend_files": [
+        "frontend/contexts/auth-context.tsx",
+        "frontend/lib/auth.ts",
+        "frontend/proxy.ts",
+        "frontend/app/(auth)/login/page.tsx",
+        "frontend/app/(auth)/register/page.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/auth.py",
+        "backend/app/firebase_auth.py",
+        "backend/app/deps.py"
+      ],
+      "api_paths": [
+        "POST /auth/register",
+        "POST /auth/login",
+        "POST /auth/logout",
+        "POST /auth/forgot-password"
+      ]
+    },
+    {
+      "id": "tasks",
+      "name": "Task Management",
+      "status": "working",
+      "persistence": "Firestore tasks/{id}",
+      "known_issues": [
+        "assignee is a display string, not a user UID",
+        "no project_id FK",
+        "no pipeline_id FK"
+      ],
+      "frontend_files": [
+        "frontend/contexts/task-context.tsx",
+        "frontend/app/tasks/page.tsx",
+        "frontend/components/tasks/task-columns.tsx",
+        "frontend/components/tasks/task-detail-modal.tsx",
+        "frontend/components/tasks/edit-task-dialog.tsx",
+        "frontend/components/tasks/comments-modal.tsx",
+        "frontend/components/tasks/quick-add-task.tsx",
+        "frontend/components/create-task-dialog.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/tasks.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/tasks",
+        "POST /api/v1/tasks",
+        "PATCH /api/v1/tasks/{id}",
+        "DELETE /api/v1/tasks/{id}",
+        "POST /api/v1/tasks/{id}/comments",
+        "GET /api/v1/tasks/{id}/comments"
+      ]
+    },
+    {
+      "id": "kanban",
+      "name": "Kanban Board",
+      "status": "isolated",
+      "persistence": "Firestore kanban_states/{pipeline_id} (opaque blob)",
+      "known_issues": [
+        "completely disconnected from the tasks collection",
+        "kanban cards are not real tasks",
+        "no shared data model with task management"
+      ],
+      "frontend_files": [
+        "frontend/components/dashboard/board/kanban-board.tsx",
+        "frontend/components/dashboard/board/kanban-card.tsx",
+        "frontend/components/dashboard/board/kanban-column.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/kanban.py"
+      ],
+      "api_paths": [
+        "GET /kanban/{pipeline_id}",
+        "PUT /kanban/{pipeline_id}"
+      ]
+    },
+    {
+      "id": "projects",
+      "name": "Projects",
+      "status": "working",
+      "persistence": "Firestore projects/{id}",
+      "known_issues": [
+        "project tasks tab has no project_id FK — tasks cannot be reliably filtered by project"
+      ],
+      "frontend_files": [
+        "frontend/contexts/project-context.tsx",
+        "frontend/app/projects/[slug]/page.tsx",
+        "frontend/components/projects/project-overview-tab.tsx",
+        "frontend/components/projects/project-tasks-tab.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/projects.py"
+      ],
+      "api_paths": [
+        "GET /projects",
+        "POST /projects",
+        "GET /projects/{id}",
+        "PATCH /projects/{id}",
+        "DELETE /projects/{id}"
+      ]
+    },
+    {
+      "id": "pipelines",
+      "name": "Pipelines",
+      "status": "working",
+      "persistence": "Firestore pipelines/{id}",
+      "frontend_files": [
+        "frontend/contexts/pipeline-context.tsx",
+        "frontend/app/pipelines/page.tsx",
+        "frontend/app/pipelines/[id]/page.tsx",
+        "frontend/components/pipelines/pipelines-list.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/pipelines.py"
+      ],
+      "api_paths": [
+        "GET /pipelines",
+        "POST /pipelines",
+        "GET /pipelines/{id}",
+        "PATCH /pipelines/{id}",
+        "DELETE /pipelines/{id}"
+      ]
+    },
+    {
+      "id": "calendar",
+      "name": "Calendar",
+      "status": "working",
+      "persistence": "Firestore calendar_events/{id}",
+      "frontend_files": [
+        "frontend/contexts/calendar-context.tsx",
+        "frontend/app/calendar/page.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/calendar.py"
+      ],
+      "api_paths": [
+        "GET /calendar",
+        "POST /calendar",
+        "PATCH /calendar/{id}",
+        "DELETE /calendar/{id}"
+      ]
+    },
+    {
+      "id": "files",
+      "name": "File Management",
+      "status": "working",
+      "persistence": "Firestore file_records/{id} (metadata) + R2/local disk (binary)",
+      "frontend_files": [
+        "frontend/app/files/[[...path]]/page.tsx",
+        "frontend/components/files/file-client-page.tsx",
+        "frontend/lib/actions/files.ts"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/files_core.py",
+        "backend/app/routers/v1/files_bulk.py",
+        "backend/app/routers/v1/files_trash.py",
+        "backend/app/routers/v1/files_share.py",
+        "backend/app/routers/v1/files_drive.py",
+        "backend/app/routers/v1/files_misc.py",
+        "backend/app/routers/v1/files_utils.py",
+        "backend/app/r2.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/files",
+        "POST /api/v1/files/upload",
+        "GET /api/v1/files/download/{id}",
+        "DELETE /api/v1/files/{id}",
+        "PATCH /api/v1/files/{id}/rename",
+        "POST /api/v1/files/folder",
+        "POST /api/v1/files/bulk/move",
+        "POST /api/v1/files/bulk/copy",
+        "POST /api/v1/files/bulk/trash",
+        "GET /api/v1/files/trash",
+        "POST /api/v1/files/trash/{id}/restore",
+        "DELETE /api/v1/files/permanent/{id}",
+        "POST /api/v1/files/empty-trash",
+        "POST /api/v1/files/share",
+        "GET /api/v1/files/share/{token}",
+        "DELETE /api/v1/files/share/{id}",
+        "POST /api/v1/files/drive/import",
+        "GET /api/v1/files/quota",
+        "GET /api/v1/files/zip"
+      ]
+    },
+    {
+      "id": "team",
+      "name": "Team Management",
+      "status": "working",
+      "persistence": "Firestore team_members/{id}",
+      "frontend_files": [
+        "frontend/contexts/team-context.tsx",
+        "frontend/app/team/page.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/team.py",
+        "backend/app/routers/v1/team.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/team/members",
+        "POST /api/v1/team/members",
+        "PATCH /api/v1/team/members/{id}",
+        "DELETE /api/v1/team/members/{id}"
+      ]
+    },
+    {
+      "id": "admin_users",
+      "name": "Admin — User Management",
+      "status": "working",
+      "persistence": "Firestore users/{uid}",
+      "phase1_fix": "double-prefix bug fixed in main.py",
+      "frontend_files": [
+        "frontend/app/admin/page.tsx",
+        "frontend/components/admin/users-section.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/admin.py"
+      ],
+      "api_paths": [
+        "GET /admin/users",
+        "POST /admin/users",
+        "PATCH /admin/users/{id}",
+        "PATCH /admin/users/{id}/toggle-active",
+        "DELETE /admin/users/{id}"
+      ]
+    },
+    {
+      "id": "admin_bots",
+      "name": "Admin — Bot Management",
+      "status": "working",
+      "persistence": "Firestore bots/{id}",
+      "phase1_fix": "admin-shared.ts stubs replaced with real apiClient calls",
+      "frontend_files": [
+        "frontend/components/admin/admin-shared.ts",
+        "frontend/components/admin/bots-section.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/bots.py"
+      ],
+      "api_paths": [
+        "GET /admin/bots",
+        "POST /admin/bots",
+        "PATCH /admin/bots/{id}",
+        "DELETE /admin/bots/{id}",
+        "POST /admin/bots/{id}/regenerate-key"
+      ]
+    },
+    {
+      "id": "admin_roles",
+      "name": "Admin — Roles & Permissions",
+      "status": "working",
+      "persistence": "Firestore role_permissions/{role}_{perm}, custom_roles/{name}",
+      "phase1_fix": "frontend API paths corrected to /permissions/admin/*",
+      "frontend_files": [
+        "frontend/app/admin/roles/page.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/permissions.py"
+      ],
+      "api_paths": [
+        "GET /permissions/my",
+        "GET /permissions/admin/roles",
+        "POST /permissions/admin/roles",
+        "DELETE /permissions/admin/roles/{name}",
+        "GET /permissions/admin/permissions",
+        "PUT /permissions/admin/permissions"
+      ]
+    },
+    {
+      "id": "admin_storage",
+      "name": "Admin — Storage & Drive Config",
+      "status": "not_implemented",
+      "known_issues": [
+        "frontend UI exists but no backend endpoints",
+        "admin-shared.ts now throws clear errors explaining missing backend"
+      ],
+      "frontend_files": [
+        "frontend/components/admin/admin-shared.ts"
+      ],
+      "backend_files": [],
+      "api_paths": []
+    },
+    {
+      "id": "agents",
+      "name": "Agent Builder",
+      "status": "working",
+      "persistence": "Firestore agent_configs/{id}",
+      "frontend_files": [
+        "frontend/app/agent-builder/[id]/page.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/agent_configs.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/agents",
+        "POST /api/v1/agents",
+        "GET /api/v1/agents/{id}",
+        "PATCH /api/v1/agents/{id}",
+        "DELETE /api/v1/agents/{id}"
+      ]
+    },
+    {
+      "id": "chat",
+      "name": "Direct Messaging (Chat)",
+      "status": "working",
+      "persistence": "Firestore chat_rooms/{id}/messages/{id}",
+      "phase1_fix": "corrected /api/v1/messages/contacts → /api/v1/chat/contacts and WebSocket path",
+      "frontend_files": [
+        "frontend/components/chat-widget.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/chat.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/chat/contacts",
+        "GET /api/v1/chat/{room_id}/messages",
+        "WS  /api/v1/chat/{room_id}/ws"
+      ]
+    },
+    {
+      "id": "analytics",
+      "name": "Analytics",
+      "status": "working",
+      "persistence": "computed from Firestore (not stored)",
+      "frontend_files": [
+        "frontend/app/analytics/page.tsx",
+        "frontend/components/dashboard/task-overview-chart.tsx",
+        "frontend/components/dashboard/team-workload-chart.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/analytics.py",
+        "backend/app/routers/analytics.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/analytics/summary",
+        "GET /api/v1/analytics/daily"
+      ]
+    },
+    {
+      "id": "activity",
+      "name": "Activity Log",
+      "status": "working",
+      "persistence": "Firestore activity/{id}",
+      "frontend_files": [
+        "frontend/contexts/task-context.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/activity.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/activity",
+        "POST /api/v1/activity"
+      ]
+    },
+    {
+      "id": "notifications",
+      "name": "Notifications",
+      "status": "working",
+      "persistence": "derived from activity API + WebSocket; read-state in localStorage only",
+      "frontend_files": [
+        "frontend/contexts/notifications-context.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/presence.py"
+      ],
+      "api_paths": [
+        "WS /api/v1/ws/notifications"
+      ]
+    },
+    {
+      "id": "presence",
+      "name": "User Presence",
+      "status": "partial",
+      "persistence": "Firestore presence/{uid}",
+      "known_issues": [
+        "heartbeat works but there is no real-time push to other clients",
+        "clients only see presence changes on next poll or reload"
+      ],
+      "frontend_files": [
+        "frontend/contexts/presence-context.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/v1/presence.py"
+      ],
+      "api_paths": [
+        "PATCH /api/v1/presence/heartbeat",
+        "GET /api/v1/presence"
+      ]
+    },
+    {
+      "id": "settings",
+      "name": "User Settings",
+      "status": "working",
+      "persistence": "Firestore users/{uid}/preferences",
+      "frontend_files": [
+        "frontend/app/settings/page.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/users.py"
+      ],
+      "api_paths": [
+        "GET /users/me/preferences",
+        "PATCH /users/me/preferences"
+      ]
+    },
+    {
+      "id": "profile",
+      "name": "User Profile",
+      "status": "working",
+      "persistence": "Firestore users/{uid}",
+      "phase1_note": "was broken due to double-prefix bug — now fixed",
+      "frontend_files": [
+        "frontend/app/profile/page.tsx"
+      ],
+      "backend_files": [
+        "backend/app/routers/users.py"
+      ],
+      "api_paths": [
+        "GET /users/me",
+        "PATCH /users/me",
+        "POST /users/me/avatar"
+      ]
+    },
+    {
+      "id": "webhooks",
+      "name": "Webhooks",
+      "status": "working",
+      "persistence": "Firestore webhooks/{id}",
+      "frontend_files": [],
+      "backend_files": [
+        "backend/app/routers/v1/webhooks.py"
+      ],
+      "api_paths": [
+        "GET /api/v1/webhooks",
+        "POST /api/v1/webhooks",
+        "PATCH /api/v1/webhooks/{id}",
+        "DELETE /api/v1/webhooks/{id}"
+      ]
+    }
+  ],
+  "firestore_collections": [
+    "users",
+    "tasks",
+    "task_comments",
+    "projects",
+    "pipelines",
+    "kanban_states",
+    "calendar_events",
+    "team_members",
+    "activity",
+    "bots",
+    "agent_configs",
+    "file_records",
+    "file_shares",
+    "file_access_logs",
+    "chat_rooms",
+    "presence",
+    "webhooks",
+    "role_permissions",
+    "custom_roles"
+  ],
+  "known_issues": [
+    {
+      "id": "B-01",
+      "severity": "P0",
+      "status": "FIXED",
+      "title": "Double-prefix bug blocks all users/me and admin/* endpoints",
+      "root_cause": "Legacy routers declared self-prefix AND received duplicate prefix in include_router()",
+      "fix": "Removed duplicate prefix args from include_router() calls in main.py"
+    },
+    {
+      "id": "B-02",
+      "severity": "P0",
+      "status": "FIXED",
+      "title": "Chat widget calls wrong API paths",
+      "root_cause": "Frontend and backend chat API designed independently with mismatched paths",
+      "fix": "Corrected both paths in chat-widget.tsx; added GET /api/v1/chat/contacts endpoint"
+    },
+    {
+      "id": "B-03",
+      "severity": "P0",
+      "status": "FIXED",
+      "title": "Bot management stubs silently fail",
+      "root_cause": "admin-shared.ts was scaffolded but never wired to the backend",
+      "fix": "Replaced all stubs with real apiClient calls to /admin/bots/*"
+    },
+    {
+      "id": "B-04",
+      "severity": "P0",
+      "status": "FIXED",
+      "title": "Admin roles/permissions page calls wrong paths",
+      "root_cause": "Frontend called /admin/roles but backend has /permissions/admin/roles",
+      "fix": "Updated 4 path strings in admin/roles/page.tsx"
+    },
+    {
+      "id": "A-01",
+      "severity": "P1",
+      "status": "OPEN",
+      "title": "Two independent task systems (Tasks collection vs Kanban blob)",
+      "root_cause": "Tasks and Kanban built in isolation without shared data model",
+      "fix": "Phase 2: Make Kanban a view of the Tasks collection. Add pipeline_id/sort_order to tasks."
+    },
+    {
+      "id": "A-03",
+      "severity": "P1",
+      "status": "OPEN",
+      "title": "No task→project FK, no assignee UID",
+      "root_cause": "Task schema uses string fields instead of relational IDs",
+      "fix": "Phase 2: Add project_id, pipeline_id, assignee_id to task schema"
+    },
+    {
+      "id": "A-02",
+      "severity": "P2",
+      "status": "OPEN",
+      "title": "Legacy router tier is dead code",
+      "root_cause": "v1 tier added without removing legacy routers",
+      "fix": "Phase 4: Remove /tasks, /team, /activity, /analytics legacy routers"
+    },
+    {
+      "id": "A-04",
+      "severity": "P2",
+      "status": "OPEN",
+      "title": "Firestore rules allow direct client writes",
+      "root_cause": "Rules were not tightened after deciding all access goes through Admin SDK",
+      "fix": "Phase 3: Lock down rules to deny direct client writes"
+    },
+    {
+      "id": "A-05",
+      "severity": "P2",
+      "status": "OPEN",
+      "title": "empty_trash R2 deletion not atomic with Firestore batch",
+      "root_cause": "R2 deletions happen before Firestore batch in empty_trash",
+      "fix": "Phase 4: Reverse order — delete Firestore first, then R2"
+    }
+  ]
+}

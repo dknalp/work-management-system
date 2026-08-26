@@ -3,7 +3,13 @@
  *
  * Reads the Firebase ID token from localStorage on every request.
  * On a 401, forces a Firebase token refresh (the SDK re-fetches from
- * Firebase servers) and retries the request once before redirecting to /login.
+ * Firebase servers) and retries the request once.
+ *
+ * Redirect to /login only happens when the token refresh definitively fails
+ * because there is no Firebase currentUser — NOT when currentUser is merely
+ * null due to the Firebase SDK still initialising (a common race on page load).
+ * In that race case we throw so the calling context's catch block handles it
+ * gracefully and the context can retry once auth resolves.
  *
  * Usage:
  *   import { apiClient } from "@/lib/api"
@@ -15,13 +21,18 @@ import { firebaseAuth } from "./firebase"
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3052").replace(/\/+$/, "")
 
-/** Force-refresh the Firebase ID token and persist the new value. */
+/**
+ * Attempt to force-refresh the Firebase ID token.
+ *
+ * Returns the new token string on success.
+ * Returns null when Firebase has no currentUser (either truly logged out or
+ * SDK not yet initialised — callers must decide which case applies).
+ */
 async function refreshFirebaseToken(): Promise<string | null> {
   try {
     const user = firebaseAuth.currentUser
     if (!user) {
-      console.warn("[api] refreshFirebaseToken: no current Firebase user")
-      tokenStorage.clear()
+      console.warn("[api] refreshFirebaseToken: firebaseAuth.currentUser is null")
       return null
     }
     const newToken = await user.getIdToken(/* forceRefresh= */ true)
@@ -51,15 +62,27 @@ export async function apiClient<T>(path: string, options: RequestInit = {}): Pro
 
   let res = await fetch(`${API_BASE}${path}`, { ...options, headers })
 
-  // On 401, try a single token refresh and retry
+  // On 401, attempt a single Firebase token refresh and retry the request.
   if (res.status === 401 && token) {
     console.warn(`[api] 401 on ${path} — attempting token refresh`)
     const newToken = await refreshFirebaseToken()
+
     if (!newToken) {
-      console.error("[api] Token refresh failed — redirecting to /login")
-      if (typeof window !== "undefined") window.location.href = "/login"
+      // refreshFirebaseToken returns null either because Firebase is still
+      // initialising (race on page load) or because the user is truly signed
+      // out.  We can distinguish the two: if firebaseAuth.currentUser is still
+      // null after the refresh attempt AND there is no stored token, the
+      // session is genuinely expired and we redirect.  If there IS a stored
+      // token but currentUser is null, Firebase SDK has not initialised yet —
+      // just throw so the context retries once auth resolves.
+      const stillHasToken = !!tokenStorage.getToken()
+      if (!stillHasToken && typeof window !== "undefined") {
+        console.error("[api] Token refresh failed with no stored token — redirecting to /login")
+        window.location.href = "/login"
+      }
       throw new Error("Session expired. Please log in again.")
     }
+
     headers["Authorization"] = `Bearer ${newToken}`
     res = await fetch(`${API_BASE}${path}`, { ...options, headers })
   }
