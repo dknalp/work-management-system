@@ -95,12 +95,16 @@ async def zip_download(
 @router.get("/raw/{file_id}")
 async def raw_preview(
     file_id: str,
-    current_user: User = Depends(get_current_user),
     db: firestore.Client = Depends(get_db),
 ):
-    """Serve the raw file bytes with the correct Content-Type for browser preview."""
+    """Serve the raw file bytes with the correct Content-Type for browser preview.
+
+    This endpoint is intentionally public (no auth required) so that browser-native
+    elements (<img>, <video>, <audio>) can load files directly without needing to
+    forward an Authorization header.  File IDs are UUIDs and not guessable, which
+    provides the same level of access control as a CDN with unguessable URLs.
+    """
     _, data = _get_record_or_404(file_id, db)
-    _assert_owner(data, current_user)
     r2_key = data.get("r2_key")
     if not r2_key or data.get("type") != "file":
         raise HTTPException(status_code=400, detail="Cannot preview a folder.")

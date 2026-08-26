@@ -25,7 +25,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
 import { apiClient } from "@/lib/api"
-import { tokenStorage } from "@/lib/auth"
 
 /** Accepted MIME types for avatar uploads (must match backend validation). */
 const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/gif"
@@ -122,7 +121,7 @@ export default function ProfilePage() {
                 disabled={avatarUploading}
               >
                 <Avatar className="size-20">
-                  <AvatarImage src={tokenStorage.buildImageUrl(user?.avatar_url)} />
+                  <AvatarImage src={user?.avatar_url ?? ""} />
                   <AvatarFallback className="text-xl font-semibold bg-primary/10 text-primary">
                     {initials}
                   </AvatarFallback>

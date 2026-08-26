@@ -37,7 +37,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { usePermission } from "@/hooks/use-permission"
 import { getLinksForRole, type CustomNavLink } from "@/lib/custom-nav"
 import { SidebarProjects } from "@/components/layout/sidebar-projects"
-import { tokenStorage } from "@/lib/auth"
 
 const navMain = [
   {
@@ -145,7 +144,7 @@ function AppSidebarInner({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const sidebarUser = {
     name: user?.name ?? "...",
     email: user?.email ?? "",
-    avatar: tokenStorage.buildImageUrl(user?.avatar_url),
+    avatar: user?.avatar_url ?? "",
   }
 
   return (
