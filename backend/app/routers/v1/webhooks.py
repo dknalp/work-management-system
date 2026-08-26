@@ -74,13 +74,13 @@ def list_webhooks(
 ):
     """Return all webhooks registered by the calling bot account."""
     bot = _require_bot(actor)
-    docs = (
+    raw = list(
         db.collection("webhooks")
         .where("bot_id", "==", bot.id)
-        .order_by("created_at")
         .stream()
     )
-    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
+    raw.sort(key=lambda d: (d.to_dict() or {}).get("created_at") or "")
+    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in raw]
 
 
 @router.delete("/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -99,13 +99,17 @@ def get_messages(
     db: firestore.Client = Depends(get_db),
 ) -> list[dict]:
     """Return recent chat messages for a room, oldest first."""
-    docs = (
+    raw_docs = list(
         db.collection("chat_messages")
         .where("room_id", "==", room_id)
-        .order_by("created_at", direction=firestore.Query.DESCENDING)
-        .limit(limit)
+        .limit(limit * 2)
         .stream()
     )
+    raw_docs.sort(
+        key=lambda d: (d.to_dict() or {}).get("created_at") or "",
+        reverse=True,
+    )
+    docs = raw_docs[:limit]
     messages = []
     for doc in docs:
         d = doc.to_dict() or {}

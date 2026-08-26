@@ -106,12 +106,16 @@ async def list_agent_configs(
     db=Depends(get_db),
 ) -> list[AgentConfigResponse]:
     """Return all agent configurations owned by the current user."""
-    query = (
+    docs = (
         db.collection(_COLLECTION)
         .where("owner_id", "==", current_user.id)
-        .order_by("created_at", direction="DESCENDING")
+        .stream()
     )
-    return [_doc_to_response(doc.id, doc.to_dict()) for doc in query.stream()]
+    results = [_doc_to_response(doc.id, doc.to_dict()) for doc in docs]
+    # Sort in Python to avoid requiring a Firestore composite index on
+    # (owner_id, created_at).
+    results.sort(key=lambda r: r.created_at, reverse=True)
+    return results
 
 
 @router.post("", response_model=AgentConfigResponse, status_code=status.HTTP_201_CREATED)

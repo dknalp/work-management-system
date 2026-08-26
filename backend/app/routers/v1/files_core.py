@@ -425,12 +425,13 @@ def list_recent(
     db: firestore.Client = Depends(get_db),
 ) -> list[FileRecordResponse]:
     """Return recently accessed files for the current user."""
-    logs = (
+    logs = sorted(
         db.collection("file_access_logs")
         .where("user_id", "==", current_user.id)
-        .order_by("accessed_at", direction=firestore.Query.DESCENDING)
-        .limit(limit * 3)
-        .stream()
+        .limit(limit * 10)
+        .stream(),
+        key=lambda d: (d.to_dict() or {}).get("accessed_at") or "",
+        reverse=True,
     )
 
     seen: set[str] = set()
