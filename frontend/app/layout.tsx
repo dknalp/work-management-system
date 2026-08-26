@@ -5,8 +5,6 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/layout/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { AuthProvider } from "@/contexts/auth-context"
-import { UploadQueueProvider } from "@/contexts/upload-queue-context"
-import { UploadTray } from "@/components/files/upload-tray"
 import { PermissionsProvider } from "@/contexts/permissions-context"
 import { TaskProvider } from "@/contexts/task-context"
 import { CommandPalette } from "@/components/command-palette"
@@ -56,7 +54,7 @@ export default function RootLayout({
         "font-sans"
       )}
     >
-      <body>
+      <body suppressHydrationWarning>
         <ThemeProvider>
           <AuthProvider><PresenceProvider><PermissionsProvider><TaskProvider><NotificationsProvider><TeamProvider><ProjectProvider><PipelineProvider><CalendarProvider><CommandPalette />
             <TooltipProvider>{children}<ChatWidgetWrapper /></TooltipProvider>

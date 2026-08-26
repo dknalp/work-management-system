@@ -31,7 +31,7 @@ import {
 } from "lucide-react"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { usePermission } from "@/hooks/use-permission"
 import { getLinksForRole, type CustomNavLink } from "@/lib/custom-nav"
@@ -88,8 +88,9 @@ const navSecondary = [
   },
 ]
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+function AppSidebarInner({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
   const [customLinks, setCustomLinks] = React.useState<CustomNavLink[]>([])
   const canViewTasks = usePermission("tasks:view")
@@ -108,12 +109,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return () => window.removeEventListener("wms:custom-nav-changed", load)
   }, [user])
 
-  const [botsTabActive, setBotsTabActive] = React.useState(false)
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setBotsTabActive(params.get("tab") === "bots")
-  }, [pathname])
+  // Derive active state for the "bots" tab directly from searchParams so this
+  // works during SSR and avoids a window.location read in an effect.
+  const botsTabActive = searchParams.get("tab") === "bots"
 
   const navMainWithActive = navMain
     .filter((item) => {
@@ -133,7 +131,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     .map((item) => ({
       ...item,
       isActive: item.url.startsWith("/files?view=")
-        ? typeof window !== "undefined" && window.location.pathname + window.location.search === item.url
+        ? pathname === "/files" && `?${searchParams.toString()}` === item.url.slice(item.url.indexOf("?"))
         : pathname === item.url,
     }))
 
@@ -232,5 +230,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser user={sidebarUser} />
       </SidebarFooter>
     </Sidebar>
+  )
+}
+
+/**
+ * Wraps AppSidebarInner in a React.Suspense boundary so that
+ * useSearchParams() inside AppSidebarInner does not throw during SSR
+ * in Next.js 16 (which requires a Suspense boundary around any component
+ * that calls useSearchParams in a statically rendered page).
+ */
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  return (
+    <React.Suspense fallback={null}>
+      <AppSidebarInner {...props} />
+    </React.Suspense>
   )
 }

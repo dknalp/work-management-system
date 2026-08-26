@@ -171,7 +171,15 @@ def _now() -> datetime:
 
 
 def _build_path(parent: str, name: str) -> str:
-    """Combine a parent directory path with a file/folder name."""
+    """Combine a parent directory path with a file/folder name.
+
+    Rejects names that contain path separators or traversal sequences
+    (``..`` / ``/``) to prevent malformed virtual paths in Firestore.
+    The storage key is always UUID-based so there is no real filesystem
+    traversal risk, but malformed paths break directory-listing queries.
+    """
+    if not name or "/" in name or name in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid file name.")
     return f"{parent}/{name}" if parent else name
 
 
@@ -200,15 +208,16 @@ def _doc_to_response(doc_id: str, data: dict) -> FileRecordResponse:
     )
 
 
-def _assert_owner(data: dict, current_user_id: str) -> None:
-    """Raise HTTP 403 if the file record does not belong to current_user_id.
+def _assert_owner(data: dict, current_user: "User") -> None:
+    """Raise HTTP 403 if the file record does not belong to current_user.
 
-    Admins bypass this check — pass current_user.id here and call this after
-    _get_record_or_404.  The caller is responsible for passing the correct
-    owner_id to avoid giving admins blanket access unintentionally; if admin
-    bypass is needed, check is_admin before calling.
+    Admin users bypass this check so they can access and manage any file
+    (e.g. for moderation or support).  All other users must be the owner.
     """
-    if data.get("owner_id") != current_user_id:
+    from app.models import User  # local import to avoid circular dependency
+    if isinstance(current_user, User) and current_user.is_admin:
+        return
+    if data.get("owner_id") != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 

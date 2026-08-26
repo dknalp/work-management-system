@@ -37,7 +37,7 @@ def trash_file(
         raise HTTPException(status_code=404, detail="File not found.")
 
     data = doc.to_dict() or {}
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     now = _now()
 
     db.collection("file_records").document(file_id).update({
@@ -100,7 +100,7 @@ def restore_file(
         raise HTTPException(status_code=404, detail="File not found.")
 
     data = doc.to_dict() or {}
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     if not data.get("is_deleted", False):
         raise HTTPException(status_code=400, detail="File is not in trash.")
 
@@ -132,7 +132,23 @@ async def empty_trash(
         .stream()
     )
 
-    # Collect R2 keys for storage cleanup
+    # Step 1: Delete all Firestore records first (authoritative "gone" signal).
+    # An orphaned R2 object is far better than a Firestore record that points
+    # to nothing — the user could not delete such a record from the UI.
+    batch = db.batch()
+    count = 0
+    for doc in docs:
+        batch.delete(doc.reference)
+        count += 1
+        if count >= 499:
+            batch.commit()
+            batch = db.batch()
+            count = 0
+    if count > 0:
+        batch.commit()
+
+    # Step 2: Clean up storage objects best-effort.  Failures are logged so
+    # an ops job can later reconcile orphaned objects if needed.
     r2_keys = [
         (doc.to_dict() or {}).get("r2_key")
         for doc in docs
@@ -148,21 +164,12 @@ async def empty_trash(
                     local = _local_path(key)
                     if local.exists():
                         local.unlink()
-        except Exception:
-            pass  # Best-effort; delete Firestore records regardless
-
-    # Delete Firestore documents in batches of 500
-    batch = db.batch()
-    count = 0
-    for doc in docs:
-        batch.delete(doc.reference)
-        count += 1
-        if count >= 499:
-            batch.commit()
-            batch = db.batch()
-            count = 0
-    if count > 0:
-        batch.commit()
+        except Exception as err:
+            logger.warning(
+                "[files] empty_trash: storage cleanup failed for %d objects: %s",
+                len(r2_keys),
+                err,
+            )
 
 
 @router.delete("/permanent/{file_id}", status_code=204)
@@ -177,7 +184,7 @@ async def delete_permanently(
         raise HTTPException(status_code=404, detail="File not found.")
 
     data = doc.to_dict() or {}
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     r2_key = data.get("r2_key")
 
     if r2_key:

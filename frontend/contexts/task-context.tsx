@@ -34,6 +34,7 @@ import React, {
 } from "react"
 import { toast } from "sonner"
 import { apiClient } from "@/lib/api"
+import { cacheGet, cacheSet, cacheInvalidate } from "@/lib/query-cache"
 import type { Task, SubTask, Comment, Reply } from "@/types/task"
 import { useAuth } from "./auth-context"
 
@@ -134,15 +135,38 @@ export function useTasks(): TaskContextValue {
 export function TaskProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
 
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [activity, setActivity] = useState<ActivityEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  // Seed state from cache immediately so pages render without a loading spinner
+  // on repeat visits. The background refresh below keeps data fresh.
+  const [tasks, setTasks] = useState<Task[]>(() => cacheGet<Task[]>("tasks") ?? [])
+  const [activity, setActivity] = useState<ActivityEntry[]>(() => cacheGet<ActivityEntry[]>("activity") ?? [])
+  const [loading, setLoading] = useState(() => cacheGet<Task[]>("tasks") === null)
   const [error, setError] = useState<string | null>(null)
+
+  /**
+   * Wrapper around setTasks that also writes the new state to the session
+   * cache so that the next page mount renders from the latest data rather
+   * than a snapshot that predates the mutation.
+   *
+   * Accepts the same updater-function or direct-value signature as useState's
+   * setter, but always resolves to the final array before caching.
+   */
+  const setTasksAndCache = useCallback(
+    (updater: Task[] | ((prev: Task[]) => Task[])) => {
+      setTasks((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater
+        cacheSet("tasks", next)
+        return next
+      })
+    },
+    []
+  )
 
   // ── Fetch tasks from backend ───────────────────────────────────────────────
 
-  const refreshTasks = useCallback(async () => {
-    setLoading(true)
+  const refreshTasks = useCallback(async (silent = false) => {
+    // In silent mode (background refresh from cache hit) we skip the loading
+    // spinner so the UI never flickers while data is already visible.
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const raw = await apiClient<Task[]>("/api/v1/tasks")
@@ -156,13 +180,14 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         comments: t.comments ?? [],
       }))
       setTasks(data)
+      cacheSet("tasks", data)
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to load tasks"
       setError(message)
       // Do not toast here — the calling page will show an error state if needed.
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -172,26 +197,34 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await apiClient<ActivityEntry[]>("/api/v1/activity")
       setActivity(data)
+      cacheSet("activity", data)
     } catch {
       // Activity is non-critical; silently ignore fetch failures.
     }
   }, [])
 
   // ── Initial load — only fetch when a user is authenticated ─────────────────
-  // Clearing tasks/activity on logout is intentional; this is not a cascading update.
+  // Uses user?.id (not the full user object) as the dependency so that Firebase
+  // token refreshes (which create a new user object reference) do not trigger
+  // a full re-fetch. Only an actual login/logout changes user?.id.
   useEffect(() => {
-    if (!user) {
+    if (!user?.id) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setTasks([])
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setActivity([])
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false)
+      cacheInvalidate("tasks")
+      cacheInvalidate("activity")
       return
     }
-    refreshTasks()
+    // If we already have cached data, refresh silently in the background.
+    const hasCachedTasks = cacheGet<Task[]>("tasks") !== null
+    refreshTasks(hasCachedTasks)
     refreshActivity()
-  }, [user, refreshTasks, refreshActivity])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   // ── CRUD operations ────────────────────────────────────────────────────────
 
@@ -204,7 +237,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
           body: JSON.stringify(data),
         })
-        setTasks((prev) => [created, ...prev])
+        setTasksAndCache((prev) => [created, ...prev])
         return created
       } catch (err) {
         const message =
@@ -226,7 +259,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           method: "PATCH",
           body: JSON.stringify(data),
         })
-        setTasks((prev) =>
+        setTasksAndCache((prev) =>
           prev.map((t) => (t.id === id ? updated : t))
         )
         return updated
@@ -243,7 +276,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   const deleteTask = useCallback(async (id: string): Promise<boolean> => {
     try {
       await apiClient(`/api/v1/tasks/${id}`, { method: "DELETE" })
-      setTasks((prev) => prev.filter((t) => t.id !== id))
+      setTasksAndCache((prev) => prev.filter((t) => t.id !== id))
       return true
     } catch (err) {
       const message =
@@ -262,7 +295,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           `/api/v1/tasks/${taskId}/comments`,
           { method: "POST", body: JSON.stringify({ body }) }
         )
-        setTasks((prev) =>
+        setTasksAndCache((prev) =>
           prev.map((t) =>
             t.id === taskId
               ? { ...t, comments: [...(t.comments ?? []), comment] }
@@ -286,7 +319,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         await apiClient(`/api/v1/tasks/${taskId}/comments/${commentId}`, {
           method: "DELETE",
         })
-        setTasks((prev) =>
+        setTasksAndCache((prev) =>
           prev.map((t) =>
             t.id === taskId
               ? {
@@ -320,7 +353,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           `/api/v1/tasks/${taskId}/comments/${commentId}/replies`,
           { method: "POST", body: JSON.stringify({ body }) }
         )
-        setTasks((prev) =>
+        setTasksAndCache((prev) =>
           prev.map((t) => {
             if (t.id !== taskId) return t
             return {
@@ -353,7 +386,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           `/api/v1/tasks/${taskId}/subtasks`,
           { method: "POST", body: JSON.stringify({ title }) }
         )
-        setTasks((prev) =>
+        setTasksAndCache((prev) =>
           prev.map((t) =>
             t.id === taskId
               ? { ...t, sub_tasks: [...(t.sub_tasks ?? []), subtask] }
@@ -382,7 +415,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
           `/api/v1/tasks/${taskId}/subtasks/${subtaskId}`,
           { method: "PATCH", body: JSON.stringify(data) }
         )
-        setTasks((prev) =>
+        setTasksAndCache((prev) =>
           prev.map((t) =>
             t.id === taskId
               ? {
@@ -411,7 +444,7 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         await apiClient(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, {
           method: "DELETE",
         })
-        setTasks((prev) =>
+        setTasksAndCache((prev) =>
           prev.map((t) =>
             t.id === taskId
               ? {

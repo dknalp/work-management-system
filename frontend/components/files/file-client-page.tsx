@@ -5,11 +5,12 @@
  * - Loading/error/not-found state for the current directory listing
  * - View mode (list vs. grid) persisted to localStorage
  * - Quota display
- * - Google Drive import trigger (opens the picker, then hands off to
- *   DriveImportDialog for all import logic and progress display)
  *
  * Does NOT own: file CRUD operations (those live inside FileExplorer and
- * its sub-components), or the import SSE stream (that lives in DriveImportDialog).
+ * its sub-components).
+ *
+ * Note: Google Drive import is not available in this release — the OAuth
+ * flow has not been implemented yet.
  */
 
 "use client"
@@ -17,17 +18,15 @@
 import * as React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AlertCircleIcon, FolderXIcon, RefreshCwIcon } from "lucide-react"
-import { LayoutListIcon, LayoutGridIcon, HardDriveDownloadIcon } from "lucide-react"
+import { LayoutListIcon, LayoutGridIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { FileItem } from "@/components/files/file-utils"
 import { fileRecordToItem } from "@/components/files/file-utils"
 import { FileExplorer } from "@/components/files/file-explorer"
 import { TrashView } from "@/components/files/trash-view"
-import { DriveImportDialog } from "@/components/files/drive-import-dialog"
 import { listFiles, listStarred, listRecent, getQuota } from "@/lib/actions/files"
 import { useLocalStorage } from "@/hooks/use-local-storage"
-import { useDrivePicker } from "@/hooks/use-drive-picker"
 
 interface FileClientPageProps {
   initialItems: FileItem[]
@@ -51,13 +50,8 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   const [quota, setQuota] = React.useState<{ used_bytes: number; file_count: number } | null>(null)
 
   // Drive import dialog state — set after the Picker resolves, cleared on complete/close
-  const [driveDialogOpen, setDriveDialogOpen] = React.useState(false)
-  const [drivePickerResult, setDrivePickerResult] = React.useState<{
-    items: Array<{ fileId: string; name: string; isFolder: boolean }>
-    accessToken: string
-  } | null>(null)
+ | null>(null)
 
-  const { openPicker } = useDrivePicker()
 
   // Load quota once on mount
   React.useEffect(() => {
@@ -134,32 +128,6 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   // Google Drive import
   // ------------------------------------------------------------------
 
-  /**
-   * Opens the Google Drive Picker. Once the user confirms a selection
-   * the result is stored and the DriveImportDialog is opened to handle
-   * all import logic and show real-time SSE progress.
-   */
-  const handleDriveImport = React.useCallback(async () => {
-    try {
-      const result = await openPicker()
-      if (!result || result.items.length === 0) return
-
-      setDrivePickerResult({
-        items: result.items.map((item) => ({
-          fileId: item.fileId,
-          name: item.fileName,
-          isFolder: item.isFolder,
-        })),
-        accessToken: result.accessToken,
-      })
-      setDriveDialogOpen(true)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Google Drive açılamadı"
-      // Surface picker errors (e.g. missing env vars) as a console warning.
-      // The picker itself shows its own UI for auth failures.
-      console.warn("Drive picker error:", message)
-    }
-  }, [openPicker])
 
   // ------------------------------------------------------------------
   // Loading skeleton
@@ -271,15 +239,7 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Drive import trigger — all progress is shown inside DriveImportDialog */}
-          <button
-            onClick={() => void handleDriveImport()}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Google Drive'dan dosya içe aktar"
-          >
-            <HardDriveDownloadIcon className="size-3.5" />
-            <span>{"Drive'dan İçe Aktar"}</span>
-          </button>
+          {/* Drive import is not available in this release — OAuth flow not yet implemented */}
 
           {quota && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -311,20 +271,7 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
         )}
       </div>
 
-      {/* Drive import progress dialog — mounts only while a picker result is pending */}
-      {drivePickerResult && (
-        <DriveImportDialog
-          open={driveDialogOpen}
-          onOpenChange={setDriveDialogOpen}
-          items={drivePickerResult.items}
-          accessToken={drivePickerResult.accessToken}
-          parentPath={currentPath}
-          onComplete={() => {
-            load()
-            setDrivePickerResult(null)
-          }}
-        />
-      )}
+      {/* Drive import dialog removed — not available in this release */}
     </div>
   )
 }

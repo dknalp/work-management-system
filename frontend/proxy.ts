@@ -61,6 +61,17 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+  // Gate /admin routes on the is_admin cookie.
+  // The cookie is set by client-side JS and is NOT a security trust boundary —
+  // all admin API endpoints enforce RBAC server-side.  This redirect exists to
+  // prevent non-admin users from seeing the admin UI at all (UX + defence-in-depth).
+  if (pathname.startsWith("/admin") && hasSession) {
+    const isAdmin = req.cookies.get("is_admin")?.value === "1"
+    if (!isAdmin) {
+      return NextResponse.redirect(new URL("/home", req.url))
+    }
+  }
+
   // Redirect already-authenticated users away from auth pages.
   if (isAuthRoute && hasSession) {
     const url = req.nextUrl.clone()

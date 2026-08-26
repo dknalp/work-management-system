@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { Pipeline } from "@/types/pipeline"
 import { apiClient } from "@/lib/api"
+import { cacheGet, cacheSet } from "@/lib/query-cache"
 import { useAuth } from "./auth-context"
 
 type ApiPipeline = {
@@ -35,22 +36,27 @@ const PipelineContext = createContext<PipelineContextValue | null>(null)
 
 export function PipelineProvider({ children }: { children: React.ReactNode }) {
   const { loading: authLoading } = useAuth()
-  const [pipelines, setPipelines] = useState<Pipeline[]>([])
-  const [loading, setLoading] = useState(true)
+  const [pipelines, setPipelines] = useState<Pipeline[]>(
+    () => cacheGet<Pipeline[]>("pipelines") ?? []
+  )
+  const [loading, setLoading] = useState(() => cacheGet<Pipeline[]>("pipelines") === null)
   const pipelinesRef = useRef<Pipeline[]>([])
 
   useEffect(() => {
     pipelinesRef.current = pipelines
   }, [pipelines])
 
-  const fetchPipelines = useCallback(async () => {
+  const fetchPipelines = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const data = await apiClient<ApiPipeline[]>("/pipelines")
-      setPipelines(data.map(fromApi))
+      const pipelines = data.map(fromApi)
+      setPipelines(pipelines)
+      cacheSet("pipelines", pipelines)
     } catch {
       // keep previous state on error
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -58,7 +64,9 @@ export function PipelineProvider({ children }: { children: React.ReactNode }) {
   // where the token is not yet stored when the context first mounts.
   useEffect(() => {
     if (authLoading) return
-    fetchPipelines()
+    const hasCached = cacheGet<Pipeline[]>("pipelines") !== null
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchPipelines(hasCached)
   }, [authLoading, fetchPipelines])
 
   const createPipeline = useCallback(async (projectId: string, name: string): Promise<Pipeline> => {

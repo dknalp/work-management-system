@@ -4,7 +4,10 @@ Handles: list directory, upload file, create folder, download, rename,
 move, copy, delete, star, patch metadata, quota, and recent files.
 """
 
+import io
+import logging
 import secrets
+import shutil
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -15,6 +18,7 @@ from firebase_admin import firestore
 
 from app.deps import Actor, get_current_actor, get_current_user
 from app.firebase import get_db
+from app.main import UPLOAD_SEMAPHORE
 from app.models import User
 from app.r2 import (
     r2_copy_object,
@@ -22,6 +26,23 @@ from app.r2 import (
     r2_generate_presigned_url,
     r2_upload_fileobj,
 )
+logger = logging.getLogger(__name__)
+
+# Maximum file size accepted by the upload endpoint.
+# Requests that exceed this are rejected before the semaphore is acquired.
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
+
+# MIME types that must never be accepted because a browser may execute them
+# when served back (e.g. via a share link or direct download).
+BLOCKED_MIME_TYPES = frozenset({
+    "text/html",
+    "application/javascript",
+    "application/x-javascript",
+    "application/x-httpd-php",
+    "application/x-sh",
+    "application/x-perl",
+})
+
 from app.routers.v1.files_utils import (
     CopyBody,
     FileRecordResponse,
@@ -99,7 +120,7 @@ async def upload_file(
     data = {
         "owner_id": current_user.id,
         "name": filename,
-        "path": path,
+        "path": virtual_path,
         "parent_path": parent_path,
         "type": "file",
         "size": size,
@@ -156,7 +177,7 @@ async def download_file(
 ):
     """Download a file (attachment disposition)."""
     fid, data = _get_record_or_404(file_id, db)
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     if data.get("type") == "folder":
         raise HTTPException(status_code=400, detail="Cannot download a folder directly.")
     r2_key = data.get("r2_key")
@@ -213,7 +234,7 @@ def rename_file(
 ) -> FileRecordResponse:
     """Rename a file or folder (updates paths of descendants for folders)."""
     fid, data = _get_record_or_404(file_id, db)
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     old_path = data["path"]
     parent_path = data["parent_path"]
     new_path = _build_path(parent_path, body.name)
@@ -298,8 +319,14 @@ async def delete_file_permanently(
 ) -> None:
     """Permanently delete a file and its storage object."""
     fid, data = _get_record_or_404(file_id, db)
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     r2_key = data.get("r2_key")
+
+    # Delete the Firestore record first — this is the authoritative signal
+    # that the file is gone.  Storage cleanup is best-effort: an orphaned
+    # object (bytes wasted) is always preferable to a missing record
+    # (user sees a broken file they can never remove).
+    db.collection("file_records").document(fid).delete()
 
     if r2_key:
         try:
@@ -309,10 +336,10 @@ async def delete_file_permanently(
                 local = _local_path(r2_key)
                 if local.exists():
                     local.unlink()
-        except Exception:
-            pass  # Best-effort cleanup — delete the metadata regardless
-
-    db.collection("file_records").document(fid).delete()
+        except Exception as err:
+            logger.warning(
+                "[files] delete_file: storage cleanup failed for %s: %s", fid, err
+            )
 
 
 @router.post("/star/{file_id}", response_model=FileRecordResponse)
@@ -408,7 +435,7 @@ def patch_file(
 ) -> FileRecordResponse:
     """Partially update file metadata (color, icon_emoji, is_starred)."""
     fid, data = _get_record_or_404(file_id, db)
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     allowed = {"is_starred", "color", "icon_emoji"}
     updates = {k: v for k, v in body.items() if k in allowed}
     updates["updated_at"] = _now()
@@ -430,5 +457,5 @@ def _log_access(file_id: str, user_id: str, action: str, db: firestore.Client) -
             "action": action,
             "accessed_at": _now(),
         })
-    except Exception:
-        pass
+    except Exception as err:
+        logger.warning("[files] _log_access failed for file %s user %s: %s", file_id, user_id, err)

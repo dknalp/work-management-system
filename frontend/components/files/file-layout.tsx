@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -96,6 +96,7 @@ function formatSize(bytes: number): string {
 
 function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { pinned, unpin } = usePinnedFolders()
   const [driveConnected, setDriveConnected] = React.useState(false)
   const [order, setOrder] = useLocalStorage<string[]>("wms:files:sidebar-order", DEFAULT_SIDEBAR_ORDER)
@@ -110,6 +111,7 @@ function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
 
   React.useEffect(() => {
     // TODO: yeni storage sistemi bağlandığında Drive bağlantısı kontrol edilecek
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDriveConnected(false)
     fetchQuota()
 
@@ -163,7 +165,7 @@ function FileSidebar({ currentPath: _currentPath }: FileSidebarProps) {
       )
     }
     if (id === "disk") {
-      const diskActive = !!pathname && (pathname === "/files" || pathname.startsWith("/files/")) && !driveActive && new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("source") === "disk"
+      const diskActive = !!pathname && (pathname === "/files" || pathname.startsWith("/files/")) && !driveActive && searchParams.get("source") === "disk"
       return (
         <SortableNavItem key="disk" id="disk">
           <Link

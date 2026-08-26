@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
+import { cacheGet, cacheSet } from "@/lib/query-cache"
 import { useAuth } from "./auth-context"
 
 export type TeamMember = {
@@ -52,17 +53,22 @@ const TeamContext = createContext<TeamContextValue | null>(null)
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
   const { loading: authLoading } = useAuth()
-  const [members, setMembers] = useState<TeamMember[]>([])
-  const [loading, setLoading] = useState(true)
+  const [members, setMembers] = useState<TeamMember[]>(
+    () => cacheGet<TeamMember[]>("team") ?? []
+  )
+  const [loading, setLoading] = useState(() => cacheGet<TeamMember[]>("team") === null)
 
-  const fetchMembers = useCallback(async () => {
+  const fetchMembers = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const data = await apiClient<ApiMember[]>("/api/v1/team/members")
-      setMembers(data.map(fromApi))
+      const members = data.map(fromApi)
+      setMembers(members)
+      cacheSet("team", members)
     } catch {
       // keep previous state on error
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -70,7 +76,9 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   // where the token is not yet stored when the context first mounts.
   useEffect(() => {
     if (authLoading) return
-    fetchMembers()
+    const hasCached = cacheGet<TeamMember[]>("team") !== null
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchMembers(hasCached)
   }, [authLoading, fetchMembers])
 
   const addMember = useCallback(

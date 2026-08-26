@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api"
+import { cacheGet, cacheSet } from "@/lib/query-cache"
 import { useAuth } from "./auth-context"
 
 export type CalendarEvent = {
@@ -53,17 +54,22 @@ const CalendarContext = createContext<CalendarContextValue | null>(null)
 
 export function CalendarProvider({ children }: { children: React.ReactNode }) {
   const { loading: authLoading } = useAuth()
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
+  const [events, setEvents] = useState<CalendarEvent[]>(
+    () => cacheGet<CalendarEvent[]>("calendar") ?? []
+  )
+  const [loading, setLoading] = useState(() => cacheGet<CalendarEvent[]>("calendar") === null)
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const data = await apiClient<ApiEvent[]>("/calendar")
-      setEvents(data.map(fromApi))
+      const events = data.map(fromApi)
+      setEvents(events)
+      cacheSet("calendar", events)
     } catch {
       // keep previous state on error
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -71,7 +77,9 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
   // where the token is not yet stored when the context first mounts.
   useEffect(() => {
     if (authLoading) return
-    fetchEvents()
+    const hasCached = cacheGet<CalendarEvent[]>("calendar") !== null
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchEvents(hasCached)
   }, [authLoading, fetchEvents])
 
   const addEvent = useCallback(async (event: Omit<CalendarEvent, "createdAt">) => {

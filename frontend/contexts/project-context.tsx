@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { Project, ProjectColor } from "@/types/project"
 import { apiClient } from "@/lib/api"
+import { cacheGet, cacheSet } from "@/lib/query-cache"
 import { useAuth } from "./auth-context"
 
 type ApiProject = {
@@ -57,18 +58,23 @@ function slugify(name: string): string {
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const { loading: authLoading } = useAuth()
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
+  const [projects, setProjects] = useState<Project[]>(
+    () => cacheGet<Project[]>("projects") ?? []
+  )
+  const [loading, setLoading] = useState(() => cacheGet<Project[]>("projects") === null)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const fetchProjects = useCallback(async () => {
+  const fetchProjects = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const data = await apiClient<ApiProject[]>("/projects")
-      setProjects(data.map(fromApi))
+      const projects = data.map(fromApi)
+      setProjects(projects)
+      cacheSet("projects", projects)
     } catch {
       // keep previous state on error
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -76,7 +82,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   // where the token is not yet stored when the context first mounts.
   useEffect(() => {
     if (authLoading) return
-    fetchProjects()
+    const hasCached = cacheGet<Project[]>("projects") !== null
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchProjects(hasCached)
   }, [authLoading, fetchProjects])
 
   const createProject = useCallback(async (name: string, emoji: string, color: ProjectColor): Promise<Project> => {

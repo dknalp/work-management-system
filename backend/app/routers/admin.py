@@ -1,3 +1,4 @@
+import logging
 """Admin router — user management for admin actors.
 
 Only users with ``is_admin=True`` or ``role='admin'`` may call these endpoints.
@@ -13,6 +14,8 @@ from ..deps import get_current_user, evict_user_cache, clear_permission_cache
 from ..firebase import get_db
 from ..models import User
 from ..schemas import AdminUserUpdate, RegisterRequest, UserResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -129,6 +132,21 @@ def toggle_active(
     data = doc.to_dict() or {}
     new_active = not data.get("is_active", True)
     doc_ref.update({"is_active": new_active, "updated_at": datetime.now(timezone.utc)})
+
+    # Sync the Firebase Auth account's disabled flag so that existing tokens
+    # belonging to a deactivated user are rejected at the Auth layer before
+    # they reach our Firestore is_active check.  Best-effort: Firestore is
+    # already updated above, so a failure here only means the Firebase Auth
+    # token keeps working until it expires (~1 h), after which the Firestore
+    # check will still block the user.
+    try:
+        fb_auth.update_user(user_id, disabled=not new_active)
+    except Exception as err:
+        logger.warning(
+            "[admin] toggle_active: Firebase Auth sync failed for user %s: %s",
+            user_id,
+            err,
+        )
 
     data["is_active"] = new_active
     return _doc_to_user_response(user_id, data)

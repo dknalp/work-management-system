@@ -16,6 +16,7 @@ FRONTEND_URL
     Allowed CORS origin (default: http://localhost:3000)
 """
 
+import asyncio
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -23,6 +24,18 @@ from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Upload concurrency semaphore
+# ---------------------------------------------------------------------------
+
+# Limits the number of file uploads that may buffer data in memory at the
+# same time.  With 2 uvicorn workers and a 2 GB max upload size the worst
+# case without a semaphore is 2 × 2 GB = 4 GB resident per worker.
+# Setting the cap to 2 means at most 2 uploads are active per process; every
+# additional upload request queues inside FastAPI's async event loop and
+# proceeds as a slot frees — no request is rejected, it just waits.
+UPLOAD_SEMAPHORE = asyncio.Semaphore(2)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

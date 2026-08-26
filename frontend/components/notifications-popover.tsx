@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { BellIcon, CheckCheckIcon, MessageCircleIcon, ListTodoIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -14,17 +14,14 @@ import { tr } from "date-fns/locale"
 export function NotificationsPopover() {
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
   const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative size-9">
           <BellIcon className="size-4" />
-          {mounted && unreadCount > 0 && (
-            <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none ring-2 ring-background">
+          {unreadCount > 0 && (
+            <span suppressHydrationWarning className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none ring-2 ring-background">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -36,13 +33,13 @@ export function NotificationsPopover() {
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">Bildirimler</h3>
-            {mounted && unreadCount > 0 && (
-              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-bold">
+            {unreadCount > 0 && (
+              <Badge suppressHydrationWarning variant="secondary" className="h-5 px-1.5 text-[10px] font-bold">
                 {unreadCount}
               </Badge>
             )}
           </div>
-          {mounted && unreadCount > 0 && (
+          {unreadCount > 0 && (
             <Button
               variant="ghost" size="sm"
               className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"

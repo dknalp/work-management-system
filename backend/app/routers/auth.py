@@ -1,3 +1,4 @@
+import logging
 """Authentication router.
 
 Handles user registration and password management via Firebase Authentication.
@@ -27,6 +28,8 @@ from ..schemas import (
     UpdateProfileRequest,
     UserResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
 
@@ -70,7 +73,31 @@ def register(
         "created_at": now,
         "updated_at": None,
     }
-    db.collection("users").document(fb_user.uid).set(user_data)
+    uid = fb_user.uid
+    try:
+        db.collection("users").document(uid).set(user_data)
+    except Exception as firestore_err:
+        # Firestore write failed — try to roll back the Firebase Auth account
+        # so the user is not left with credentials they can never use.
+        logger.error(
+            "[auth] Firestore write failed during registration for uid=%s: %s. "
+            "Attempting Firebase Auth rollback.",
+            uid,
+            firestore_err,
+        )
+        try:
+            fb_auth.delete_user(uid)
+        except Exception as rollback_err:
+            logger.error(
+                "[auth] Firebase Auth rollback FAILED for uid=%s: %s. "
+                "Orphaned Firebase account requires manual cleanup.",
+                uid,
+                rollback_err,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed due to a server error. Please try again.",
+        )
 
     return UserResponse(
         id=fb_user.uid,

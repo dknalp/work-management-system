@@ -35,12 +35,43 @@ function getMockPermissionsForRole(role: string): Permission[] {
   return DEFAULT_ROLE_PERMISSIONS[sysRole] ?? []
 }
 
+/**
+ * Derive optimistic permissions from a role string using the static default
+ * table. Used to seed the context before the backend responds so the sidebar
+ * renders immediately without waiting for the /permissions/my round-trip.
+ */
+function getOptimisticPermissions(role: string | undefined, isAdmin: boolean | undefined): Permission[] {
+  if (isAdmin) return DEFAULT_ROLE_PERMISSIONS["admin"] ?? []
+  const sysRole = SYSTEM_ROLES.includes(role as (typeof SYSTEM_ROLES)[number])
+    ? (role as (typeof SYSTEM_ROLES)[number])
+    : "member"
+  return DEFAULT_ROLE_PERMISSIONS[sysRole] ?? []
+}
+
 export function PermissionsProvider({ children }: { children: React.ReactNode }) {
   // `authPermissions` is pre-fetched in parallel with the user profile by
   // AuthProvider, so when it is non-null we skip the redundant API call.
-  const { user, permissions: authPermissions } = useAuth()
+  const { user, loading: authLoading, permissions: authPermissions } = useAuth()
+
+  // Always start empty to match server-rendered HTML (user is always null on
+  // the server). The optimistic-seeding effect below runs immediately after
+  // hydration and fills in role-derived permissions before the backend responds,
+  // so the sidebar renders with full nav items on the first client paint.
   const [permissions, setPermissions] = useState<Permission[]>([])
-  const [loading, setLoading] = useState(!MOCK_AUTH)
+  const [loading, setLoading] = useState(false)
+
+  // When auth resolves and we have a user, immediately apply optimistic
+  // permissions derived from role — no network call needed for this step.
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPermissions([])
+      return
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPermissions(getOptimisticPermissions(user.role, user.is_admin))
+  }, [authLoading, user?.id, user?.role, user?.is_admin])
 
   const fetchPermissions = useCallback(async () => {
     if (!user) {
@@ -64,20 +95,27 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
       return
     }
 
+    // Silently confirm permissions from backend — UI is already showing
+    // optimistic values so no loading spinner is needed.
     try {
       const data = await apiClient<{ permissions: string[] }>("/permissions/my")
       setPermissions((data.permissions ?? []) as Permission[])
     } catch {
-      setPermissions([])
+      // Keep the optimistic role-derived permissions on error.
     } finally {
       setLoading(false)
     }
-  }, [user, authPermissions])
+  // Depend on user?.id + user?.role (primitive strings) rather than the full
+  // user object so Firebase token refreshes — which create a new object reference
+  // but don't change identity or role — do not trigger a permissions re-fetch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role, user?.is_admin, authPermissions])
 
   useEffect(() => {
-    if (!MOCK_AUTH) setLoading(true)
+    if (authLoading) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPermissions()
-  }, [fetchPermissions])
+  }, [authLoading, fetchPermissions])
 
   return (
     <PermissionsContext.Provider value={{ permissions, loading, refresh: fetchPermissions }}>

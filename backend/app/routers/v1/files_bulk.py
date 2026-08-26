@@ -36,7 +36,7 @@ def bulk_move(
     for fid in body.ids:
         try:
             _, data = _get_record_or_404(fid, db)
-            if data.get("owner_id") != current_user.id:
+            if not current_user.is_admin and data.get("owner_id") != current_user.id:
                 failed.append(fid)
                 continue
             new_path = _build_path(body.dest_parent, data["name"])
@@ -62,7 +62,7 @@ async def bulk_copy(
     for fid in body.ids:
         try:
             _, data = _get_record_or_404(fid, db)
-            if data.get("owner_id") != current_user.id:
+            if not current_user.is_admin and data.get("owner_id") != current_user.id:
                 failed.append(fid)
                 continue
             new_id = str(uuid.uuid4())
@@ -110,7 +110,7 @@ def bulk_trash(
     for fid in body.ids:
         try:
             _, data = _get_record_or_404(fid, db)
-            if data.get("owner_id") != current_user.id:
+            if not current_user.is_admin and data.get("owner_id") != current_user.id:
                 failed.append(fid)
                 continue
             db.collection("file_records").document(fid).update({

@@ -36,6 +36,7 @@ import {
 import { firebaseAuth } from "@/lib/firebase"
 import { tokenStorage } from "@/lib/auth"
 import { apiClient } from "@/lib/api"
+import { cacheInvalidateAll } from "@/lib/query-cache"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -264,6 +265,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ── logout ────────────────────────────────────────────────────────────────
 
   const logout = useCallback(async () => {
+    // Clear the session cache so the next login gets fresh data rather than
+    // seeing the previous user's tasks, projects, etc.
+    cacheInvalidateAll()
+
     if (MOCK_AUTH) {
       localStorage.removeItem(MOCK_USER_KEY)
       setUser(null)
