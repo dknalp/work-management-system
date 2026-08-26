@@ -64,40 +64,48 @@ def initialize_firebase() -> None:
                 f"Underlying error: {exc}"
             ) from exc
 
-    # Path to a JSON key file
+    # Detect format: JSON string, base64-encoded JSON, or file path.
+    # Order matters:
+    #   1. Starts with '{' → inline JSON (handled below)
+    #   2. Doesn't start with '{' and looks like a path (short, has / or .json) → file
+    #   3. Anything else that doesn't start with '{' → try base64 decode
     if not raw.startswith("{"):
-        path = Path(raw)
-        logger.info("Loading Firebase credentials from file: %s", path)
-        if not path.exists():
-            raise RuntimeError(
-                f"FIREBASE_SERVICE_ACCOUNT_JSON points to a file that does not exist: {path}"
-            )
-        try:
-            cred = credentials.Certificate(str(path))
-            firebase_admin.initialize_app(cred)
-            logger.info("Firebase initialized from key file: %s", path)
-            return
-        except Exception as exc:
-            raise RuntimeError(
-                f"Firebase initialization failed loading key file '{path}': {exc}"
-            ) from exc
-
-    # Base64-encoded JSON (preferred for env panels that mangle multi-line values)
-    # Detected when the value doesn't start with '{' — base64 never starts with '{'.
-    if not raw.strip().startswith("{"):
-        logger.info("Attempting to decode FIREBASE_SERVICE_ACCOUNT_JSON as base64")
-        try:
-            raw = base64.b64decode(raw.strip()).decode("utf-8")
-            logger.info("Successfully decoded base64 Firebase credentials")
-        except Exception as exc:
-            raise RuntimeError(
-                "FIREBASE_SERVICE_ACCOUNT_JSON does not look like a file path, "
-                "valid JSON, or valid base64. Please set it to either:\n"
-                "  1. A file path to the service account JSON\n"
-                "  2. The raw JSON content (starting with '{')\n"
-                "  3. The base64-encoded JSON (run: base64 -w0 firebase-service-account.json)\n"
-                f"Decode error: {exc}"
-            ) from exc
+        # Heuristic: a file path is short and contains path separators or .json
+        looks_like_path = (
+            len(raw) < 512
+            and ("/" in raw or raw.endswith(".json"))
+        )
+        if looks_like_path:
+            path = Path(raw)
+            logger.info("Loading Firebase credentials from file: %s", path)
+            if not path.exists():
+                raise RuntimeError(
+                    f"FIREBASE_SERVICE_ACCOUNT_JSON points to a file that does not exist: {path}"
+                )
+            try:
+                cred = credentials.Certificate(str(path))
+                firebase_admin.initialize_app(cred)
+                logger.info("Firebase initialized from key file: %s", path)
+                return
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Firebase initialization failed loading key file '{path}': {exc}"
+                ) from exc
+        else:
+            # Base64-encoded JSON (safe for env panels that mangle multi-line values)
+            logger.info("Attempting to decode FIREBASE_SERVICE_ACCOUNT_JSON as base64")
+            try:
+                raw = base64.b64decode(raw.strip()).decode("utf-8")
+                logger.info("Successfully decoded base64 Firebase credentials")
+            except Exception as exc:
+                raise RuntimeError(
+                    "FIREBASE_SERVICE_ACCOUNT_JSON does not look like a file path, "
+                    "valid JSON, or valid base64. Please set it to either:\n"
+                    "  1. A file path to the service account JSON\n"
+                    "  2. The raw JSON content (starting with '{')\n"
+                    "  3. The base64-encoded JSON (run: base64 -w0 firebase-service-account.json)\n"
+                    f"Decode error: {exc}"
+                ) from exc
 
     # Inline JSON string
     logger.info("Loading Firebase credentials from inline JSON string")
