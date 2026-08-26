@@ -34,7 +34,8 @@ const nextConfig = {
             destination: `${backendUrl}/${prefix}/:path*`,
         }))
         return [
-            { source: "/api/:path*", destination: `${backendUrl}/:path*` },
+            // /api/v1/me → backend:3052/api/v1/me (preserve the /api prefix)
+            { source: "/api/:path*", destination: `${backendUrl}/api/:path*` },
             ...legacyRewrites,
         ]
     },
