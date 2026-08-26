@@ -132,6 +132,10 @@ export default function TeamPage() {
 
   async function handleConfirmDeleteAgent() {
     if (!deletingAgent || deleteConfirmInput !== deletingAgent.name) return
+    if (MOCK_AUTH) {
+      toast.error("Ajan silmek için gerçek kimlik doğrulama gerekli.")
+      return
+    }
     setIsDeletingAgent(true)
     try {
       await apiClient.delete(`/api/v1/agents/${deletingAgent.id}`)
