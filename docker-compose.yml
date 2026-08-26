@@ -26,7 +26,12 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3052}
+        # NEXT_PUBLIC_* vars are baked into the JS bundle at build time.
+        # The browser never talks to the backend directly — all API calls go
+        # through Next.js rewrites (/api/* and legacy prefixes → backend:3052).
+        # So NEXT_PUBLIC_API_URL is intentionally left empty here; the
+        # api client defaults to "" which means relative URLs that Next.js proxies.
+        NEXT_PUBLIC_API_URL: ""
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
         NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: ${NEXT_PUBLIC_GOOGLE_PICKER_API_KEY:-}
         NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
@@ -36,6 +41,8 @@ services:
       - backend
     environment:
       NEXT_PUBLIC_MOCK_AUTH: "false"
+      # Internal URL used by Next.js rewrites to reach the backend container
+      BACKEND_INTERNAL_URL: http://backend:3052
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}

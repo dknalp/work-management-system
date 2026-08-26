@@ -19,7 +19,9 @@
 import { tokenStorage } from "./auth"
 import { firebaseAuth } from "./firebase"
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3052").replace(/\/+$/, "")
+// Empty string = use relative URLs (Next.js rewrites proxy to backend).
+// Explicit URL = direct calls (local dev without Docker or separate backend domain).
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "")
 
 /**
  * Attempt to force-refresh the Firebase ID token.

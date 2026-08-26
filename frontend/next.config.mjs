@@ -12,6 +12,32 @@ const nextConfig = {
     typescript: {
         ignoreBuildErrors: true,
     },
+    /**
+     * Proxy all backend requests through Next.js so the browser never needs to
+     * know the backend's internal address.  In production (Dokploy), the
+     * frontend and backend run as separate containers in the same compose network.
+     * BACKEND_INTERNAL_URL defaults to http://backend:3052 (compose service name).
+     */
+    async rewrites() {
+        const backendUrl =
+            process.env.BACKEND_INTERNAL_URL ?? "http://backend:3052"
+        // Proxy both the /api/* routes (v1 + new) and all legacy backend routes
+        // that don't carry the /api prefix.  The frontend never exposes these
+        // paths itself, so forwarding them to the backend is safe.
+        const legacyPrefixes = [
+            "auth", "users", "admin", "tasks", "activity", "team",
+            "analytics", "permissions", "projects", "pipelines",
+            "kanban", "calendar", "bots", "webhooks", "presence",
+        ]
+        const legacyRewrites = legacyPrefixes.map((prefix) => ({
+            source: `/${prefix}/:path*`,
+            destination: `${backendUrl}/${prefix}/:path*`,
+        }))
+        return [
+            { source: "/api/:path*", destination: `${backendUrl}/:path*` },
+            ...legacyRewrites,
+        ]
+    },
     async headers() {
         return [
             {
