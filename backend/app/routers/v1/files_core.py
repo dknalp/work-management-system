@@ -18,7 +18,7 @@ from firebase_admin import firestore
 
 from app.deps import Actor, get_current_actor, get_current_user
 from app.firebase import get_db
-from app.main import UPLOAD_SEMAPHORE
+from app.routers.v1.files_utils import UPLOAD_SEMAPHORE
 from app.models import User
 from app.r2 import (
     r2_copy_object,

@@ -266,7 +266,7 @@ export function TrashView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Kalıcı olarak silinsin mi?</AlertDialogTitle>
             <AlertDialogDescription>
-              &quot;{permanentDeleteTarget?.name}&quot; kalıcı olarak silinecek. Bu işlem geri alınamaz.
+              "{permanentDeleteTarget?.name}" kalıcı olarak silinecek. Bu işlem geri alınamaz.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

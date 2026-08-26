@@ -1,10 +1,9 @@
 "use client"
 
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
+
 import React, { useMemo, useState } from "react"
 import Link from "next/link"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
 import { useAuth } from "@/contexts/auth-context"
 import { usePermission } from "@/hooks/use-permission"
 import { AccessDenied } from "@/components/auth/access-denied"
@@ -175,10 +174,9 @@ export default function ActivityLogPage() {
 
   if (loading) return null
   if (!canView) return (
-    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
-      <AppSidebar variant="inset" />
-      <SidebarInset><SiteHeader /><main className="flex flex-1 items-center justify-center"><AccessDenied /></main></SidebarInset>
-    </SidebarProvider>
+    <AppShellDynamic>
+      <main className="flex flex-1 items-center justify-center"><AccessDenied /></main>
+    </AppShellDynamic>
   )
 
   const selectedPersonName = selectedUser === "all"
@@ -186,10 +184,7 @@ export default function ActivityLogPage() {
     : persons.find((p) => p.name === selectedUser)?.name ?? selectedUser
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col h-[calc(100vh-3.5rem)]">
 
           {/* Top bar */}
@@ -374,8 +369,7 @@ export default function ActivityLogPage() {
           </div>
 
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      </AppShellDynamic>
   )
 }
 

@@ -1,9 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
 import { TaskTable } from "@/components/tasks/task-table"
 import { Task } from "@/types/task"
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal"
@@ -37,26 +35,13 @@ export default function TasksPage() {
   }
 
   if (!canView) return (
-    <SidebarProvider
-      style={{ "--sidebar-width": "calc(var(--spacing) * 64)", "--header-height": "calc(var(--spacing) * 14)" } as React.CSSProperties}
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset><SiteHeader /><main className="flex flex-1 items-center justify-center"><AccessDenied /></main></SidebarInset>
-    </SidebarProvider>
+    <AppShellDynamic>
+      <main className="flex flex-1 items-center justify-center"><AccessDenied /></main>
+    </AppShellDynamic>
   )
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 64)",
-          "--header-height": "calc(var(--spacing) * 14)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col overflow-auto bg-background">
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10">
             <div className="mb-6">
@@ -75,7 +60,6 @@ export default function TasksPage() {
             />
           </div>
         </main>
-      </SidebarInset>
       <TaskDetailModal
         task={selectedTask}
         open={selectedTask !== null}
@@ -87,6 +71,6 @@ export default function TasksPage() {
           setSelectedTask(updated)
         }}
       />
-    </SidebarProvider>
+    </AppShellDynamic>
   )
 }

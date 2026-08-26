@@ -138,7 +138,7 @@ export function ExpenseBudgetChart({ budgets }: Props) {
         </span>
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-sm bg-amber-500 inline-block" />
-          Uyarı (&gt;%80)
+          Uyarı ({'>'}%80)
         </span>
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-sm bg-red-500 inline-block" />

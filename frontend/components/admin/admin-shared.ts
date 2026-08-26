@@ -114,50 +114,59 @@ export async function regenerateBotKey(botId: string): Promise<Bot> {
 }
 
 // ---------------------------------------------------------------------------
-// Google Drive connection — not yet implemented on the backend
+// Google Drive connection — not available in this release
 // ---------------------------------------------------------------------------
 
-/** @throws Will throw until the backend Drive status endpoint is implemented. */
-export async function getDriveConnectionStatus(): Promise<{ connected: boolean }> {
-  throw new Error(
-    "Drive connection status endpoint not yet implemented. " +
-      "Add GET /api/v1/files/drive/status to the backend."
-  )
+/** Shape returned by getDriveConnectionStatus. */
+export interface DriveConnectionStatus {
+  connected: boolean
+  /** Email of the connected Google account (only present when connected). */
+  email?: string
+  /** ISO timestamp when the account was connected (only present when connected). */
+  connectedAt?: string
 }
 
-/** @throws Will throw until the backend Drive OAuth endpoint is implemented. */
-export async function getConnectDriveUrl(): Promise<{ url: string }> {
-  throw new Error(
-    "Drive OAuth URL endpoint not yet implemented. " +
-      "Add GET /api/v1/files/drive/connect to the backend."
-  )
+/**
+ * Returns a stub "not connected" state.
+ * Drive OAuth is not implemented yet — the admin UI should display a
+ * "coming soon" notice rather than an error when it calls this.
+ */
+export async function getDriveConnectionStatus(): Promise<DriveConnectionStatus> {
+  return { connected: false }
 }
 
-/** @throws Will throw until the backend Drive disconnect endpoint is implemented. */
+/** Drive OAuth connect URL — not yet implemented. Returns null. */
+export async function getConnectDriveUrl(): Promise<{ url: string } | null> {
+  return null
+}
+
+/** Drive disconnect — no-op until the feature is implemented. */
 export async function disconnectDrive(): Promise<void> {
-  throw new Error(
-    "Drive disconnect endpoint not yet implemented. " +
-      "Add DELETE /api/v1/files/drive/connection to the backend."
-  )
+  // Not yet implemented — Drive integration is not available in this release.
 }
 
 // ---------------------------------------------------------------------------
-// Storage configuration — not yet implemented on the backend
+// Storage configuration — reads backend-configured values
 // ---------------------------------------------------------------------------
 
-/** @throws Will throw until the backend storage config endpoint is implemented. */
+/**
+ * Returns the current storage backend in use.
+ * Derives the value from the env variable exposed to the frontend
+ * (NEXT_PUBLIC_STORAGE_BACKEND) so it works without a dedicated endpoint.
+ * Falls back to "local" when the variable is not set.
+ */
 export async function getStorageConfig(): Promise<{ path: string; backend: "local" | "r2" }> {
-  throw new Error(
-    "Storage config endpoint not yet implemented. " +
-      "Add GET /admin/storage/config to the backend."
-  )
+  const backend =
+    (process.env.NEXT_PUBLIC_STORAGE_BACKEND as "local" | "r2" | undefined) ?? "local"
+  const path = process.env.NEXT_PUBLIC_STORAGE_PATH ?? ""
+  return { path, backend }
 }
 
-/** @throws Will throw until the backend storage path endpoint is implemented. */
-export async function updateStoragePath(path: string): Promise<void> {
-  void path
-  throw new Error(
-    "Storage path update endpoint not yet implemented. " +
-      "Add PATCH /admin/storage/config to the backend."
-  )
+/**
+ * Storage path is managed via environment variables on the backend —
+ * it cannot be changed at runtime from the UI in this release.
+ */
+export async function updateStoragePath(_path: string): Promise<void> {
+  // Storage configuration is managed via environment variables.
+  // Runtime changes from the UI are not supported in this release.
 }

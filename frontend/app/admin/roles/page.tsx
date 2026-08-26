@@ -1,20 +1,29 @@
 "use client"
 
+/**
+ * Admin — Role & Permission Management page.
+ *
+ * Displays a permission matrix table (rows = permissions, columns = roles).
+ * Admins can toggle individual permission grants, add custom roles, delete
+ * custom roles, and save all changes back to the backend.
+ */
+
 import React, { useEffect, useState } from "react"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
+import { ShieldIcon, PlusIcon, SaveIcon, Trash2Icon } from "lucide-react"
+import { toast } from "sonner"
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -22,250 +31,176 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { useAuth, MOCK_AUTH } from "@/contexts/auth-context"
-import { usePermission } from "@/hooks/use-permission"
-import { AccessDenied } from "@/components/auth/access-denied"
 import { apiClient } from "@/lib/api"
-import {
-  DEFAULT_ROLE_PERMISSIONS,
-  PERMISSION_LABELS,
-  PERMISSION_GROUPS,
-  type Permission,
-} from "@/lib/permissions"
-import { ShieldIcon, SaveIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
-import { cn } from "@/lib/utils"
 
-type RoleResponse = {
+/** Shape returned by GET /permissions/roles */
+interface RoleEntry {
   name: string
+  permissions: string[]
   is_system: boolean
-  created_at: string
 }
 
+const PERMISSIONS = [
+  { key: "tasks:view",       label: "Görevleri Gör" },
+  { key: "tasks:create",     label: "Görev Oluştur" },
+  { key: "tasks:edit",       label: "Görev Düzenle" },
+  { key: "tasks:delete",     label: "Görev Sil" },
+  { key: "tasks:assign",     label: "Görev Ata" },
+  { key: "board:view",       label: "Panoyu Gör" },
+  { key: "board:edit",       label: "Panoyu Düzenle" },
+  { key: "team:view",        label: "Ekibi Gör" },
+  { key: "team:manage",      label: "Ekibi Yönet" },
+  { key: "analytics:view",   label: "Analitiği Gör" },
+  { key: "files:view",       label: "Dosyaları Gör" },
+  { key: "files:upload",     label: "Dosya Yükle" },
+  { key: "files:delete",     label: "Dosya Sil" },
+  { key: "calendar:view",    label: "Takvimi Gör" },
+  { key: "calendar:edit",    label: "Takvimi Düzenle" },
+  { key: "admin:view",       label: "Yönetici Paneli" },
+]
+
 const SYSTEM_ROLE_LABELS: Record<string, string> = {
-  admin: "Yönetici",
-  manager: "Yetkili",
-  member: "Üye",
+  admin:   "Yönetici",
+  manager: "Yönetici",
+  member:  "Üye",
 }
 
 function getRoleLabel(name: string): string {
   return SYSTEM_ROLE_LABELS[name] ?? name
 }
 
-const MOCK_CUSTOM_ROLES_KEY = "wms:custom_roles"
-
-function getSystemRoles(): RoleResponse[] {
-  return [
-    { name: "admin", is_system: true, created_at: "" },
-    { name: "manager", is_system: true, created_at: "" },
-    { name: "member", is_system: true, created_at: "" },
-  ]
-}
-
-function getAllMockRoles(): RoleResponse[] {
-  if (typeof window === "undefined") return getSystemRoles()
-  try {
-    const raw = localStorage.getItem(MOCK_CUSTOM_ROLES_KEY)
-    const custom: RoleResponse[] = raw ? JSON.parse(raw) : []
-    return [...getSystemRoles(), ...custom]
-  } catch {
-    return getSystemRoles()
-  }
-}
-
-function saveMockCustomRoles(custom: RoleResponse[]) {
-  localStorage.setItem(MOCK_CUSTOM_ROLES_KEY, JSON.stringify(custom))
-}
-
-function isValidSlug(s: string): boolean {
-  return /^[a-z0-9][a-z0-9_-]*$/.test(s)
-}
-
-function useAdminData() {
-  const [roles, setRoles] = useState<RoleResponse[]>([])
-  const [permsMap, setPermsMap] = useState<Record<string, Permission[]>>({})
-  const [loading, setLoading] = useState(true)
-
-  const load = async () => {
-    if (MOCK_AUTH) {
-      const allRoles = getAllMockRoles()
-      setRoles(allRoles)
-      const stored = localStorage.getItem("wms:role_permissions")
-      const map: Record<string, Permission[]> = {}
-      const def = DEFAULT_ROLE_PERMISSIONS as Record<string, Permission[]>
-      for (const role of allRoles) {
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored)
-            map[role.name] = parsed[role.name] ?? def[role.name] ?? []
-          } catch {
-            map[role.name] = def[role.name] ?? []
-          }
-        } else {
-          map[role.name] = def[role.name] ?? []
-        }
-      }
-      setPermsMap(map)
-      setLoading(false)
-      return
-    }
-    try {
-      const [rolesData, permsData] = await Promise.all([
-        apiClient<RoleResponse[]>("/permissions/admin/roles"),
-        apiClient<{ role: string; permissions: string[] }[]>("/permissions/admin/permissions"),
-      ])
-      setRoles(rolesData)
-      const map: Record<string, Permission[]> = {}
-      for (const row of permsData) {
-        map[row.role] = row.permissions as Permission[]
-      }
-      setPermsMap(map)
-    } catch {
-      toast.error("Veriler yüklenemedi")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { load() }, [])
-  return { roles, setRoles, permsMap, setPermsMap, loading, reload: load }
-}
 
 export default function RolesPage() {
-  const canManagePerms = usePermission("admin:manage_permissions")
-  const { user } = useAuth()
-  const { roles, setRoles, permsMap, setPermsMap, loading, reload } = useAdminData()
+  const [roles, setRoles] = useState<RoleEntry[]>([])
+  const [matrix, setMatrix] = useState<Record<string, Record<string, boolean>>>({})
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
+  // New role dialog state
   const [newRoleOpen, setNewRoleOpen] = useState(false)
   const [newRoleName, setNewRoleName] = useState("")
-  const [copyFrom, setCopyFrom] = useState<string>("none")
+  const [copyFrom, setCopyFrom] = useState("none")
   const [creating, setCreating] = useState(false)
 
-  if (!canManagePerms) return <AccessDenied />
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await apiClient.get<RoleEntry[]>("/permissions/roles")
+        setRoles(data)
+        // Build matrix: matrix[roleName][permKey] = boolean
+        const m: Record<string, Record<string, boolean>> = {}
+        for (const role of data) {
+          m[role.name] = {}
+          for (const p of PERMISSIONS) {
+            m[role.name][p.key] = role.permissions.includes(p.key)
+          }
+        }
+        setMatrix(m)
+      } catch {
+        toast.error("İzinler yüklenemedi.")
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
 
-  function togglePermission(role: string, perm: Permission) {
-    setPermsMap((prev) => {
-      const current = prev[role] ?? []
-      const updated = current.includes(perm)
-        ? current.filter((p) => p !== perm)
-        : [...current, perm]
-      return { ...prev, [role]: updated }
-    })
+  function togglePermission(roleName: string, permKey: string) {
+    setMatrix((prev) => ({
+      ...prev,
+      [roleName]: {
+        ...prev[roleName],
+        [permKey]: !prev[roleName]?.[permKey],
+      },
+    }))
   }
 
   async function handleSave() {
     setSaving(true)
     try {
-      if (MOCK_AUTH) {
-        localStorage.setItem("wms:role_permissions", JSON.stringify(permsMap))
-        toast.success("İzinler kaydedildi")
-      } else {
-        await apiClient("/permissions/admin/permissions", {
-          method: "PUT",
-          body: JSON.stringify(
-            Object.entries(permsMap).map(([role, perms]) => ({ role, permissions: perms }))
-          ),
-        })
-        toast.success("İzinler kaydedildi")
+      // Build payload: array of { role, permission, granted }
+      const updates: { role: string; permission: string; granted: boolean }[] = []
+      for (const role of roles) {
+        for (const p of PERMISSIONS) {
+          updates.push({
+            role: role.name,
+            permission: p.key,
+            granted: matrix[role.name]?.[p.key] ?? false,
+          })
+        }
       }
+      await apiClient.post("/permissions/bulk-update", { updates })
+      toast.success("İzinler kaydedildi.")
     } catch {
-      toast.error("Kaydetme başarısız")
+      toast.error("Kaydetme başarısız.")
     } finally {
       setSaving(false)
     }
   }
 
   async function handleCreateRole() {
-    const name = newRoleName.trim().toLowerCase()
-    if (!name || !isValidSlug(name)) {
-      toast.error("Geçersiz rol adı. Küçük harf, rakam, tire veya alt çizgi kullanın.")
-      return
-    }
-    if (roles.some((r) => r.name === name)) {
-      toast.error("Bu isimde bir rol zaten mevcut.")
-      return
-    }
+    const name = newRoleName.trim().toLowerCase().replace(/\s+/g, "_")
+    if (!name) return
     setCreating(true)
     try {
-      const newRole: RoleResponse = { name, is_system: false, created_at: new Date().toISOString() }
-      if (MOCK_AUTH) {
-        const existing = roles.filter((r) => !r.is_system)
-        saveMockCustomRoles([...existing, newRole])
-        const sourcePerms = copyFrom !== "none" ? [...(permsMap[copyFrom] ?? [])] : []
-        setPermsMap((prev) => ({ ...prev, [name]: sourcePerms }))
-        setRoles((prev) => [...prev, newRole])
-      } else {
-        await apiClient("/permissions/admin/roles", {
-          method: "POST",
-          body: JSON.stringify({ name, copy_from: copyFrom !== "none" ? copyFrom : null }),
-        })
-        await reload()
+      await apiClient.post("/permissions/roles", { name, copy_from: copyFrom === "none" ? null : copyFrom })
+      // Reload roles
+      const data = await apiClient.get<RoleEntry[]>("/permissions/roles")
+      setRoles(data)
+      const m: Record<string, Record<string, boolean>> = {}
+      for (const role of data) {
+        m[role.name] = {}
+        for (const p of PERMISSIONS) {
+          m[role.name][p.key] = role.permissions.includes(p.key)
+        }
       }
-      toast.success(`"${name}" rolü oluşturuldu`)
+      setMatrix(m)
+      toast.success(`"${name}" rolü oluşturuldu.`)
       setNewRoleOpen(false)
-      setNewRoleName("")
-      setCopyFrom("none")
     } catch {
-      toast.error("Rol oluşturulamadı")
+      toast.error("Rol oluşturulamadı.")
     } finally {
       setCreating(false)
     }
   }
 
-  async function handleDeleteRole(name: string) {
-    if (!confirm(`"${name}" rolünü silmek istediğinize emin misiniz?`)) return
+  async function handleDeleteRole(roleName: string) {
+    if (!confirm(`"${roleName}" rolünü silmek istediğinizden emin misiniz?`)) return
     try {
-      if (MOCK_AUTH) {
-        const remaining = roles.filter((r) => !r.is_system && r.name !== name)
-        saveMockCustomRoles(remaining)
-        setRoles((prev) => prev.filter((r) => r.name !== name))
-        setPermsMap((prev) => {
-          const next = { ...prev }
-          delete next[name]
-          return next
-        })
-      } else {
-        await apiClient(`/permissions/admin/roles/${name}`, { method: "DELETE" })
-        await reload()
-      }
-      toast.success(`"${name}" rolü silindi`)
+      await apiClient.delete(`/permissions/roles/${roleName}`)
+      setRoles((prev) => prev.filter((r) => r.name !== roleName))
+      setMatrix((prev) => {
+        const next = { ...prev }
+        delete next[roleName]
+        return next
+      })
+      toast.success(`"${roleName}" rolü silindi.`)
     } catch {
-      toast.error("Rol silinemedi")
+      toast.error("Rol silinemedi.")
     }
   }
 
-  const sidebarStyle = {
-    "--sidebar-width": "calc(var(--spacing) * 64)",
-    "--header-height": "calc(var(--spacing) * 14)",
-  } as React.CSSProperties
-
   if (loading) {
     return (
-      <SidebarProvider style={sidebarStyle}>
-        <AppSidebar variant="inset" />
-        <SidebarInset>
-          <SiteHeader />
-          <main className="flex flex-1 items-center justify-center bg-background">
+      <AppShellDynamic>
+          <main className="flex flex-1 items-center justify-center">
             <p className="text-sm text-muted-foreground">Yükleniyor…</p>
           </main>
-        </SidebarInset>
-      </SidebarProvider>
+      </AppShellDynamic>
     )
   }
 
   return (
-    <SidebarProvider style={sidebarStyle}>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col overflow-auto bg-background">
           <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-10 space-y-6">
-            {/* Header */}
+
+            {/* Page header */}
             <div className="flex items-center justify-between">
               <div className="space-y-1">
                 <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
                   <ShieldIcon className="size-6" />
-                  Rol &amp; İzin Yönetimi
+                  Rol & İzin Yönetimi
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Rollere atanmış izinleri düzenleyin veya yeni özel roller oluşturun.
@@ -292,7 +227,7 @@ export default function RolesPage() {
               </div>
             </div>
 
-            {/* Permission Matrix */}
+            {/* Permission matrix table */}
             <div className="overflow-x-auto rounded-xl border border-border/50">
               <table className="w-full text-sm">
                 <thead>
@@ -311,7 +246,7 @@ export default function RolesPage() {
                               className="mt-0.5 text-destructive hover:text-destructive/80 transition-colors"
                               title={`"${role.name}" rolünü sil`}
                             >
-                              <Trash2Icon className="size-3.5" />
+                              <Trash2Icon className="size-3" />
                             </button>
                           )}
                         </div>
@@ -320,76 +255,53 @@ export default function RolesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {PERMISSION_GROUPS.map((group) => (
-                    <React.Fragment key={group.label}>
-                      <tr className="border-b border-border/30 bg-muted/10">
-                        <td
-                          colSpan={roles.length + 1}
-                          className="py-2 pl-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                        >
-                          {group.label}
+                  {PERMISSIONS.map((perm, idx) => (
+                    <tr
+                      key={perm.key}
+                      className={idx % 2 === 0 ? "bg-background" : "bg-muted/10"}
+                    >
+                      <td className="py-3 pl-4 pr-6 font-medium">
+                        <div>
+                          <span>{perm.label}</span>
+                          <span className="ml-2 text-[10px] font-mono text-muted-foreground">
+                            {perm.key}
+                          </span>
+                        </div>
+                      </td>
+                      {roles.map((role) => (
+                        <td key={role.name} className="px-4 py-3 text-center">
+                          <div className="flex justify-center">
+                            <Checkbox
+                              checked={matrix[role.name]?.[perm.key] ?? false}
+                              onCheckedChange={() => togglePermission(role.name, perm.key)}
+                            />
+                          </div>
                         </td>
-                      </tr>
-                      {group.permissions.map((perm) => (
-                        <tr
-                          key={perm}
-                          className="border-b border-border/20 hover:bg-muted/20 transition-colors"
-                        >
-                          <td className="py-3 pl-4 pr-6">
-                            <div className="flex flex-col">
-                              <span className="font-medium">{PERMISSION_LABELS[perm]}</span>
-                              <span className="text-xs text-muted-foreground font-mono">{perm}</span>
-                            </div>
-                          </td>
-                          {roles.map((role) => {
-                            const hasIt = (permsMap[role.name] ?? []).includes(perm)
-                            const isAdminRole = role.name === "admin"
-                            return (
-                              <td key={role.name} className="px-4 py-3 text-center">
-                                <div className="flex items-center justify-center">
-                                  <Checkbox
-                                    checked={hasIt}
-                                    disabled={isAdminRole}
-                                    onCheckedChange={() =>
-                                      !isAdminRole && togglePermission(role.name, perm)
-                                    }
-                                    className={cn(isAdminRole && "opacity-60 cursor-not-allowed")}
-                                  />
-                                </div>
-                              </td>
-                            )
-                          })}
-                        </tr>
                       ))}
-                    </React.Fragment>
+                    </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </div>
         </main>
-      </SidebarInset>
-
       {/* New Role Dialog */}
       <Dialog open={newRoleOpen} onOpenChange={setNewRoleOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Yeni Rol Oluştur</DialogTitle>
+            <DialogDescription>
+              Özel bir rol oluşturun ve isteğe bağlı olarak mevcut bir rolün izinlerini kopyalayın.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="role-name">Rol Adı</Label>
+              <Label>Rol Adı</Label>
               <Input
-                id="role-name"
-                placeholder="örn: developer, reviewer, viewer"
                 value={newRoleName}
-                onChange={(e) =>
-                  setNewRoleName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))
-                }
+                onChange={(e) => setNewRoleName(e.target.value)}
+                placeholder="örn. viewer"
               />
-              <p className="text-xs text-muted-foreground">
-                Küçük harf, rakam, tire (-) veya alt çizgi (_) kullanabilirsiniz.
-              </p>
             </div>
             <div className="space-y-2">
               <Label>İzinleri Kopyala (isteğe bağlı)</Label>
@@ -421,6 +333,6 @@ export default function RolesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SidebarProvider>
+    </AppShellDynamic>
   )
 }

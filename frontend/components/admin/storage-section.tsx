@@ -14,9 +14,9 @@ export function StorageSection() {
   const [saving, setSaving] = React.useState(false)
 
   React.useEffect(() => {
-    getStorageConfig().then(({ path, source }) => {
+    getStorageConfig().then(({ path, backend }) => {
       setStoragePath(path)
-      setSource(source)
+      setSource(backend === "r2" ? "config" : "default")
       setPathInput(path)
     })
   }, [])
@@ -24,15 +24,18 @@ export function StorageSection() {
   const handleSave = async () => {
     if (!pathInput.trim()) return
     setSaving(true)
-    const res = await updateStoragePath(pathInput.trim())
-    if (res.success) {
-      setStoragePath(res.path ?? pathInput.trim())
-      setSource("config")
-      toast.success("Depolama yolu güncellendi")
-    } else {
-      toast.error(res.error ?? "Failed to update storage path")
+    try {
+      await updateStoragePath(pathInput.trim())
+      // updateStoragePath is a no-op in this release — storage path is
+      // managed via the FILE_STORAGE_PATH environment variable on the server.
+      toast.info(
+        "Depolama yolu bu sürümde yalnızca FILE_STORAGE_PATH ortam değişkeni ile yapılandırılabilir."
+      )
+    } catch {
+      toast.error("Depolama yolu güncellenemedi.")
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   const sourceLabel = {

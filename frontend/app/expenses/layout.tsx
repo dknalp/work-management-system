@@ -1,6 +1,4 @@
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/layout/app-sidebar";
-import { SiteHeader } from "@/components/layout/site-header";
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
 
 export default function ExpensesLayout({
   children,
@@ -8,19 +6,8 @@ export default function ExpensesLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 64)",
-          "--header-height": "calc(var(--spacing) * 14)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex-1">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+</AppShellDynamic>
   );
 }

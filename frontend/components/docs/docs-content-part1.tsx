@@ -33,22 +33,22 @@ export function DocsContentPart1() {
           {/* Getting Started */}
           <SectionHeading id="getting-started">Başlangıç</SectionHeading>
           <p className="text-sm text-muted-foreground mb-4">
-            WorkSync API&#39;yi kullanmak için önce admin panelinden bir bot hesabı oluşturmanız gerekir.
+            WorkSync API'yi kullanmak için önce admin panelinden bir bot hesabı oluşturmanız gerekir.
             Bot hesapları sadece admin kullanıcılar tarafından açılabilir.
           </p>
           <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
             <li>Admin paneline gidin ve <strong className="text-foreground">Botlar</strong> sekmesini açın: <InlineCode>/admin?tab=bots</InlineCode></li>
             <li><strong className="text-foreground">Yeni Bot</strong> butonuna tıklayın</li>
             <li>Bot adı ve açıklaması girin, oluşturun</li>
-            <li>Gösterilen API key&#39;i kopyalayın — <strong className="text-red-400">bir daha gösterilmeyecektir</strong></li>
-            <li>Key&#39;i <InlineCode>Authorization: Bearer &lt;key&gt;</InlineCode> header&#39;ı ile kullanın</li>
+            <li>Gösterilen API key'i kopyalayın — <strong className="text-red-400">bir daha gösterilmeyecektir</strong></li>
+            <li>Key'i <InlineCode>{"Authorization: Bearer <key>"}</InlineCode> header'ı ile kullanın</li>
           </ol>
 
           {/* Authentication */}
           <SectionHeading id="authentication">Authentication</SectionHeading>
           <p className="text-sm text-muted-foreground mb-4">
-            Tüm API endpoint&#39;leri <InlineCode>Authorization</InlineCode> header&#39;ı gerektirir.
-            Hem bot API key&#39;leri hem de kullanıcı JWT token&#39;ları kabul edilir.
+            Tüm API endpoint'leri <InlineCode>Authorization</InlineCode> header'ı gerektirir.
+            Hem bot API key'leri hem de kullanıcı JWT token'ları kabul edilir.
           </p>
 
           <div className="space-y-3 mb-4">
@@ -67,7 +67,7 @@ export function DocsContentPart1() {
           </div>
 
           <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700 dark:text-red-300 mb-4">
-            <strong>Güvenlik Notu:</strong> API key&#39;lerinizi asla kaynak kodunuza ya da public repo&#39;larınıza eklemeyin.
+            <strong>Güvenlik Notu:</strong> API key'lerinizi asla kaynak kodunuza ya da public repo'larınıza eklemeyin.
             Ortam değişkeni (<InlineCode>WMS_API_KEY</InlineCode>) kullanın.
           </div>
 
@@ -111,8 +111,8 @@ console.log(me);`,
           {/* Tasks */}
           <SectionHeading id="tasks">Tasks</SectionHeading>
           <p className="text-sm text-muted-foreground mb-4">
-            Görev oluşturma, listeleme, güncelleme ve silme işlemleri. Webhook&#39;lar task.created,
-            task.updated, task.deleted event&#39;lerini tetikler.
+            Görev oluşturma, listeleme, güncelleme ve silme işlemleri. Webhook'lar task.created,
+            task.updated, task.deleted event'lerini tetikler.
           </p>
           <div className="space-y-2">
             <EndpointCard

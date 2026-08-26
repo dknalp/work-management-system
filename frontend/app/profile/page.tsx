@@ -1,5 +1,7 @@
 "use client"
 
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
+
 /**
  * Profile page — lets the authenticated user view and edit their own profile.
  *
@@ -15,9 +17,6 @@ import { useRef, useState } from "react"
 import { Camera, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -98,10 +97,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
@@ -238,7 +234,6 @@ export default function ProfilePage() {
             </div>
           </div>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      </AppShellDynamic>
   )
 }

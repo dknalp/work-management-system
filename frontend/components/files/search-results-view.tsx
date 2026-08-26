@@ -77,7 +77,7 @@ export function SearchResultsView({
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
         <SearchXIcon className="size-10 opacity-20" />
-        <p className="text-sm font-medium">&quot;{query}&quot; için sonuç bulunamadı</p>
+        <p className="text-sm font-medium">"{query}" için sonuç bulunamadı</p>
         <p className="text-xs opacity-60">Farklı bir arama terimi deneyin veya filtrelerde içerik aramasını etkinleştirin</p>
       </div>
     )
@@ -86,7 +86,7 @@ export function SearchResultsView({
   return (
     <div className="flex flex-col gap-1">
       <p className="mb-2 px-1 text-xs text-muted-foreground">
-        &quot;{query}&quot; için {results.length} sonuç
+        "{query}" için {results.length} sonuç
       </p>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">

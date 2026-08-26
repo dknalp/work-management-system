@@ -1,10 +1,8 @@
 "use client"
 
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
 import React, { useState, use, useEffect } from "react"
 import Link from "next/link"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -213,61 +211,29 @@ export default function AgentBuilderPage({ params }: { params: Promise<{ id: str
 
   if (pageLoading) {
     return (
-      <SidebarProvider
-        style={
-          {
-            "--sidebar-width": "calc(var(--spacing) * 64)",
-            "--header-height": "calc(var(--spacing) * 14)",
-          } as React.CSSProperties
-        }
-      >
-        <AppSidebar variant="inset" />
-        <SidebarInset>
-          <SiteHeader />
+      <AppShellDynamic>
           <div className="flex flex-1 items-center justify-center text-muted-foreground">
             Yükleniyor…
           </div>
-        </SidebarInset>
-      </SidebarProvider>
+</AppShellDynamic>
     )
   }
 
   if (pageError) {
     return (
-      <SidebarProvider
-        style={
-          {
-            "--sidebar-width": "calc(var(--spacing) * 64)",
-            "--header-height": "calc(var(--spacing) * 14)",
-          } as React.CSSProperties
-        }
-      >
-        <AppSidebar variant="inset" />
-        <SidebarInset>
-          <SiteHeader />
+      <AppShellDynamic>
           <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <p className="text-destructive text-sm">{pageError}</p>
             <Link href="/team" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
               Takım sayfasına dön
             </Link>
           </div>
-        </SidebarInset>
-      </SidebarProvider>
+</AppShellDynamic>
     )
   }
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 64)",
-          "--header-height": "calc(var(--spacing) * 14)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col overflow-auto bg-background/50">
           <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 md:px-8">
 
@@ -688,8 +654,7 @@ export default function AgentBuilderPage({ params }: { params: Promise<{ id: str
             </Tabs>
           </div>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+</AppShellDynamic>
   )
 }
 

@@ -53,25 +53,30 @@ export function HomeHero() {
       <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
         {/* Left: Greeting */}
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 suppressHydrationWarning className="text-2xl font-semibold tracking-tight">
             {getGreeting(hour)}, {firstName} 👋
           </h1>
           {/* Today's quick stats */}
           <div className="mt-5 flex flex-wrap gap-2">
             <div className="flex items-center gap-1.5 rounded-full bg-background/70 px-3 py-1.5 text-xs font-medium ring-1 ring-foreground/10">
               <ListTodo className="size-3.5 text-blue-500" />
-              <span>{todaysTasks.length} görev bugün</span>
+              <span suppressHydrationWarning>{todaysTasks.length} görev bugün</span>
             </div>
             <div className="flex items-center gap-1.5 rounded-full bg-background/70 px-3 py-1.5 text-xs font-medium ring-1 ring-foreground/10">
               <CheckCircle2 className="size-3.5 text-emerald-500" />
-              <span>{completedToday} tamamlandı</span>
+              <span suppressHydrationWarning>{completedToday} tamamlandı</span>
             </div>
-            {overdueCount > 0 && (
-              <div className="flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:ring-rose-800/40">
-                <AlertTriangle className="size-3.5" />
-                <span>{overdueCount} gecikmiş</span>
-              </div>
-            )}
+            {/* Always render the overdue badge container so the DOM structure
+                matches between server (overdueCount=0) and client. Hiding via
+                visibility/opacity avoids a structural HTML mismatch (#418). */}
+            <div
+              suppressHydrationWarning
+              className="flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 ring-1 ring-rose-200 dark:bg-rose-950/30 dark:text-rose-400 dark:ring-rose-800/40"
+              style={{ display: overdueCount > 0 ? "flex" : "none" }}
+            >
+              <AlertTriangle className="size-3.5" />
+              <span suppressHydrationWarning>{overdueCount} gecikmiş</span>
+            </div>
           </div>
         </div>
 
@@ -79,11 +84,11 @@ export function HomeHero() {
         <div className="flex flex-col items-start md:items-end gap-1 shrink-0">
           <div className="flex items-center gap-2">
             <Clock className="size-4 text-muted-foreground" />
-            <span className="font-mono text-3xl font-bold tabular-nums tracking-tight">
+            <span suppressHydrationWarning className="font-mono text-3xl font-bold tabular-nums tracking-tight">
               {time ?? "──:──:──"}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground capitalize">
+          <p suppressHydrationWarning className="text-sm text-muted-foreground capitalize">
             {dateStr || "─────────────────"}
           </p>
         </div>

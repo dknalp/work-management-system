@@ -32,27 +32,19 @@ export function DriveSection() {
   }, [searchParams])
 
   async function handleConnect() {
-    setActionLoading(true)
-    try {
-      const { url } = await getConnectDriveUrl()
-      window.location.href = url
-    } catch (e) {
-      const msg = e instanceof Error && e.message.includes("GOOGLE_CLIENT_ID")
-        ? "GOOGLE_CLIENT_ID ve GOOGLE_CLIENT_SECRET tanımlanmamış. .env.local dosyasına ekleyin."
-        : "Bağlantı kurulamadı. Lütfen tekrar deneyin."
-      setBanner({ type: "error", msg })
-      setActionLoading(false)
-    }
+    // Google Drive OAuth is not available in this release.
+    setBanner({
+      type: "error",
+      msg: "Google Drive entegrasyonu bu sürümde kullanılamaz.",
+    })
   }
 
   async function handleDisconnect() {
-    setActionLoading(true)
-    const res = await disconnectDrive()
-    if (res.success) {
-      setStatus({ connected: false })
-      setBanner({ type: "success", msg: "Google Drive bağlantısı kesildi." })
-    }
-    setActionLoading(false)
+    // Google Drive disconnect is not available in this release.
+    setBanner({
+      type: "error",
+      msg: "Google Drive entegrasyonu bu sürümde kullanılamaz.",
+    })
   }
 
   return (

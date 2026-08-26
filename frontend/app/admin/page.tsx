@@ -1,10 +1,9 @@
 "use client"
 
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
+
 import React from "react"
 import Link from "next/link"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ActivityIcon,
@@ -37,20 +36,13 @@ export default function AdminPage() {
   }), [tasks])
 
   if (!canView) return (
-    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <AccessDenied />
-      </SidebarInset>
-    </SidebarProvider>
+</AppShellDynamic>
   )
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col">
           <Tabs defaultValue="overview" className="flex flex-1 flex-col">
 
@@ -171,7 +163,6 @@ export default function AdminPage() {
 
           </Tabs>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      </AppShellDynamic>
   )
 }

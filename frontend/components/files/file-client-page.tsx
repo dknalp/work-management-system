@@ -49,9 +49,6 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   const [state, setState] = React.useState<LoadState>({ status: "loading" })
   const [quota, setQuota] = React.useState<{ used_bytes: number; file_count: number } | null>(null)
 
-  // Drive import dialog state — set after the Picker resolves, cleared on complete/close
- | null>(null)
-
 
   // Load quota once on mount
   React.useEffect(() => {

@@ -1,9 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useEffect } from "react"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
 import { TeamTable } from "@/components/team/team-table"
 import { MemberGrid } from "@/components/team/member-grid"
 import { MemberDialog } from "@/components/team/member-dialog"
@@ -42,7 +40,7 @@ import { AccessDenied } from "@/components/auth/access-denied"
 import { apiClient } from "@/lib/api"
 import { createDefaultAgent } from "@/types/agent"
 import { useRouter } from "next/navigation"
-import { MOCK_AUTH } from "@/contexts/auth-context"
+import { MOCK_AUTH, useAuth } from "@/contexts/auth-context"
 
 // Re-export for backward compat
 export type { TeamMember }
@@ -58,6 +56,7 @@ interface AgentSummary {
 }
 
 export default function TeamPage() {
+  const { loading: authLoading } = useAuth()
   const canView = usePermission("team:view")
   const canManage = usePermission("team:manage")
   const { members, addMember, updateMember, deleteMember } = useTeam()
@@ -70,8 +69,9 @@ export default function TeamPage() {
 
   // ── AI Agents — backend-persisted via /api/v1/agents ────────────────────
   const [agents, setAgents] = useState<AgentSummary[]>([])
-  // In mock auth mode we never fetch from the backend so there is nothing to load.
-  const [agentsLoading, setAgentsLoading] = useState(!MOCK_AUTH)
+  // Always start false so server and client produce identical initial HTML.
+  // Loading begins only after auth resolves (see useEffect below).
+  const [agentsLoading, setAgentsLoading] = useState(false)
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState(false)
   const [newAgentName, setNewAgentName] = useState("")
   const [newAgentDescription, setNewAgentDescription] = useState("")
@@ -82,18 +82,19 @@ export default function TeamPage() {
   const [deleteConfirmInput, setDeleteConfirmInput] = useState("")
   const [isDeletingAgent, setIsDeletingAgent] = useState(false)
 
-  // Load agents from backend on mount.
-  // In mock auth mode there is no Firebase token, so backend calls would fail with 401.
-  // We skip the fetch entirely (agentsLoading is initialized to false in that case).
+  // Load agents from backend once Firebase auth has resolved.
+  // Waiting for authLoading prevents a 401 from firing before the token is available.
+  // In mock auth mode there is no Firebase token so we skip the fetch entirely.
   useEffect(() => {
-    if (MOCK_AUTH) return
+    if (authLoading || MOCK_AUTH) return
     let cancelled = false
+    setAgentsLoading(true)
     apiClient.get<AgentSummary[]>("/api/v1/agents")
       .then((data) => { if (!cancelled) setAgents(data ?? []) })
       .catch((err: unknown) => { console.warn("[TeamPage] agents load failed:", err) })
       .finally(() => { if (!cancelled) setAgentsLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [authLoading])
 
   /** Create agent: POST to backend first, then navigate to builder with the real Firestore ID. */
   async function handleCreateAgent() {
@@ -226,26 +227,13 @@ export default function TeamPage() {
   ]
 
   if (!canView) return (
-    <SidebarProvider
-      style={{ "--sidebar-width": "calc(var(--spacing) * 64)", "--header-height": "calc(var(--spacing) * 14)" } as React.CSSProperties}
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset><SiteHeader /><main className="flex flex-1 items-center justify-center"><AccessDenied /></main></SidebarInset>
-    </SidebarProvider>
+    <AppShellDynamic>
+      <main className="flex flex-1 items-center justify-center"><AccessDenied /></main>
+    </AppShellDynamic>
   )
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 64)",
-          "--header-height": "calc(var(--spacing) * 14)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col overflow-auto bg-background/50">
           <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 md:px-8">
             <div className="flex flex-col gap-1">
@@ -523,7 +511,6 @@ export default function TeamPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </SidebarInset>
-    </SidebarProvider>
+      </AppShellDynamic>
   )
 }

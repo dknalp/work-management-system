@@ -7,11 +7,16 @@ Firestore collection: ``file_records``
 Physical storage:     Cloudflare R2 (when env vars are set) or local disk
 """
 
+import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
+
+# Semaphore that caps concurrent large-file uploads at 2 in-flight at once
+# per process.  Additional requests queue here rather than competing for RAM.
+UPLOAD_SEMAPHORE = asyncio.Semaphore(2)
 
 from fastapi import HTTPException
 from firebase_admin import firestore

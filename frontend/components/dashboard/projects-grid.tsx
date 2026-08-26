@@ -1,5 +1,15 @@
 "use client"
 
+/**
+ * ProjectsGrid
+ *
+ * Displays the current user's projects as a responsive card grid.
+ * Pinned projects always appear first.
+ *
+ * Must only be rendered inside a <ClientOnly> boundary — it reads from the
+ * project context which is always empty on the server.
+ */
+
 import Link from "next/link"
 import { useProjects } from "@/contexts/project-context"
 import { ProjectColor } from "@/types/project"

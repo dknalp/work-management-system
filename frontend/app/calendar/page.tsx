@@ -24,9 +24,7 @@ import {
   Users,
   X,
 } from "lucide-react"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -156,17 +154,7 @@ export default function CalendarPage() {
     setCurrentMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 64)",
-          "--header-height": "calc(var(--spacing) * 14)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 overflow-hidden bg-background">
           {permLoading ? null : !canView ? (
             <AccessDenied />
@@ -491,7 +479,6 @@ export default function CalendarPage() {
             </div>
           )}
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      </AppShellDynamic>
   )
 }

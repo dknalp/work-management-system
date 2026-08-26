@@ -26,9 +26,12 @@ from app.routers.v1.files_utils import (
     _local_path,
     _now,
     _use_r2,
+    _DOWNLOAD_TTL,
+    _PREVIEW_TTL,
 )
+from app.r2 import r2_generate_presigned_url
 
-router = APIRouter()
+router = APIRouter(prefix="/files", tags=["v1-files"])
 
 
 @router.post("/zip-download")
@@ -100,7 +103,7 @@ async def raw_preview(
 ):
     """Serve the raw file bytes with the correct Content-Type for browser preview."""
     _, data = _get_record_or_404(file_id, db)
-    _assert_owner(data, current_user.id)
+    _assert_owner(data, current_user)
     r2_key = data.get("r2_key")
     if not r2_key or data.get("type") != "file":
         raise HTTPException(status_code=400, detail="Cannot preview a folder.")
@@ -138,3 +141,63 @@ def patch_metadata(
     updates["updated_at"] = _now()
     db.collection("file_records").document(file_id).update(updates)
     return _doc_to_response(file_id, {**data, **updates})
+
+@router.get("/preview-url/{file_id}")
+async def get_preview_url(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> dict:
+    """Return a JSON object with a ``url`` key suitable for inline preview.
+
+    For R2 storage the URL is a presigned GET URL with
+    ``Content-Disposition: inline``.  For local storage the URL is the
+    backend raw-preview proxy path which the caller must hit with its auth
+    token (the frontend passes it as a src on an <img> or <video> tag via
+    the authenticated API client).
+    """
+    doc_ref, data = _get_record_or_404(file_id, db)
+    _assert_owner(data, current_user)
+
+    if _use_r2():
+        r2_key = data.get("r2_key") or data.get("storage_key", "")
+        url = await r2_generate_presigned_url(
+            r2_key, expires_in=_PREVIEW_TTL, disposition="inline"
+        )
+    else:
+        # Return a relative path — the frontend's _getPresignedUrl helper
+        # prepends API_BASE_URL to any URL starting with "/", so a relative
+        # path is sufficient and avoids hardcoding the backend origin here.
+        url = f"/api/v1/files/raw/{file_id}"
+
+    return {"url": url}
+
+
+@router.get("/download-url/{file_id}")
+async def get_download_url(
+    file_id: str,
+    inline: bool = Query(default=False),
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> dict:
+    """Return a JSON object with a ``url`` key for file download.
+
+    When ``inline=true`` the URL is served with ``Content-Disposition: inline``
+    (browser renders it); otherwise ``attachment`` (browser downloads it).
+    For R2 this is a presigned URL.  For local storage this is the backend
+    download proxy path.
+    """
+    doc_ref, data = _get_record_or_404(file_id, db)
+    _assert_owner(data, current_user)
+
+    if _use_r2():
+        r2_key = data.get("r2_key") or data.get("storage_key", "")
+        disposition = "inline" if inline else "attachment"
+        url = await r2_generate_presigned_url(
+            r2_key, expires_in=_DOWNLOAD_TTL, disposition=disposition
+        )
+    else:
+        qs = "?inline=true" if inline else ""
+        url = f"/api/v1/files/download/{file_id}{qs}"
+
+    return {"url": url}

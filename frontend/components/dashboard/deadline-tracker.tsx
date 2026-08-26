@@ -1,5 +1,15 @@
 "use client"
 
+/**
+ * DeadlineTracker
+ *
+ * Shows overdue tasks and tasks due within the next 7 days as a horizontal
+ * scrollable card strip. Returns null when there are no qualifying tasks.
+ *
+ * Must only be rendered inside a <ClientOnly> boundary — it reads live task
+ * state from context which is always empty on the server.
+ */
+
 import { addDays, differenceInCalendarDays, format, isAfter, isBefore, parseISO } from "date-fns"
 import { tr } from "date-fns/locale"
 import { CalendarClock, Clock } from "lucide-react"
@@ -91,7 +101,6 @@ export function DeadlineTracker() {
               key={task.id}
               className="min-w-[210px] max-w-[210px] flex-shrink-0 rounded-xl bg-card ring-1 ring-foreground/10 p-4 flex flex-col gap-3"
             >
-              {/* Days remaining badge */}
               <div className="flex items-center justify-between gap-2">
                 <span
                   className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${daysRemainingBadge(daysLeft)}`}
@@ -105,12 +114,10 @@ export function DeadlineTracker() {
                 </span>
               </div>
 
-              {/* Task title */}
               <p className="text-sm font-medium leading-snug line-clamp-2">
                 {task.title}
               </p>
 
-              {/* Footer: date + assignees */}
               <div className="flex items-center justify-between mt-auto">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="size-3" />

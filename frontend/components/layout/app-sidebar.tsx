@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import { NavMain } from "@/components/layout/nav-main"
 import { NavSecondary } from "@/components/layout/nav-secondary"
 import { NavUser } from "@/components/layout/nav-user"
@@ -234,15 +235,24 @@ function AppSidebarInner({ ...props }: React.ComponentProps<typeof Sidebar>) {
 }
 
 /**
- * Wraps AppSidebarInner in a React.Suspense boundary so that
- * useSearchParams() inside AppSidebarInner does not throw during SSR
- * in Next.js 16 (which requires a Suspense boundary around any component
- * that calls useSearchParams in a statically rendered page).
+ * The sidebar is 100% auth/permission-gated client UI — it reads localStorage,
+ * Firebase auth state, and RBAC permissions, all of which are unavailable on
+ * the server. Rendering it during SSR produces different HTML from the client
+ * hydration pass (different nav items, different user name/email, different
+ * permission-filtered items), which triggers React hydration error #418.
+ *
+ * The correct fix is to skip SSR for the sidebar entirely. `next/dynamic` with
+ * `ssr: false` renders nothing on the server and mounts the real component only
+ * after client hydration, eliminating the mismatch completely.
+ *
+ * `loading: () => null` means no placeholder flicker — the layout reserves the
+ * sidebar space via CSS (SidebarProvider CSS vars) so there is no layout shift.
  */
+const AppSidebarDynamic = dynamic(
+  () => Promise.resolve(AppSidebarInner),
+  { ssr: false, loading: () => null }
+)
+
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
-  return (
-    <React.Suspense fallback={null}>
-      <AppSidebarInner {...props} />
-    </React.Suspense>
-  )
+  return <AppSidebarDynamic {...props} />
 }

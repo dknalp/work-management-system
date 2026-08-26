@@ -1,6 +1,13 @@
 "use client"
 
-"use client"
+/**
+ * RemindersWidget
+ *
+ * Displays today's calendar events/reminders in a card. Links to /calendar.
+ *
+ * Must only be rendered inside a <ClientOnly> boundary — it reads from the
+ * calendar context which is always empty on the server.
+ */
 
 import { Bell, CalendarClock, Clock } from "lucide-react"
 import { useCalendar } from "@/contexts/calendar-context"

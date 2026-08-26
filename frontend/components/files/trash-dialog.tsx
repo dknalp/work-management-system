@@ -215,7 +215,7 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              &quot;{permanentDeleteTarget?.originalName}&quot; kalıcı olarak silinsin mi?
+              "{permanentDeleteTarget?.originalName}" kalıcı olarak silinsin mi?
             </AlertDialogTitle>
             <AlertDialogDescription>Bu işlem geri alınamaz.</AlertDialogDescription>
           </AlertDialogHeader>

@@ -1,5 +1,7 @@
 "use client"
 
+import { AppShellDynamic } from "@/components/layout/app-shell-dynamic"
+
 /**
  * Settings page — appearance, notification, and privacy preferences.
  *
@@ -10,9 +12,6 @@
  */
 
 import { useState, useEffect, useCallback, useSyncExternalStore } from "react"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/layout/app-sidebar"
-import { SiteHeader } from "@/components/layout/site-header"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -219,10 +218,7 @@ export default function SettingsPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": "16rem", "--header-height": "3.5rem" } as React.CSSProperties}>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
+    <AppShellDynamic>
         <main className="flex flex-1 flex-col gap-6 p-6 lg:p-8">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Ayarlar</h1>
@@ -436,7 +432,6 @@ export default function SettingsPage() {
             </div>
           </div>
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      </AppShellDynamic>
   )
 }
