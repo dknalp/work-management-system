@@ -33,6 +33,7 @@ import { usePermission } from "@/hooks/use-permission"
 import { apiClient } from "@/lib/api"
 import { toast } from "sonner"
 import { getAllRoles, initials, ROLE_LABELS } from "./admin-shared"
+import { tokenStorage } from "@/lib/auth"
 
 const EMPTY_FORM = { name: "", email: "", password: "", role: "member" }
 
@@ -159,7 +160,7 @@ export function UsersSection() {
         ) : users.map((u) => (
           <div key={u.id} className="flex items-center gap-3 px-5 py-3">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-              {u.avatar ? <img src={u.avatar} alt={u.name ?? ""} className="size-8 rounded-full object-cover" /> : initials(u.name ?? u.email ?? "?")}
+              {u.avatar ? <img src={tokenStorage.buildImageUrl(u.avatar)} alt={u.name ?? ""} className="size-8 rounded-full object-cover" /> : initials(u.name ?? u.email ?? "?")}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{u.name ?? u.email}</p>

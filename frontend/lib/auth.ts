@@ -44,6 +44,27 @@ export const tokenStorage = {
     return this.getToken()
   },
 
+  /**
+   * Build an authenticated URL for resources that require a Bearer token but
+   * must be loaded by browser-native elements (<img>, <video>) that cannot set
+   * request headers.
+   *
+   * If the URL starts with /api/v1/files/raw/ (or any /api/ path), the stored
+   * Firebase ID token is appended as ?token=… so the backend can authenticate
+   * the request via the query-parameter fallback in _extract_bearer_token().
+   *
+   * Non-API URLs (e.g. R2 public CDN, /data/ static files) are returned as-is.
+   */
+  buildImageUrl(url: string | null | undefined): string {
+    if (!url) return ""
+    // Only authenticated backend paths need the token appended.
+    if (!url.startsWith("/api/")) return url
+    const token = this.getToken()
+    if (!token) return url
+    const sep = url.includes("?") ? "&" : "?"
+    return `${url}${sep}token=${encodeURIComponent(token)}`
+  },
+
   /** Remove the token and clear the session cookie (logout). */
   clear(): void {
     if (typeof localStorage === "undefined") return

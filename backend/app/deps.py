@@ -56,16 +56,25 @@ _permission_cache: Dict[str, List[str]] = {}
 
 
 def _extract_bearer_token(request: Request) -> str:
-    """Extract the raw token from the Authorization header.
+    """Extract the raw token from the Authorization header or ?token= query param.
 
     Accepts both ``Bearer <token>`` and bare ``<token>`` forms so that the
     API key path (``wms_live_*``) can be passed without a scheme prefix.
+
+    Also accepts a ``?token=`` query parameter as a fallback.  This allows
+    browser-native elements (``<img>``, ``<video>``) that cannot set request
+    headers to load authenticated resources by appending the Firebase ID token
+    to the URL:  ``/api/v1/files/raw/{id}?token=<firebase-id-token>``
     """
     header = request.headers.get("Authorization", "")
     if header.lower().startswith("bearer "):
         return header[7:].strip()
     if header:
         return header.strip()
+    # Fallback: token passed as a query parameter (for <img src="...?token=...">)
+    token_param = request.query_params.get("token", "").strip()
+    if token_param:
+        return token_param
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authorization header missing.",
