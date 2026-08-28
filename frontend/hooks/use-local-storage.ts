@@ -26,14 +26,14 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     } catch {
       return initialValue
     }
-  }, [key, initialValue]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, initialValue])
 
   /**
    * Server snapshot must match the initial client render to avoid hydration
    * mismatch. Always returns initialValue — localStorage is not available on
    * the server and the first client render must be identical.
    */
-  const getServerSnapshot = useCallback((): T => initialValue, [initialValue]) // eslint-disable-line react-hooks/exhaustive-deps
+  const getServerSnapshot = useCallback((): T => initialValue, [initialValue])
 
   const value = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 

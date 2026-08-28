@@ -14,9 +14,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
 
-# Semaphore that caps concurrent large-file uploads at 2 in-flight at once
+# Semaphore that caps concurrent large-file uploads at 3 in-flight at once
+# (matches MAX_CONCURRENT=3 in the frontend upload queue)
 # per process.  Additional requests queue here rather than competing for RAM.
-UPLOAD_SEMAPHORE = asyncio.Semaphore(2)
+UPLOAD_SEMAPHORE = asyncio.Semaphore(3)
 
 from fastapi import HTTPException
 from firebase_admin import firestore

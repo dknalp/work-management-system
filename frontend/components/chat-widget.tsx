@@ -71,7 +71,8 @@ export function ChatWidget() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const activeContactRef = useRef<Contact | null>(null)
-  activeContactRef.current = activeContact
+  // Sync ref in an effect so it's never read/written during render.
+  useEffect(() => { activeContactRef.current = activeContact }, [activeContact])
 
   const totalUnread = Object.values(chatUnread).reduce((s, n) => s + n, 0)
 
@@ -156,7 +157,7 @@ export function ChatWidget() {
     ws.onclose = () => {
       if (wsRef.current === ws) { setConnError(true); setLoading(false) }
     }
-  }, [user?.id, markChatRead])
+  }, [user, markChatRead])
 
   const send = useCallback(() => {
     const text = input.trim()
@@ -176,7 +177,7 @@ export function ChatWidget() {
     wsRef.current.send(JSON.stringify({ text }))
     const roomId = makeRoomId(user.id, activeContactRef.current.id)
     markChatSent(activeContactRef.current.id, roomId)
-  }, [input, user?.id, user?.name, markChatSent])
+  }, [input, user, markChatSent])
 
   return (
     <div className="fixed bottom-5 right-5 z-50">

@@ -16,7 +16,9 @@
  *   NEXT_PUBLIC_FIREBASE_PROJECT_ID
  */
 
+import { getApps, initializeApp } from "firebase/app"
 import type { Auth } from "firebase/auth"
+import { getAuth } from "firebase/auth"
 
 let _auth: Auth | null = null
 
@@ -49,10 +51,6 @@ function getFirebaseAuth(): Auth {
         "and NEXT_PUBLIC_FIREBASE_PROJECT_ID in .env.local."
     )
   }
-
-  // Lazy import so the module can be loaded on the server without crashing
-  const { getApps, initializeApp } = require("firebase/app")
-  const { getAuth } = require("firebase/auth")
 
   const app =
     getApps().length === 0

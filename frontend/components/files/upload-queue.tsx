@@ -89,8 +89,13 @@ export function useUploadQueue() {
 
 const MAX_CONCURRENT = 3
 
-const API_BASE_URL =
-  (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3052").replace(/\/$/, "")
+// XHR upload always uses a relative URL so the request goes through the
+// Next.js rewrite proxy (/api/* → backend:3052).  Never use NEXT_PUBLIC_API_URL
+// here: that env var points directly at the backend port which is unreachable
+// from the browser in Docker (only the frontend port is exposed), causing
+// ERR_ACCESS_DENIED.  All other fetch/apiClient calls in the app already use
+// relative paths for the same reason.
+const API_BASE_URL = ""
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,12 +179,14 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
   // -------------------------------------------------------------------------
 
   const drainQueue = useCallback(() => {
-    setItems((prev) => {
-      const pending = prev.filter((i) => i.status === "pending")
-      const slots = MAX_CONCURRENT - activeCount.current
-      pending.slice(0, slots).forEach((item) => uploadFnRef.current(item))
-      return prev
-    })
+    // Read from itemsRef (kept in sync by useEffect) instead of calling
+    // uploadFnRef inside a setItems updater.  Running side-effects inside a
+    // state-updater function is an anti-pattern: React 18 StrictMode invokes
+    // updaters twice in development, which double-starts uploads and causes
+    // activeCount to permanently desync.
+    const pending = itemsRef.current.filter((i) => i.status === "pending")
+    const slots = MAX_CONCURRENT - activeCount.current
+    pending.slice(0, slots).forEach((item) => uploadFnRef.current(item))
   }, [])
 
   // Keep drainQueue accessible to the upload fn
@@ -193,36 +200,27 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
 
     activeCount.current += 1
 
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === item.id ? { ...i, status: "uploading" as const, progress: 0 } : i
+    // Helper: update both itemsRef and React state together so drainQueue
+    // always reads a consistent snapshot regardless of React commit timing.
+    const patchItem = (patch: Partial<UploadItem>) => {
+      itemsRef.current = itemsRef.current.map((i) =>
+        i.id === item.id ? { ...i, ...patch } : i
       )
-    )
+      setItems(itemsRef.current)
+    }
+
+    patchItem({ status: "uploading", progress: 0 })
 
     uploadWithXHR(item, overwrite, (progress) => {
-      setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, progress } : i))
-      )
+      patchItem({ progress })
     })
       .then((result) => {
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id
-              ? { ...i, status: "done" as const, progress: 100, result }
-              : i
-          )
-        )
+        patchItem({ status: "done", progress: 100, result })
         window.dispatchEvent(new Event("wms:files:changed"))
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error"
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id
-              ? { ...i, status: "error" as const, errorMessage: message }
-              : i
-          )
-        )
+        patchItem({ status: "error", errorMessage: message })
       })
       .finally(() => {
         activeCount.current -= 1
@@ -297,8 +295,11 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
 
       if (newItems.length === 0) return
 
-      setItems((prev) => [...prev, ...newItems])
-      setTimeout(() => drainQueue(), 0)
+      // Update itemsRef synchronously so drainQueue sees the new items
+      // immediately, even before React commits the setItems update.
+      itemsRef.current = [...itemsRef.current, ...newItems]
+      setItems(itemsRef.current)
+      drainQueue()
     },
     [askDuplicate, drainQueue]
   )
@@ -309,14 +310,14 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
 
   const retryItem = useCallback(
     (id: string) => {
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === id
-            ? { ...i, status: "pending" as const, progress: 0, errorMessage: undefined }
-            : i
-        )
+      // Update itemsRef synchronously so drainQueue sees the reset item.
+      itemsRef.current = itemsRef.current.map((i) =>
+        i.id === id
+          ? { ...i, status: "pending" as const, progress: 0, errorMessage: undefined }
+          : i
       )
-      setTimeout(() => drainQueue(), 0)
+      setItems(itemsRef.current)
+      drainQueue()
     },
     [drainQueue]
   )

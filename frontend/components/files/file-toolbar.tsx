@@ -114,6 +114,11 @@ export function FileToolbar({ currentPath, isDriveView = false }: FileToolbarPro
               onChange={(e) => {
                 const rawFiles = Array.from(e.target.files ?? [])
                 if (!rawFiles.length) return
+                // Group files by their target path first, then call addFiles
+                // once per group.  Calling addFiles once per file triggers N
+                // separate drain cycles and saturates activeCount prematurely,
+                // leaving later files stuck as "pending" indefinitely.
+                const byPath = new Map<string, File[]>()
                 for (const file of rawFiles) {
                   const relativePath = (file as File & { webkitRelativePath?: string })
                     .webkitRelativePath ?? file.name
@@ -121,7 +126,12 @@ export function FileToolbar({ currentPath, isDriveView = false }: FileToolbarPro
                   const targetPath = currentPath
                     ? folderPart ? `${currentPath}/${folderPart}` : currentPath
                     : folderPart || ""
-                  addFiles([file], targetPath)
+                  const group = byPath.get(targetPath) ?? []
+                  group.push(file)
+                  byPath.set(targetPath, group)
+                }
+                for (const [targetPath, files] of byPath) {
+                  addFiles(files, targetPath)
                 }
                 e.target.value = ""
               }}

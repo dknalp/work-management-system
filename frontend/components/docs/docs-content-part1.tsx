@@ -33,7 +33,7 @@ export function DocsContentPart1() {
           {/* Getting Started */}
           <SectionHeading id="getting-started">Başlangıç</SectionHeading>
           <p className="text-sm text-muted-foreground mb-4">
-            WorkSync API'yi kullanmak için önce admin panelinden bir bot hesabı oluşturmanız gerekir.
+            WorkSync API&apos;yi kullanmak için önce admin panelinden bir bot hesabı oluşturmanız gerekir.
             Bot hesapları sadece admin kullanıcılar tarafından açılabilir.
           </p>
           <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
@@ -48,7 +48,7 @@ export function DocsContentPart1() {
           <SectionHeading id="authentication">Authentication</SectionHeading>
           <p className="text-sm text-muted-foreground mb-4">
             Tüm API endpoint'leri <InlineCode>Authorization</InlineCode> header'ı gerektirir.
-            Hem bot API key'leri hem de kullanıcı JWT token'ları kabul edilir.
+            Hem bot API key&apos;leri hem de kullanıcı JWT token&apos;ları kabul edilir.
           </p>
 
           <div className="space-y-3 mb-4">
@@ -67,7 +67,7 @@ export function DocsContentPart1() {
           </div>
 
           <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700 dark:text-red-300 mb-4">
-            <strong>Güvenlik Notu:</strong> API key'lerinizi asla kaynak kodunuza ya da public repo'larınıza eklemeyin.
+            <strong>Güvenlik Notu:</strong> API key&apos;lerinizi asla kaynak kodunuza ya da public repo&apos;larınıza eklemeyin.
             Ortam değişkeni (<InlineCode>WMS_API_KEY</InlineCode>) kullanın.
           </div>
 
@@ -111,8 +111,8 @@ console.log(me);`,
           {/* Tasks */}
           <SectionHeading id="tasks">Tasks</SectionHeading>
           <p className="text-sm text-muted-foreground mb-4">
-            Görev oluşturma, listeleme, güncelleme ve silme işlemleri. Webhook'lar task.created,
-            task.updated, task.deleted event'lerini tetikler.
+            Görev oluşturma, listeleme, güncelleme ve silme işlemleri. Webhook&apos;lar task.created,
+            task.updated, task.deleted event&apos;lerini tetikler.
           </p>
           <div className="space-y-2">
             <EndpointCard

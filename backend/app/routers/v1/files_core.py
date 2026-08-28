@@ -91,9 +91,9 @@ async def upload_file(
 ) -> FileRecordResponse:
     """Upload a file to the given parent directory path.
 
-    The upload is queued behind UPLOAD_SEMAPHORE so at most 2 large uploads
-    buffer in memory at once per process; additional requests wait rather than
-    competing for RAM.
+    The upload is queued behind UPLOAD_SEMAPHORE so at most 3 large uploads
+    buffer in memory at once per process (matching MAX_CONCURRENT=3 in the
+    frontend); additional requests wait rather than competing for RAM.
     """
     # Reject oversized uploads before buffering any bytes.
     content_length = file.size  # set by FastAPI from Content-Length header when present
@@ -115,6 +115,35 @@ async def upload_file(
     # parent_path is the "path" field from the frontend FormData.
     parent_path = path
     virtual_path = _build_path(parent_path, filename)
+
+    # ── Deduplication check ─────────────────────────────────────────────────
+    # Look for an existing, non-deleted file record with the same virtual path
+    # owned by this user.  A file with the same name in the same folder counts
+    # as a collision regardless of whether it was uploaded in this session.
+    existing_docs = (
+        db.collection("file_records")
+        .where("owner_id", "==", current_user.id)
+        .where("path", "==", virtual_path)
+        .where("is_deleted", "==", False)
+        .where("type", "==", "file")
+        .limit(1)
+        .get()
+    )
+    existing_id: str | None = None
+    existing_r2_key: str | None = None
+    if existing_docs:
+        existing_doc = existing_docs[0]
+        existing_data = existing_doc.to_dict() or {}
+        if not overwrite:
+            raise HTTPException(
+                status_code=409,
+                detail=f"A file named '{filename}' already exists at this location. "
+                       "Set overwrite=true to replace it.",
+            )
+        # overwrite=True: remember the old record so we can delete it after
+        # the new file is safely written.
+        existing_id = existing_doc.id
+        existing_r2_key = existing_data.get("r2_key")
 
     async with UPLOAD_SEMAPHORE:
         if _use_r2():
@@ -165,6 +194,25 @@ async def upload_file(
         "updated_at": now,
     }
     db.collection("file_records").document(file_id).set(data)
+
+    # ── Overwrite cleanup ────────────────────────────────────────────────────
+    # Now that the new file is safely written, remove the old Firestore record
+    # and its backing storage so we don't accumulate orphaned records/bytes.
+    if existing_id:
+        db.collection("file_records").document(existing_id).delete()
+        if existing_r2_key:
+            try:
+                if _use_r2():
+                    await r2_delete_object(existing_r2_key)
+                else:
+                    old_local = _local_path(existing_r2_key)
+                    if old_local.exists():
+                        old_local.unlink(missing_ok=True)
+            except Exception:
+                # Swallow storage errors — the new record is already the source
+                # of truth; the old bytes are merely orphaned, not dangerous.
+                pass
+
     return _doc_to_response(file_id, data)
 
 

@@ -77,7 +77,6 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (authLoading) return
     const hasCached = cacheGet<TeamMember[]>("team") !== null
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMembers(hasCached)
   }, [authLoading, fetchMembers])
 
