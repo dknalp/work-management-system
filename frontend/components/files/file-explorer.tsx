@@ -150,6 +150,7 @@ export function FileExplorer({
 
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [deletePaths, setDeletePaths] = React.useState<string[]>([])
+  const [deleteHasFolders, setDeleteHasFolders] = React.useState(false)
 
   const [moveToOpen, setMoveToOpen] = React.useState(false)
   const [moveSourcePaths, setMoveSourcePaths] = React.useState<string[]>([])
@@ -324,7 +325,11 @@ export function FileExplorer({
   }
 
   const handleDeleteConfirm = (paths: string | string[]) => {
-    setDeletePaths(typeof paths === "string" ? [paths] : paths)
+    const ids = typeof paths === "string" ? [paths] : paths
+    setDeletePaths(ids)
+    // Check if any of the selected items is a folder (type=folder in items list)
+    const hasFolders = ids.some((id) => items.find((item) => item.id === id)?.type === "folder")
+    setDeleteHasFolders(hasFolders)
     setDeleteOpen(true)
   }
 
@@ -1299,7 +1304,11 @@ export function FileExplorer({
             <AlertDialogTitle>
               {deletePaths.length === 1 ? "Bu öğe çöp kutusuna taşınsın mı?" : `${deletePaths.length} öğe çöp kutusuna taşınsın mı?`}
             </AlertDialogTitle>
-            <AlertDialogDescription>Öğeler 7 gün sonra otomatik olarak kalıcı şekilde silinir.</AlertDialogDescription>
+            <AlertDialogDescription>
+              {deleteHasFolders
+                ? "Bu klasörün içindeki tüm dosyalar da çöp kutusuna taşınacak. Öğeler 7 gün sonra otomatik olarak kalıcı şekilde silinir."
+                : "Öğeler 7 gün sonra otomatik olarak kalıcı şekilde silinir."}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>İptal</AlertDialogCancel>

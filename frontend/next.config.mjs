@@ -40,17 +40,22 @@ const nextConfig = {
         ]
     },
     async headers() {
+        const isProduction = process.env.NODE_ENV === "production" &&
+            !process.env.BACKEND_INTERNAL_URL?.includes("localhost")
         return [
             {
-                source: "/(.*)",
+                // Apply security headers to pages only — not to /api/* proxied routes.
+                // HSTS on proxied /api routes confuses Chrome on localhost (ERR_ACCESS_DENIED).
+                source: "/((?!api/).*)",
                 headers: [
                     { key: "X-Frame-Options", value: "DENY" },
                     { key: "X-Content-Type-Options", value: "nosniff" },
                     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-                    {
+                    // HSTS only in production HTTPS — never in local dev (causes ERR_ACCESS_DENIED)
+                    ...(isProduction ? [{
                         key: "Strict-Transport-Security",
                         value: "max-age=63072000; includeSubDomains; preload",
-                    },
+                    }] : []),
                     {
                         key: "Permissions-Policy",
                         value: "geolocation=(), camera=(), microphone=()",

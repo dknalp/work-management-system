@@ -21,98 +21,9 @@ from app.routers.v1.files_utils import (
 
 router = APIRouter(prefix="/files", tags=["v1-files"])
 
-
-@router.delete("/trash/{file_id}", response_model=FileRecordResponse)
-def trash_file(
-    file_id: str,
-    current_user: User = Depends(get_current_user),
-    db: firestore.Client = Depends(get_db),
-) -> FileRecordResponse:
-    """Move a file or folder to trash (soft-delete).
-
-    Also cascades the trash flag to all descendants when the target is a folder.
-    """
-    doc = db.collection("file_records").document(file_id).get()
-    if not doc.exists or (doc.to_dict() or {}).get("is_deleted", False):
-        raise HTTPException(status_code=404, detail="File not found.")
-
-    data = doc.to_dict() or {}
-    _assert_owner(data, current_user)
-    now = _now()
-
-    db.collection("file_records").document(file_id).update({
-        "is_deleted": True,
-        "deleted_at": now,
-        "updated_at": now,
-    })
-
-    # Cascade to children when trashing a folder
-    if data.get("type") == "folder":
-        prefix = data["path"] + "/"
-        suffix = data["path"] + "0"  # range upper bound
-        children = (
-            db.collection("file_records")
-            .where("path", ">=", prefix)
-            .where("path", "<", suffix)
-            .where("is_deleted", "==", False)
-            .stream()
-        )
-        batch = db.batch()
-        count = 0
-        for child in children:
-            batch.update(child.reference, {"is_deleted": True, "deleted_at": now, "updated_at": now})
-            count += 1
-            if count >= 499:
-                batch.commit()
-                batch = db.batch()
-                count = 0
-        if count > 0:
-            batch.commit()
-
-    updated = {**data, "is_deleted": True, "deleted_at": now, "updated_at": now}
-    return _doc_to_response(file_id, updated)
-
-
-@router.get("/trash", response_model=list[FileRecordResponse])
-def list_trash(
-    current_user: User = Depends(get_current_user),
-    db: firestore.Client = Depends(get_db),
-) -> list[FileRecordResponse]:
-    """Return all trashed files for the current user."""
-    docs = (
-        db.collection("file_records")
-        .where("owner_id", "==", current_user.id)
-        .where("is_deleted", "==", True)
-        .stream()
-    )
-    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
-
-
-@router.post("/restore/{file_id}", response_model=FileRecordResponse)
-def restore_file(
-    file_id: str,
-    current_user: User = Depends(get_current_user),
-    db: firestore.Client = Depends(get_db),
-) -> FileRecordResponse:
-    """Restore a trashed file or folder."""
-    doc = db.collection("file_records").document(file_id).get()
-    if not doc.exists:
-        raise HTTPException(status_code=404, detail="File not found.")
-
-    data = doc.to_dict() or {}
-    _assert_owner(data, current_user)
-    if not data.get("is_deleted", False):
-        raise HTTPException(status_code=400, detail="File is not in trash.")
-
-    now = _now()
-    db.collection("file_records").document(file_id).update({
-        "is_deleted": False,
-        "deleted_at": None,
-        "updated_at": now,
-    })
-
-    updated = {**data, "is_deleted": False, "deleted_at": None, "updated_at": now}
-    return _doc_to_response(file_id, updated)
+# NOTE: static routes (/empty-trash, /trash, /restore) MUST be registered
+# before parameterized routes (/trash/{file_id}) so FastAPI doesn't swallow
+# the literal path segment as a file_id value.
 
 
 @router.delete("/empty-trash", status_code=204)
@@ -170,6 +81,106 @@ async def empty_trash(
                 len(r2_keys),
                 err,
             )
+
+
+@router.delete("/trash/{file_id}", response_model=FileRecordResponse)
+def trash_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> FileRecordResponse:
+    """Move a file or folder to trash (soft-delete).
+
+    Also cascades the trash flag to all descendants when the target is a folder.
+    """
+    doc = db.collection("file_records").document(file_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="File not found.")
+    data = doc.to_dict() or {}
+    # If already trashed, return current state — idempotent, not an error
+    if data.get("is_deleted", False):
+        return _doc_to_response(file_id, data)
+
+    _assert_owner(data, current_user)
+    now = _now()
+
+    db.collection("file_records").document(file_id).update({
+        "is_deleted": True,
+        "deleted_at": now,
+        "updated_at": now,
+    })
+
+    # Cascade to children when trashing a folder.
+    # We query only by path range (no is_deleted filter) to avoid needing a
+    # composite Firestore index.  Already-deleted children are skipped in Python.
+    if data.get("type") == "folder":
+        prefix = data["path"] + "/"
+        suffix = data["path"] + "0"  # lexicographic upper bound — '0' > '/'
+        children = (
+            db.collection("file_records")
+            .where("path", ">=", prefix)
+            .where("path", "<", suffix)
+            .stream()
+        )
+        batch = db.batch()
+        count = 0
+        for child in children:
+            child_data = child.to_dict() or {}
+            if child_data.get("is_deleted"):
+                continue  # already trashed — skip without needing composite index
+            batch.update(child.reference, {"is_deleted": True, "deleted_at": now, "updated_at": now})
+            count += 1
+            if count >= 499:
+                batch.commit()
+                batch = db.batch()
+                count = 0
+        if count > 0:
+            batch.commit()
+
+    updated = {**data, "is_deleted": True, "deleted_at": now, "updated_at": now}
+    return _doc_to_response(file_id, updated)
+
+
+@router.get("/trash", response_model=list[FileRecordResponse])
+def list_trash(
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> list[FileRecordResponse]:
+    """Return all trashed files for the current user."""
+    docs = (
+        db.collection("file_records")
+        .where("owner_id", "==", current_user.id)
+        .where("is_deleted", "==", True)
+        .stream()
+    )
+    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
+
+
+@router.post("/restore/{file_id}", response_model=FileRecordResponse)
+def restore_file(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: firestore.Client = Depends(get_db),
+) -> FileRecordResponse:
+    """Restore a trashed file or folder."""
+    doc = db.collection("file_records").document(file_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    data = doc.to_dict() or {}
+    _assert_owner(data, current_user)
+    if not data.get("is_deleted", False):
+        raise HTTPException(status_code=400, detail="File is not in trash.")
+
+    now = _now()
+    db.collection("file_records").document(file_id).update({
+        "is_deleted": False,
+        "deleted_at": None,
+        "updated_at": now,
+    })
+
+    updated = {**data, "is_deleted": False, "deleted_at": None, "updated_at": now}
+    return _doc_to_response(file_id, updated)
 
 
 @router.delete("/permanent/{file_id}", status_code=204)

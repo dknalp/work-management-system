@@ -144,13 +144,27 @@ function uploadWithXHR(
       }
     }
 
-    xhr.onerror = () => reject(new Error("Network error"))
+    xhr.onerror = (e) => {
+      console.error("[upload] XHR onerror", {
+        readyState: xhr.readyState,
+        status: xhr.status,
+        responseText: xhr.responseText,
+        event: e,
+      })
+      reject(new Error("Network error"))
+    }
     xhr.ontimeout = () => reject(new Error("Upload timed out"))
 
-    xhr.open("POST", `${API_BASE_URL}/api/v1/files/upload`)
+    const uploadUrl = `${API_BASE_URL}/api/v1/files/upload`
+    console.log("[upload] open XHR →", uploadUrl)
+    console.log("[upload] file:", item.file.name, item.file.size, "bytes, type:", item.file.type)
+    xhr.open("POST", uploadUrl)
     const token = tokenStorage.getAccess()
+    console.log("[upload] token present:", !!token, token ? token.slice(0, 20) + "..." : "NONE")
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`)
+    console.log("[upload] sending form...")
     xhr.send(form)
+    console.log("[upload] sent, readyState:", xhr.readyState)
   })
 }
 
@@ -166,6 +180,7 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
   const activeCount = useRef(0)
   const overwriteSet = useRef<Set<string>>(new Set())
   const itemsRef = useRef<UploadItem[]>([])
+  const askDuplicateRef = useRef<(file: File, path: string) => Promise<"overwrite" | "rename" | "skip">>(() => Promise.resolve("skip" as const))
 
   useEffect(() => {
     itemsRef.current = items
@@ -218,8 +233,36 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
         patchItem({ status: "done", progress: 100, result })
         window.dispatchEvent(new Event("wms:files:changed"))
       })
-      .catch((err: unknown) => {
+      .catch(async (err: unknown) => {
         const message = err instanceof Error ? err.message : "Unknown error"
+
+        // Server-side 409: file already exists — ask user what to do, same as
+        // in-memory collision handling in addFiles.
+        if (message.startsWith("A file named") || message.includes("already exists")) {
+          patchItem({ status: "pending", progress: 0, errorMessage: undefined })
+          const action = await askDuplicateRef.current(item.file, item.path)
+          if (action === "skip") {
+            patchItem({ status: "error", errorMessage: "Atlandı" })
+          } else if (action === "overwrite") {
+            overwriteSet.current.add(item.id)
+            patchItem({ status: "pending", progress: 0, errorMessage: undefined })
+          } else {
+            // rename: add suffix and re-queue
+            let suffix = 1
+            let newName = addSuffix(item.file.name, suffix)
+            while (itemsRef.current.find((i) => i.file.name === newName && i.path === item.path && i.status !== "error")) {
+              suffix++
+              newName = addSuffix(item.file.name, suffix)
+            }
+            const renamedFile = new File([item.file], newName, { type: item.file.type })
+            itemsRef.current = itemsRef.current.map((i) =>
+              i.id === item.id ? { ...i, file: renamedFile, status: "pending", progress: 0, errorMessage: undefined } : i
+            )
+            setItems(itemsRef.current)
+          }
+          return
+        }
+
         patchItem({ status: "error", errorMessage: message })
       })
       .finally(() => {
@@ -239,6 +282,8 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
       }),
     []
   )
+  // Keep ref in sync so async upload callbacks can always access the latest version
+  askDuplicateRef.current = askDuplicate
 
   // -------------------------------------------------------------------------
   // addFiles — public API

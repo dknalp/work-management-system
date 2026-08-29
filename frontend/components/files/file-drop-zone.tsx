@@ -3,11 +3,47 @@
 import * as React from "react"
 import { UploadIcon } from "lucide-react"
 import { useUploadQueue } from "@/components/files/upload-queue"
+import { createFolder } from "@/lib/actions/files"
 
 interface FileDropZoneProps {
   children: React.ReactNode
   currentPath: string
   disabled?: boolean
+}
+
+/** Recursively read a FileSystemDirectoryEntry and collect all File objects
+ *  with their paths relative to the dropped item's parent. */
+function readEntryRecursive(
+  entry: FileSystemEntry,
+  pathPrefix: string,
+  results: { file: File; path: string }[],
+): Promise<void> {
+  return new Promise((resolve) => {
+    if (entry.isFile) {
+      ;(entry as FileSystemFileEntry).file((file) => {
+        results.push({ file, path: pathPrefix })
+        resolve()
+      })
+    } else if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader()
+      const readAll = (accumulated: FileSystemEntry[]) => {
+        reader.readEntries((batch) => {
+          if (batch.length === 0) {
+            // all entries read — recurse into each
+            const subdir = pathPrefix ? `${pathPrefix}/${entry.name}` : entry.name
+            Promise.all(
+              accumulated.map((child) => readEntryRecursive(child, subdir, results)),
+            ).then(() => resolve())
+          } else {
+            readAll([...accumulated, ...batch])
+          }
+        })
+      }
+      readAll([])
+    } else {
+      resolve()
+    }
+  })
 }
 
 export function FileDropZone({ children, currentPath, disabled = false }: FileDropZoneProps) {
@@ -46,7 +82,95 @@ export function FileDropZone({ children, currentPath, disabled = false }: FileDr
     e.preventDefault()
     dragCounter.current = 0
     setIsDragging(false)
-    if (!disabled && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (disabled) return
+
+    // Use DataTransferItemList + webkitGetAsEntry to handle both files and
+    // folders. e.dataTransfer.files gives back directory entries as 4096-byte
+    // opaque File objects that the browser blocks from being uploaded (ERR_ACCESS_DENIED).
+    const items = e.dataTransfer.items
+    if (items && items.length > 0) {
+      const collected: { file: File; path: string }[] = []
+      const promises: Promise<void>[] = []
+
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.()
+        if (!entry) continue
+
+        if (entry.isFile) {
+          promises.push(
+            new Promise((resolve) => {
+              ;(entry as FileSystemFileEntry).file((file) => {
+                collected.push({ file, path: currentPath })
+                resolve()
+              })
+            }),
+          )
+        } else if (entry.isDirectory) {
+          // For a dropped folder, files go into currentPath/folderName/...
+          const folderPath = currentPath ? `${currentPath}/${entry.name}` : entry.name
+          const reader = (entry as FileSystemDirectoryEntry).createReader()
+          const readAll = (acc: FileSystemEntry[]): Promise<void> =>
+            new Promise((res) => {
+              reader.readEntries((batch) => {
+                if (batch.length === 0) {
+                  Promise.all(
+                    acc.map((child) => readEntryRecursive(child, folderPath, collected)),
+                  ).then(() => res())
+                } else {
+                  readAll([...acc, ...batch]).then(res)
+                }
+              })
+            })
+          promises.push(readAll([]))
+        }
+      }
+
+      Promise.all(promises).then(async () => {
+        if (collected.length === 0) return
+
+        // Collect all unique folder paths that need to exist
+        const folderPaths = new Set<string>()
+        for (const { path } of collected) {
+          // e.g. path="imgs/sub" → need "imgs" and "imgs/sub"
+          const parts = path.split("/").filter(Boolean)
+          let acc = ""
+          for (const part of parts) {
+            acc = acc ? `${acc}/${part}` : part
+            folderPaths.add(acc)
+          }
+        }
+
+        // Create folder records from shallowest to deepest (order matters)
+        const sortedFolders = Array.from(folderPaths).sort(
+          (a, b) => a.split("/").length - b.split("/").length,
+        )
+        for (const folderPath of sortedFolders) {
+          const parts = folderPath.split("/")
+          const name = parts[parts.length - 1]
+          const parent = parts.slice(0, -1).join("/")
+          try {
+            await createFolder(parent, name)
+          } catch {
+            // folder may already exist — ignore
+          }
+        }
+
+        // Group files by target path and upload
+        const byPath = new Map<string, File[]>()
+        for (const { file, path } of collected) {
+          const arr = byPath.get(path) ?? []
+          arr.push(file)
+          byPath.set(path, arr)
+        }
+        for (const [path, files] of byPath) {
+          addFiles(files, path)
+        }
+      })
+      return
+    }
+
+    // Fallback for browsers without webkitGetAsEntry (very old)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleUpload(e.dataTransfer.files)
     }
   }
