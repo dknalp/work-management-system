@@ -32,6 +32,10 @@ services:
         # So NEXT_PUBLIC_API_URL is intentionally left empty here; the
         # api client defaults to "" which means relative URLs that Next.js proxies.
         NEXT_PUBLIC_API_URL: ""
+        # Uploads go directly from the browser to the backend, bypassing the
+        # Next.js proxy which has a hard body-size limit. The backend port (3052)
+        # is published on the host so the browser can reach it directly.
+        NEXT_PUBLIC_UPLOAD_URL: "http://localhost:3052"
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
         NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: ${NEXT_PUBLIC_GOOGLE_PICKER_API_KEY:-}
         NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}

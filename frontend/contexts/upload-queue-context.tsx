@@ -3,8 +3,15 @@
 import * as React from "react"
 import { tokenStorage } from "@/lib/auth"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3052"
+// For uploads we bypass the Next.js proxy (which has a hard body-size limit)
+// and go directly to the backend. NEXT_PUBLIC_UPLOAD_URL is set to the backend
+// host URL in docker-compose; falls back to NEXT_PUBLIC_API_URL for local dev,
+// then to empty string (relative, proxied) as last resort.
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_UPLOAD_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  ""
+).replace(/\/+$/, "")
 
 export interface FileRecord {
   name: string
@@ -52,29 +59,49 @@ function uploadWithXHR(
   form.append("path", item.path)
   form.append("overwrite", "false")
 
+  const uploadUrl = `${API_BASE_URL}/api/v1/files/upload`
+  console.log("[upload] ENV NEXT_PUBLIC_API_URL:", process.env.NEXT_PUBLIC_API_URL)
+  console.log("[upload] API_BASE_URL const:", API_BASE_URL)
+  console.log("[upload] Final URL:", uploadUrl)
+  console.log("[upload] File:", item.file.name, item.file.size, "bytes")
+
   xhr.upload.onprogress = (e) => {
     if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
   }
   xhr.onload = () => {
+    console.log("[upload] onload status:", xhr.status, "response:", xhr.responseText.slice(0, 200))
     if (xhr.status >= 200 && xhr.status < 300) {
       try {
         onDone(JSON.parse(xhr.responseText) as FileRecord)
       } catch {
-        onError("Invalid response")
+        onError("Invalid response from server")
       }
     } else {
       try {
         const body = JSON.parse(xhr.responseText) as { detail?: string }
-        onError(body?.detail || "Upload failed")
+        onError(body?.detail || `Upload failed (HTTP ${xhr.status})`)
       } catch {
-        onError("Upload failed")
+        onError(`Upload failed (HTTP ${xhr.status}): ${xhr.responseText.slice(0, 100)}`)
       }
     }
   }
-  xhr.onerror = () => onError("Network error")
+  xhr.onerror = (e) => {
+    console.error("[upload] XHR onerror — likely CORS or network block", {
+      url: uploadUrl,
+      readyState: xhr.readyState,
+      status: xhr.status,
+      event: e,
+    })
+    onError(`Network error — check console. URL attempted: ${uploadUrl}`)
+  }
+  xhr.onabort = () => {
+    console.warn("[upload] XHR aborted")
+    onError("Upload aborted")
+  }
 
-  xhr.open("POST", `${API_BASE_URL}/api/v1/files/upload`)
+  xhr.open("POST", uploadUrl)
   const token = tokenStorage.getAccess()
+  console.log("[upload] Auth token present:", !!token)
   if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`)
   xhr.send(form)
   return xhr

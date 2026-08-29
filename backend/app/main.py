@@ -106,9 +106,20 @@ app = FastAPI(
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3051")
 
+# In development allow any localhost port so the Next.js dev server (3051) can
+# talk directly to the backend (3052) without CORS issues during uploads.
+# In production only the explicit FRONTEND_URL is permitted.
+if _env == "development":
+    _cors_origins: list[str] = []
+    _cors_origin_regex: str | None = r"https?://localhost(:\d+)?"
+else:
+    _cors_origins = [FRONTEND_URL]
+    _cors_origin_regex = None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
+    allow_origins=_cors_origins,
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -131,7 +142,12 @@ async def _unhandled_exception_handler(request, exc: Exception):
     logger.error("Unhandled exception: %s", traceback.format_exc())
     origin = request.headers.get("origin", "")
     headers = {}
-    if origin == FRONTEND_URL or not origin:
+    import re as _re
+    _origin_allowed = (
+        origin == FRONTEND_URL
+        or (_cors_origin_regex is not None and bool(_re.match(_cors_origin_regex, origin)))
+    )
+    if _origin_allowed or not origin:
         headers["Access-Control-Allow-Origin"] = origin or FRONTEND_URL
         headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(
