@@ -24,11 +24,10 @@ const CHUNKED_THRESHOLD = 100 * 1024 * 1024  // files > 100 MiB use chunked uplo
 const XHR_TIMEOUT_MS = 10 * 60 * 1000        // 10 minutes per chunk/request
 const REFRESH_DEBOUNCE_MS = 500              // fire wms:files:changed once after last completion
 const SESSION_STORAGE_KEY = "wms:upload-queue"
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_UPLOAD_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  ""
-)
+// Always use relative URLs so uploads go through the Next.js reverse proxy.
+// Direct backend URLs (localhost:3052) break in production where the backend
+// is not reachable from the user's browser.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 // ---------------------------------------------------------------------------
 // Types

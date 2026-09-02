@@ -36,11 +36,9 @@ services:
         # So NEXT_PUBLIC_API_URL is intentionally left empty here; the
         # api client defaults to "" which means relative URLs that Next.js proxies.
         NEXT_PUBLIC_API_URL: ""
-        # Uploads go through Next.js rewrites (/api/* → backend:3052).
-        # NEXT_PUBLIC_UPLOAD_URL is intentionally empty so the upload context
-        # falls back to NEXT_PUBLIC_API_URL (also empty = relative URLs),
-        # which the Next.js rewrite proxy forwards to the backend container.
-        NEXT_PUBLIC_UPLOAD_URL: ""
+        # Uploads use relative URLs (/api/v1/files/upload) which Next.js
+        # proxies to backend:3052. No direct backend URL is ever baked into
+        # the JS bundle — this ensures uploads work from any network/domain.
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
         NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: ${NEXT_PUBLIC_GOOGLE_PICKER_API_KEY:-}
         NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
