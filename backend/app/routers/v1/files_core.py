@@ -71,11 +71,14 @@ def list_files(
     docs = (
         db.collection("file_records")
         .where("owner_id", "==", current_user.id)
-        .where("parent_path", "==", path)
-        .where("is_deleted", "==", False)
         .stream()
     )
-    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
+    result = []
+    for doc in docs:
+        d = doc.to_dict() or {}
+        if d.get("parent_path") == path and not d.get("is_deleted", False):
+            result.append(_doc_to_response(doc.id, d))
+    return result
 
 
 @router.post("/upload", response_model=FileRecordResponse, status_code=201)
@@ -123,14 +126,16 @@ async def upload_file(
     # composite index (while the index is being built) degrades gracefully to
     # "no dedup" rather than crashing the upload with a 500.
     try:
-        existing_docs = (
+        _all_owner_docs = (
             db.collection("file_records")
             .where("owner_id", "==", current_user.id)
             .where("path", "==", virtual_path)
-            .where("is_deleted", "==", False)
-            .limit(1)
-            .get()
+            .stream()
         )
+        existing_docs = [
+            d for d in _all_owner_docs
+            if not (d.to_dict() or {}).get("is_deleted", False)
+        ][:1]
     except Exception:
         existing_docs = []
     existing_id: str | None = None
@@ -490,11 +495,15 @@ def list_starred(
     """Return all non-deleted starred files for the current user."""
     docs = (
         db.collection("file_records")
-        .where("is_starred", "==", True)
-        .where("is_deleted", "==", False)
+        .where("owner_id", "==", current_user.id)
         .stream()
     )
-    return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in docs]
+    result = []
+    for doc in docs:
+        d = doc.to_dict() or {}
+        if d.get("is_starred") and not d.get("is_deleted", False):
+            result.append(_doc_to_response(doc.id, d))
+    return result
 
 
 @router.get("/recent", response_model=list[FileRecordResponse])
@@ -539,16 +548,15 @@ def get_quota(
     docs = (
         db.collection("file_records")
         .where("owner_id", "==", current_user.id)
-        .where("is_deleted", "==", False)
-        .where("type", "==", "file")
         .stream()
     )
     used_bytes = 0
     file_count = 0
     for doc in docs:
         d = doc.to_dict() or {}
-        used_bytes += d.get("size") or 0
-        file_count += 1
+        if not d.get("is_deleted", False) and d.get("type") == "file":
+            used_bytes += d.get("size") or 0
+            file_count += 1
 
     return QuotaResponse(used_bytes=used_bytes, file_count=file_count)
 

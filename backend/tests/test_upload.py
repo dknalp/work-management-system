@@ -44,6 +44,8 @@ def _firestore_mock(existing_docs: list | None = None):
     query.where.return_value = query
     query.limit.return_value = query
     query.get.return_value = existing_docs or []
+    # Support both .get() and .stream() — new dedup code uses .stream()
+    query.stream.return_value = iter(existing_docs or [])
 
     col = MagicMock()
     col.where.return_value = query

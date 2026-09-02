@@ -155,6 +155,9 @@ class TestListTrash:
     def _setup(self, trashed_docs):
         app = _make_app()
         db = MagicMock()
+        # list_trash now uses single owner_id filter + Python-side is_deleted check
+        db.collection.return_value.where.return_value.stream.return_value = iter(trashed_docs)
+        # Keep chained .where().where().stream() mock for other tests that may use it
         db.collection.return_value.where.return_value.where.return_value.stream.return_value = iter(trashed_docs)
         from app.deps import get_current_user
         from app.firebase import get_db

@@ -189,13 +189,19 @@ def list_trash(
     Algorithm: fetch all trashed items, build a set of their paths, then
     exclude any item whose immediate parent path is also in that set.
     """
+    # Query on owner_id only (single-field, always auto-indexed).
+    # Filter is_deleted in Python to avoid requiring a composite index
+    # while the (owner_id, is_deleted) composite index is being built.
     docs = (
         db.collection("file_records")
         .where("owner_id", "==", current_user.id)
-        .where("is_deleted", "==", True)
         .stream()
     )
-    all_trashed: dict[str, dict] = {doc.id: doc.to_dict() or {} for doc in docs}
+    all_trashed: dict[str, dict] = {}
+    for doc in docs:
+        d = doc.to_dict() or {}
+        if d.get("is_deleted", False):
+            all_trashed[doc.id] = d
 
     # Build a set of all trashed paths for fast ancestor lookup
     trashed_paths: set[str] = {d.get("path", "") for d in all_trashed.values()}
@@ -276,17 +282,21 @@ async def delete_permanently(
     current_user: User = Depends(get_current_user),
     db: firestore.Client = Depends(get_db),
 ) -> None:
-    """Permanently delete a single trashed file.
+    """Permanently delete a single trashed item (file or folder).
 
-    Deletes the storage object from R2 (or local disk), the Firestore
-    file_records document, and all associated file_access_logs and
-    file_shares documents.  The file must already be in trash (is_deleted=True).
+    For files: deletes the R2/local storage object, the Firestore record,
+    and associated access logs + share records.
+
+    For folders: also cascades into all descendant file_records (files and
+    subfolders whose path starts with the folder's path + "/"), collecting
+    their R2 keys and deleting them in bulk before removing all Firestore
+    records in a batch.
 
     Storage and metadata cleanup failures are logged as warnings but do
-    not abort the operation — the file_records document is always deleted.
+    not abort the operation — Firestore records are always removed.
 
-    Raises 404 if the file does not exist, 403 if the caller does not own
-    it, and 400 if the file is not currently in trash.
+    Raises 404 if the item does not exist, 403 if the caller does not own
+    it, and 400 if the item is not currently in trash.
     """
     doc = db.collection("file_records").document(file_id).get()
     if not doc.exists:
@@ -298,31 +308,77 @@ async def delete_permanently(
     if not data.get("is_deleted", False):
         raise HTTPException(status_code=400, detail="File is not in trash.")
 
-    r2_key: str | None = data.get("r2_key")
+    is_folder = data.get("type") == "folder"
+    folder_path: str = data.get("path", "")
+
+    # Collect all items to delete: the item itself + all descendants (for folders)
+    r2_keys: list[str] = []
+    doc_refs: list = []
+    all_file_ids: list[str] = [file_id]
+
+    if root_key := data.get("r2_key"):
+        r2_keys.append(root_key)
+    doc_refs.append(db.collection("file_records").document(file_id))
+
+    if is_folder and folder_path:
+        # Fetch all descendants: records whose path starts with "<folder_path>/"
+        prefix_end = folder_path + "/"
+        child_docs = (
+            db.collection("file_records")
+            .where("owner_id", "==", current_user.id)
+            .where("path", ">=", folder_path + "/")
+            .where("path", "<=", prefix_end)
+            .stream()
+        )
+        for child in child_docs:
+            child_data = child.to_dict() or {}
+            if key := child_data.get("r2_key"):
+                r2_keys.append(key)
+            doc_refs.append(child.reference)
+            all_file_ids.append(child.id)
+
     logger.info(
-        "delete_permanently: user=%s file_id=%s r2_key=%s",
-        current_user.id, file_id, r2_key,
+        "delete_permanently: user=%s file_id=%s is_folder=%s "
+        "total_records=%d r2_objects=%d",
+        current_user.id, file_id, is_folder, len(doc_refs), len(r2_keys),
     )
 
-    # Delete storage object — non-fatal on failure
-    if r2_key:
+    # Delete storage objects — non-fatal on failure
+    if r2_keys:
         try:
             if _use_r2():
-                await r2_delete_object(r2_key)
+                if len(r2_keys) == 1:
+                    await r2_delete_object(r2_keys[0])
+                else:
+                    await r2_delete_objects(r2_keys)
             else:
-                local = _local_path(r2_key)
-                if local.exists():
-                    local.unlink()
+                for key in r2_keys:
+                    local = _local_path(key)
+                    if local.exists():
+                        local.unlink()
         except Exception as exc:
             logger.warning(
-                "delete_permanently: storage cleanup failed file_id=%s key=%s: %s",
-                file_id, r2_key, exc,
+                "delete_permanently: storage cleanup failed file_id=%s count=%d: %s",
+                file_id, len(r2_keys), exc,
             )
 
-    # Delete the primary Firestore record
-    db.collection("file_records").document(file_id).delete()
+    # Delete all Firestore records in batches of 499
+    batch = db.batch()
+    count = 0
+    for ref in doc_refs:
+        batch.delete(ref)
+        count += 1
+        if count >= 499:
+            batch.commit()
+            batch = db.batch()
+            count = 0
+    if count > 0:
+        batch.commit()
 
     # Clean up associated access logs and share records — non-fatal
-    _delete_file_metadata(db, [file_id])
+    _delete_file_metadata(db, all_file_ids)
 
-    logger.info("delete_permanently: done file_id=%s", file_id)
+    logger.info(
+        "delete_permanently: done file_id=%s deleted_records=%d",
+        file_id, len(doc_refs),
+    )
