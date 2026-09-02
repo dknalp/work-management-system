@@ -4,99 +4,258 @@
       "collectionGroup": "calendar_events",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "date", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "projects",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "pipelines",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "project_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        {
+          "fieldPath": "project_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "activity",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "user_id", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "files",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "is_deleted", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "files",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "path", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "files",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "is_starred", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "files",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "owner_id", "order": "ASCENDING" },
-        { "fieldPath": "updated_at", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
+        {
+          "fieldPath": "user_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "webhooks",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "bot_id", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "ASCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+        {
+          "fieldPath": "bot_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "file_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "parent_path",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "file_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "path",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "file_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "file_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_starred",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "file_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updated_at",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "file_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "owner_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "is_deleted",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],

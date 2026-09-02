@@ -140,19 +140,26 @@ export function FileDropZone({ children, currentPath, disabled = false }: FileDr
           }
         }
 
-        // Create folder records from shallowest to deepest (order matters)
+        // Create folder records from shallowest to deepest (parents must exist before children).
+        // Within each depth level, folders are created in parallel to avoid N serial round-trips.
         const sortedFolders = Array.from(folderPaths).sort(
           (a, b) => a.split("/").length - b.split("/").length,
         )
-        for (const folderPath of sortedFolders) {
-          const parts = folderPath.split("/")
-          const name = parts[parts.length - 1]
-          const parent = parts.slice(0, -1).join("/")
-          try {
-            await createFolder(parent, name)
-          } catch {
-            // folder may already exist — ignore
-          }
+        const byDepth = new Map<number, string[]>()
+        for (const p of sortedFolders) {
+          const depth = p.split("/").length
+          byDepth.set(depth, [...(byDepth.get(depth) ?? []), p])
+        }
+        for (const [, paths] of [...byDepth.entries()].sort(([a], [b]) => a - b)) {
+          await Promise.allSettled(
+            paths.map((folderPath) => {
+              const parts = folderPath.split("/")
+              const name = parts[parts.length - 1]
+              const parent = parts.slice(0, -1).join("/")
+              return createFolder(parent, name)
+              // allSettled — individual failures (folder already exists) are ignored
+            }),
+          )
         }
 
         // Group files by target path and upload

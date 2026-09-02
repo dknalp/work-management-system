@@ -8,6 +8,7 @@ import io
 import logging
 import secrets
 import shutil
+import os
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -18,7 +19,7 @@ from firebase_admin import firestore
 
 from app.deps import Actor, get_current_actor, get_current_user
 from app.firebase import get_db
-from app.routers.v1.files_utils import UPLOAD_SEMAPHORE
+from app.routers.v1.files_utils import UPLOAD_SEMAPHORE, MAX_SINGLE_REQUEST_BYTES
 from app.models import User
 from app.r2 import (
     r2_copy_object,
@@ -27,9 +28,7 @@ from app.r2 import (
 )
 logger = logging.getLogger(__name__)
 
-# Maximum file size accepted by the upload endpoint.
-# Requests that exceed this are rejected before the semaphore is acquired.
-MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
+# Simple upload size limit: files >= MAX_SINGLE_REQUEST_BYTES must use the chunked upload API.
 
 # MIME types that must never be accepted because a browser may execute them
 # when served back (e.g. via a share link or direct download).
@@ -97,10 +96,10 @@ async def upload_file(
     """
     # Reject oversized uploads before buffering any bytes.
     content_length = file.size  # set by FastAPI from Content-Length header when present
-    if content_length is not None and content_length > MAX_UPLOAD_BYTES:
+    if content_length is not None and content_length > MAX_SINGLE_REQUEST_BYTES:
         raise HTTPException(
             status_code=413,
-            detail=f"File exceeds maximum upload size of {MAX_UPLOAD_BYTES // (1024 ** 3)} GB.",
+            detail=f"File exceeds {MAX_SINGLE_REQUEST_BYTES // (1024 * 1024)} MiB limit for simple upload. Use the chunked upload API (/files/upload/init).",
         )
 
     file_id = str(uuid.uuid4())
@@ -120,15 +119,20 @@ async def upload_file(
     # Look for an existing, non-deleted file record with the same virtual path
     # owned by this user.  A file with the same name in the same folder counts
     # as a collision regardless of whether it was uploaded in this session.
-    existing_docs = (
-        db.collection("file_records")
-        .where("owner_id", "==", current_user.id)
-        .where("path", "==", virtual_path)
-        .where("is_deleted", "==", False)
-        .where("type", "==", "file")
-        .limit(1)
-        .get()
-    )
+    # The query is wrapped in a try/except so that a missing Firestore
+    # composite index (while the index is being built) degrades gracefully to
+    # "no dedup" rather than crashing the upload with a 500.
+    try:
+        existing_docs = (
+            db.collection("file_records")
+            .where("owner_id", "==", current_user.id)
+            .where("path", "==", virtual_path)
+            .where("is_deleted", "==", False)
+            .limit(1)
+            .get()
+        )
+    except Exception:
+        existing_docs = []
     existing_id: str | None = None
     existing_r2_key: str | None = None
     if existing_docs:
@@ -147,33 +151,60 @@ async def upload_file(
 
     async with UPLOAD_SEMAPHORE:
         if _use_r2():
-            # Stream directly to R2 without buffering in RAM.
-            content = await file.read()
-            if len(content) > MAX_UPLOAD_BYTES:
-                raise HTTPException(status_code=413, detail="File too large.")
-            size = len(content)
-            import io as _io
-            await r2_upload_fileobj(
-                _io.BytesIO(content),
-                r2_key,
-                file.content_type or "application/octet-stream",
-            )
+            # Stream UploadFile into a temp file first (avoids loading entire
+            # file into RAM), then hand the file handle to boto3's upload_fileobj
+            # which does S3 multipart internally.
+            from app.routers.v1.files_utils import _storage_root as _sr
+            tmp_dir = _sr() / "tmp"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            tmp_r2 = tmp_dir / f".tmp-r2-{file_id}"
+            try:
+                size = 0
+                with open(tmp_r2, "wb") as _tmp:
+                    while True:
+                        chunk = await file.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        size += len(chunk)
+                        if size > MAX_SINGLE_REQUEST_BYTES:
+                            raise HTTPException(
+                                status_code=413,
+                                detail=f"File exceeds {MAX_SINGLE_REQUEST_BYTES // (1024 * 1024)} MiB limit for simple upload. Use the chunked upload API (/files/upload/init).",
+                            )
+                        _tmp.write(chunk)
+                with open(tmp_r2, "rb") as _tmp:
+                    await r2_upload_fileobj(
+                        _tmp,
+                        r2_key,
+                        file.content_type or "application/octet-stream",
+                    )
+            finally:
+                tmp_r2.unlink(missing_ok=True)
         else:
             local = _local_path(r2_key)
             local.parent.mkdir(parents=True, exist_ok=True)
-            # Write in 1 MiB chunks to avoid loading the entire file into RAM.
-            size = 0
-            with open(local, "wb") as dest:
-                while True:
-                    chunk = await file.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    if size + len(chunk) > MAX_UPLOAD_BYTES:
-                        dest.close()
-                        local.unlink(missing_ok=True)
-                        raise HTTPException(status_code=413, detail="File too large.")
-                    dest.write(chunk)
-                    size += len(chunk)
+            # Write to a temp file first, then rename atomically (os.replace is
+            # POSIX rename(2) — atomic even across a crash mid-write, so the
+            # final path never contains a partial file).
+            tmp_local = local.parent / f".tmp-{file_id}"
+            try:
+                size = 0
+                with open(tmp_local, "wb") as dest:
+                    while True:
+                        chunk = await file.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        if size + len(chunk) > MAX_SINGLE_REQUEST_BYTES:
+                            raise HTTPException(
+                                status_code=413,
+                                detail=f"File exceeds {MAX_SINGLE_REQUEST_BYTES // (1024 * 1024)} MiB limit for simple upload. Use the chunked upload API (/files/upload/init).",
+                            )
+                        dest.write(chunk)
+                        size += len(chunk)
+                os.replace(tmp_local, local)  # atomic rename
+            finally:
+                if tmp_local.exists():
+                    tmp_local.unlink(missing_ok=True)
 
     now = _now()
     data = {

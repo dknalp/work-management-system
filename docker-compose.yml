@@ -19,6 +19,10 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      # Local file storage inside the container, backed by a named volume
+      FILE_STORAGE_PATH: /data/files
+    volumes:
+      - file_storage:/data/files
     ports:
       - "3052:3052"
 
@@ -52,3 +56,6 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
     ports:
       - "3051:3051"
+
+volumes:
+  file_storage:

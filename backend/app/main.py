@@ -19,7 +19,7 @@ FRONTEND_URL
 import logging
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,7 @@ from .routers.v1 import (
     files_misc,
     files_share,
     files_trash,
+    files_upload,
     me as v1_me,
     presence as v1_presence_mod,
     tasks as v1_tasks,
@@ -78,6 +79,44 @@ import os
 
 # ── Startup / shutdown ─────────────────────────────────────────────────────────
 
+async def _cleanup_stale_upload_sessions(db: firestore.Client) -> None:
+    """Abort and remove upload_sessions documents older than 48 hours.
+
+    Incomplete S3 multipart uploads accumulate storage costs in R2 until
+    explicitly aborted. This runs at startup to clean up sessions abandoned
+    by crashed or disconnected clients.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    try:
+        stale = (
+            db.collection("upload_sessions")
+            .where("created_at", "<", cutoff)
+            .where("status", "==", "in_progress")
+            .stream()
+        )
+        count = 0
+        for doc in stale:
+            data = doc.to_dict() or {}
+            r2_key = data.get("r2_key")
+            r2_upload_id = data.get("r2_upload_id")
+            if r2_key and r2_upload_id:
+                try:
+                    await r2_abort_multipart_upload(r2_key, r2_upload_id)
+                except Exception as exc:
+                    logger.warning("[startup] R2 abort failed for stale session %s: %s", doc.id, exc)
+            tmp = data.get("local_tmp_path")
+            if tmp:
+                Path(tmp).unlink(missing_ok=True)
+            doc.reference.update({"status": "aborted"})
+            count += 1
+        if count:
+            logger.info("[startup] Cleaned up %d stale upload sessions", count)
+    except Exception as exc:
+        # Never block startup — R2 or Firestore may be temporarily unreachable
+        logger.warning("[startup] Stale session cleanup failed: %s", exc)
+
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize Firebase and seed default data, then yield for request handling."""
@@ -88,6 +127,7 @@ async def lifespan(app: FastAPI):
     _seed_admin_user(db)
     # Pre-warm the permission cache so the first real request is never cold
     prewarm_permission_cache(db)
+    await _cleanup_stale_upload_sessions(db)
     yield
     # Graceful shutdown — nothing to tear down; Firebase SDK cleans itself up.
 
@@ -190,9 +230,14 @@ app.include_router(v1_tasks.router, prefix=_V1)
 app.include_router(v1_team.router, prefix=_V1)
 app.include_router(v1_activity.router, prefix=_V1)
 app.include_router(v1_analytics.router, prefix=_V1)
+# files_upload must be before files_core — its /upload/init, /upload/chunk, /upload/complete
+# routes would otherwise be caught by files_core's /{file_id} catch-all DELETE handler.
+app.include_router(files_upload.router, prefix=_V1)
+# files_trash must be before files_core — its /empty-trash and /trash/{id} routes
+# would otherwise be swallowed by files_core's catch-all DELETE /{file_id}.
+app.include_router(files_trash.router, prefix=_V1)
 app.include_router(files_core.router, prefix=_V1)
 app.include_router(files_bulk.router, prefix=_V1)
-app.include_router(files_trash.router, prefix=_V1)
 app.include_router(files_share.router, prefix=_V1)
 app.include_router(files_drive.router, prefix=_V1)
 app.include_router(files_misc.router, prefix=_V1)

@@ -153,3 +153,99 @@ async def r2_delete_objects(keys: list[str]) -> None:
         None,
         partial(client.delete_objects, Bucket=bucket, Delete={"Objects": objects}),
     )
+
+# ---------------------------------------------------------------------------
+# Multipart upload helpers (used by chunked upload router)
+# ---------------------------------------------------------------------------
+
+async def r2_create_multipart_upload(key: str, content_type: str) -> str:
+    """Initiate an S3 multipart upload and return the upload ID."""
+    client = get_r2_client()
+    bucket = get_bucket()
+    loop = asyncio.get_running_loop()
+
+    def _create() -> str:
+        resp = client.create_multipart_upload(
+            Bucket=bucket,
+            Key=key,
+            ContentType=content_type,
+        )
+        return resp["UploadId"]
+
+    return await loop.run_in_executor(None, _create)
+
+
+async def r2_upload_part(key: str, upload_id: str, part_number: int, data: bytes) -> str:
+    """Upload one part of a multipart upload and return the ETag.
+
+    Args:
+        key: R2 object key.
+        upload_id: The multipart upload ID from r2_create_multipart_upload.
+        part_number: 1-based part index (S3 requires 1–10000).
+        data: Raw bytes for this part (min 5 MiB except for the last part).
+
+    Returns:
+        ETag string (needed to complete the upload).
+    """
+    client = get_r2_client()
+    bucket = get_bucket()
+    loop = asyncio.get_running_loop()
+
+    def _upload() -> str:
+        resp = client.upload_part(
+            Bucket=bucket,
+            Key=key,
+            UploadId=upload_id,
+            PartNumber=part_number,
+            Body=data,
+        )
+        return resp["ETag"]
+
+    return await loop.run_in_executor(None, _upload)
+
+
+async def r2_complete_multipart_upload(
+    key: str,
+    upload_id: str,
+    parts: list[dict],
+) -> None:
+    """Complete a multipart upload by assembling all parts.
+
+    Args:
+        key: R2 object key.
+        upload_id: The multipart upload ID.
+        parts: List of {"PartNumber": int, "ETag": str} dicts, sorted ascending.
+    """
+    client = get_r2_client()
+    bucket = get_bucket()
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(
+        None,
+        partial(
+            client.complete_multipart_upload,
+            Bucket=bucket,
+            Key=key,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": parts},
+        ),
+    )
+
+
+async def r2_abort_multipart_upload(key: str, upload_id: str) -> None:
+    """Abort a multipart upload and free all uploaded parts in R2.
+
+    Always call this when a chunked upload is cancelled or permanently fails —
+    R2 charges for storage used by incomplete multipart uploads until aborted.
+    """
+    client = get_r2_client()
+    bucket = get_bucket()
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(
+        None,
+        partial(
+            client.abort_multipart_upload,
+            Bucket=bucket,
+            Key=key,
+            UploadId=upload_id,
+        ),
+    )

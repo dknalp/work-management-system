@@ -33,6 +33,13 @@ _DOWNLOAD_TTL = 3600  # 1 h for attachment download
 # Trash retention: items are eligible for auto-purge after this many days
 TRASH_RETENTION_DAYS: int = 30
 
+# Chunked upload: chunk size must be >= 5 MiB (S3 multipart minimum for all but last part)
+CHUNK_SIZE: int = 5 * 1024 * 1024  # 5 MiB
+
+# Simple (single-request) upload size cap. Files at or above this threshold
+# must use the chunked upload endpoints instead.
+MAX_SINGLE_REQUEST_BYTES: int = 100 * 1024 * 1024  # 100 MiB
+
 # ---------------------------------------------------------------------------
 # Storage helpers — R2 vs local disk
 # Unchanged from the PostgreSQL version: file bytes are not in Firestore.
@@ -49,9 +56,9 @@ def _use_r2() -> bool:
 def _storage_root() -> Path:
     """Return the local disk storage root (used when R2 is not configured)."""
     custom = os.environ.get("FILE_STORAGE_PATH", "").strip()
-    if custom:
-        return Path(custom)
-    return Path(__file__).parents[4] / "frontend" / "data"
+    root = Path(custom) if custom else Path(__file__).parents[4] / "frontend" / "data"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def _local_path(r2_key: str) -> Path:
@@ -298,6 +305,34 @@ def _cascade_rename(
 
     if count > 0:
         batch.commit()
+
+# ---------------------------------------------------------------------------
+# Chunked upload schemas
+# ---------------------------------------------------------------------------
+
+class ChunkUploadInitRequest(BaseModel):
+    """Request body for initialising a chunked upload session."""
+    filename: str
+    path: str              # virtual parent directory path (empty = root)
+    total_size: int        # total file size in bytes
+    total_chunks: int      # number of chunks the client will send
+    mime_type: str = "application/octet-stream"
+
+
+class ChunkUploadInitResponse(BaseModel):
+    """Returned by POST /upload/init — client uses upload_id for subsequent chunk calls."""
+    upload_id: str
+    chunk_size: int        # always CHUNK_SIZE; client should slice file into this many bytes
+
+
+class ChunkUploadPartResponse(BaseModel):
+    """Returned after each chunk is received."""
+    chunk_index: int
+    received: bool
+    chunks_received: int   # total chunks received so far (for progress display)
+    total_chunks: int
+
+
 
 # ---------------------------------------------------------------------------
 # Shared trash helpers

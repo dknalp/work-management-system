@@ -87,7 +87,6 @@ import type { FileItem, SearchResult } from "./file-utils"
 import { toast } from "sonner"
 import { usePermission } from "@/hooks/use-permission"
 import { usePinnedFolders } from "@/hooks/use-pinned-folders"
-import { UploadQueueProvider } from "@/components/files/upload-queue"
 import {
   trashFile,
   moveFile,
@@ -693,7 +692,6 @@ export function FileExplorer({
     clipboard?.mode === "cut" && clipboard.paths.includes(path)
 
   return (
-    <UploadQueueProvider>
     <>
       <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border/50">
         <FileToolbar currentPath={currentPath} />
@@ -1442,6 +1440,5 @@ export function FileExplorer({
         </div>
       )}
     </>
-    </UploadQueueProvider>
   )
 }

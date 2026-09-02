@@ -27,6 +27,7 @@ import { FileExplorer } from "@/components/files/file-explorer"
 import { TrashView } from "@/components/files/trash-view"
 import { listFiles, listStarred, listRecent, getQuota } from "@/lib/actions/files"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { UploadQueueProvider } from "@/components/files/upload-queue"
 
 interface FileClientPageProps {
   initialItems: FileItem[]
@@ -36,7 +37,7 @@ interface FileClientPageProps {
 
 type LoadState =
   | { status: "loading" }
-  | { status: "ok"; items: FileItem[] }
+  | { status: "ok"; items: FileItem[]; refreshing?: boolean }
   | { status: "error"; message: string }
   | { status: "not-found" }
 
@@ -60,7 +61,13 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
   // ------------------------------------------------------------------
 
   const load = React.useCallback(async () => {
-    setState({ status: "loading" })
+    // Use a lightweight "refreshing" flag on re-fetches so the explorer
+    // stays mounted (and in-flight uploads are not killed).
+    setState((prev) =>
+      prev.status === "ok"
+        ? { ...prev, refreshing: true }
+        : { status: "loading" }
+    )
     try {
       if (view === "starred") {
         const records = await listStarred()
@@ -132,11 +139,13 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
 
   if (state.status === "loading") {
     return (
-      <div className="flex flex-col gap-2 p-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-full rounded-lg" />
-        ))}
-      </div>
+      <UploadQueueProvider>
+        <div className="flex flex-col gap-2 p-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full rounded-lg" />
+          ))}
+        </div>
+      </UploadQueueProvider>
     )
   }
 
@@ -214,8 +223,14 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
     ? (quota.used_bytes / 1024 / 1024 / 1024).toFixed(2)
     : null
 
+  const isRefreshing = state.status === "ok" && !!state.refreshing
+
   return (
-    <div className="flex flex-col h-full">
+    <UploadQueueProvider>
+    <div className="flex flex-col h-full relative">
+      {isRefreshing && (
+        <div className="absolute inset-x-0 top-0 z-10 h-0.5 bg-primary/40 animate-pulse" />
+      )}
       {/* Top bar: view toggle, Drive import button, quota */}
       <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/40 bg-muted/20">
         <div className="flex items-center gap-1">
@@ -270,6 +285,7 @@ export function FileClientPage({ currentPath }: FileClientPageProps) {
 
       {/* Drive import dialog removed — not available in this release */}
     </div>
+    </UploadQueueProvider>
   )
 }
 
