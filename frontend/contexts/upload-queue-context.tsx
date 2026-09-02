@@ -17,7 +17,7 @@ import { tokenStorage } from "@/lib/auth"
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_CONCURRENT = 3
+const MAX_CONCURRENT = 2
 const MAX_AUTO_RETRIES = 3
 const CHUNK_SIZE = 5 * 1024 * 1024           // 5 MiB per chunk
 const CHUNKED_THRESHOLD = 100 * 1024 * 1024  // files > 100 MiB use chunked upload
@@ -127,6 +127,8 @@ function uploadWithXHR(
       catch { onDone({ id: "", name: item.filename } as FileRecord) }
     } else if (xhr.status === 409) {
       onError(`File already exists`, false)
+    } else if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504) {
+      onError(`Gateway error (${xhr.status}) — retrying`, true)
     } else if (xhr.status >= 400 && xhr.status < 500) {
       onError(`Upload rejected (${xhr.status})`, false)
     } else {
