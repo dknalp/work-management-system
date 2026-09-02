@@ -10,9 +10,9 @@ Physical storage:     Cloudflare R2 (when env vars are set) or local disk
 import asyncio
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Callable, Literal, Optional
 
 # Semaphore that caps concurrent large-file uploads at 3 in-flight at once
 # (matches MAX_CONCURRENT=3 in the frontend upload queue)
@@ -29,6 +29,9 @@ from pydantic import BaseModel
 
 _PREVIEW_TTL = 300    # 5 min for inline preview
 _DOWNLOAD_TTL = 3600  # 1 h for attachment download
+
+# Trash retention: items are eligible for auto-purge after this many days
+TRASH_RETENTION_DAYS: int = 30
 
 # ---------------------------------------------------------------------------
 # Storage helpers — R2 vs local disk
@@ -70,6 +73,7 @@ class FileRecordResponse(BaseModel):
     mime_type: Optional[str]
     is_deleted: bool
     deleted_at: Optional[datetime]
+    expires_at: Optional[datetime] = None
     is_starred: bool
     color: Optional[str] = None
     icon_emoji: Optional[str] = None
@@ -206,6 +210,11 @@ def _doc_to_response(doc_id: str, data: dict) -> FileRecordResponse:
         mime_type=data.get("mime_type"),
         is_deleted=data.get("is_deleted", False),
         deleted_at=data.get("deleted_at"),
+        expires_at=(
+            (data["deleted_at"] + timedelta(days=TRASH_RETENTION_DAYS))
+            if data.get("is_deleted") and isinstance(data.get("deleted_at"), datetime)
+            else None
+        ),
         is_starred=data.get("is_starred", False),
         color=data.get("color"),
         icon_emoji=data.get("icon_emoji"),
@@ -289,3 +298,75 @@ def _cascade_rename(
 
     if count > 0:
         batch.commit()
+
+# ---------------------------------------------------------------------------
+# Shared trash helpers
+# ---------------------------------------------------------------------------
+
+def _cascade_flag(
+    db: "firestore.Client",
+    folder_path: str,
+    updates: dict,
+    skip_if: "Callable[[dict], bool] | None" = None,
+) -> int:
+    """Apply `updates` to all descendants of `folder_path` in batched writes.
+
+    Uses a path-range query (path >= folder/ and path < folder0) to avoid
+    needing a composite Firestore index.  Commits in chunks of 499 to stay
+    within Firestore's 500-operation batch limit.
+
+    Args:
+        db: Firestore client.
+        folder_path: The parent folder path (without trailing slash).
+        updates: Field dict to apply to each matched document.
+        skip_if: Optional predicate; documents for which this returns True
+                 are skipped without being updated.
+
+    Returns:
+        Number of documents actually updated.
+    """
+    prefix = folder_path + "/"
+    suffix = folder_path + "0"  # '0' > '/' in ASCII — safe upper bound
+    docs = (
+        db.collection("file_records")
+        .where("path", ">=", prefix)
+        .where("path", "<", suffix)
+        .stream()
+    )
+    batch = db.batch()
+    count = 0
+    total = 0
+    for doc in docs:
+        data = doc.to_dict() or {}
+        if skip_if and skip_if(data):
+            continue
+        batch.update(doc.reference, updates)
+        count += 1
+        total += 1
+        if count >= 499:
+            batch.commit()
+            batch = db.batch()
+            count = 0
+    if count > 0:
+        batch.commit()
+    return total
+
+
+def _delete_file_metadata(db: "firestore.Client", file_ids: list[str]) -> None:
+    """Delete file_access_logs and file_shares records for the given file IDs.
+
+    Non-fatal: errors (e.g. missing Firestore index) are caught and logged
+    rather than propagated, so the primary deletion always completes.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    for collection in ("file_access_logs", "file_shares"):
+        for file_id in file_ids:
+            try:
+                for mdoc in db.collection(collection).where("file_id", "==", file_id).stream():
+                    mdoc.reference.delete()
+            except Exception as exc:
+                logger.warning(
+                    "_delete_file_metadata: cleanup failed collection=%s file_id=%s: %s",
+                    collection, file_id, exc,
+                )

@@ -8,6 +8,7 @@ import {
   FolderIcon,
   FileIcon,
   ArrowLeftIcon,
+  AlertCircleIcon,
 } from "lucide-react"
 import { differenceInDays } from "date-fns"
 import {
@@ -22,17 +23,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { formatSize } from "./file-utils"
 import type { TrashItem } from "@/components/files/file-utils"
-import {
-  listFiles,
-  restoreFile,
-  deleteFilePermanent,
-  emptyTrash,
-} from "@/lib/actions/files"
-import { fileRecordToTrashItem } from "./file-utils"
+import { useTrash } from "@/hooks/use-trash"
 
 function expiryLabel(expiresAt?: string): { text: string; urgent: boolean } {
   if (!expiresAt) return { text: "", urgent: false }
@@ -45,69 +39,31 @@ function expiryLabel(expiresAt?: string): { text: string; urgent: boolean } {
 
 export function TrashView() {
   const router = useRouter()
-  const [items, setItems] = React.useState<TrashItem[]>([])
-  const [loading, setLoading] = React.useState(false)
+  const { items, isLoading, error, refresh, restore, permanentDelete, emptyTrash } = useTrash()
   const [emptyConfirmOpen, setEmptyConfirmOpen] = React.useState(false)
   const [permanentDeleteTarget, setPermanentDeleteTarget] = React.useState<TrashItem | null>(null)
 
-  const load = React.useCallback(async () => {
-    setLoading(true)
-    try {
-      const records = await listFiles("", true)
-      setItems(records.map(fileRecordToTrashItem))
-    } catch {
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
+  // Re-fetch when external changes happen (e.g. file trashed from explorer)
   React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load()
-  }, [load])
-
-  // Re-fetch when external changes happen (e.g. trash from explorer)
-  React.useEffect(() => {
-    const handler = () => load()
+    const handler = () => refresh()
     window.addEventListener("wms:files:changed", handler)
     return () => window.removeEventListener("wms:files:changed", handler)
-  }, [load])
+  }, [refresh])
 
   const handleRestore = async (item: TrashItem) => {
-    try {
-      await restoreFile(item.id)
-      setItems((prev) => prev.filter((i) => i.id !== item.id))
-      toast.success(`"${item.name}" geri yüklendi`)
-      window.dispatchEvent(new Event("wms:files:changed"))
-    } catch {
-      toast.error("Geri yükleme başarısız")
-    }
+    await restore(item.id)
+    window.dispatchEvent(new Event("wms:files:changed"))
   }
 
   const handlePermanentDelete = async (item: TrashItem) => {
-    try {
-      await deleteFilePermanent(item.id)
-      setItems((prev) => prev.filter((i) => i.id !== item.id))
-      toast.success(`"${item.name}" kalıcı olarak silindi`)
-    } catch {
-      toast.error("Silme başarısız")
-    } finally {
-      setPermanentDeleteTarget(null)
-    }
+    setPermanentDeleteTarget(null)
+    await permanentDelete(item.id)
   }
 
   const handleEmptyTrash = async () => {
-    try {
-      await emptyTrash()
-      setItems([])
-      toast.success("Çöp kutusu boşaltıldı")
-      window.dispatchEvent(new Event("wms:files:changed"))
-    } catch {
-      toast.error("Çöp kutusu boşaltılamadı")
-    } finally {
-      setEmptyConfirmOpen(false)
-    }
+    setEmptyConfirmOpen(false)
+    await emptyTrash()
+    window.dispatchEvent(new Event("wms:files:changed"))
   }
 
   return (
@@ -137,102 +93,96 @@ export function TrashView() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+            className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={() => setEmptyConfirmOpen(true)}
           >
             <Trash2Icon className="size-3.5" />
-            Çöp Kutusunu Boşalt
+            Boşalt
           </Button>
         )}
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-2 mx-4 mt-3 px-3 py-2 rounded-md bg-destructive/10 text-destructive text-sm">
+          <AlertCircleIcon className="size-4 shrink-0" />
+          <span>{error}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-6 px-2 text-xs text-destructive hover:bg-destructive/10"
+            onClick={refresh}
+          >
+            Tekrar dene
+          </Button>
+        </div>
+      )}
+
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-xl" />
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="space-y-2 p-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-md" />
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-3 text-muted-foreground">
-            <Trash2Icon className="size-12 opacity-10" />
+          <div className="flex flex-col items-center justify-center h-48 gap-2 text-muted-foreground">
+            <Trash2Icon className="size-10 opacity-20" />
             <p className="text-sm">Çöp kutusu boş</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <div className="px-4 py-2.5 border-b border-border bg-muted/30">
-              <p className="text-[10px] font-bold tracking-widest text-muted-foreground/60 uppercase">
-                Silinen Dosyalar
-              </p>
-            </div>
-            <ul className="divide-y divide-border/50">
-              {items.map((item) => {
-                const expiry = expiryLabel(item.expiresAt)
-                return (
-                  <li
-                    key={item.id}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group"
-                  >
-                    <div className="shrink-0 text-muted-foreground">
-                      {item.type === "folder" ? (
-                        <FolderIcon className="size-5" />
-                      ) : (
-                        <FileIcon className="size-5" />
+          <ul className="divide-y divide-border/50">
+            {items.map((item) => {
+              const expiry = expiryLabel(item.expiresAt)
+              return (
+                <li
+                  key={item.id}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 group"
+                >
+                  {item.type === "folder" ? (
+                    <FolderIcon className="size-4 shrink-0 text-amber-500" />
+                  ) : (
+                    <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-sm font-medium">{item.name}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {item.size != null && <span>{formatSize(item.size)}</span>}
+                      {item.originalPath && (
+                        <span className="truncate opacity-60">{item.originalPath}</span>
+                      )}
+                      {expiry.text && (
+                        <span className={cn("font-medium", expiry.urgent && "text-destructive")}>
+                          {expiry.text}
+                        </span>
                       )}
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-medium">{item.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {item.path && (
-                          <span className="text-[11px] text-muted-foreground/60 truncate">
-                            {item.path}
-                          </span>
-                        )}
-                        {item.size != null && item.type !== "folder" && (
-                          <span className="text-[11px] text-muted-foreground/50 shrink-0">
-                            · {formatSize(item.size)}
-                          </span>
-                        )}
-                        {expiry.text && (
-                          <span
-                            className={cn(
-                              "text-[11px] shrink-0",
-                              expiry.urgent ? "text-destructive" : "text-muted-foreground/50"
-                            )}
-                          >
-                            · {expiry.text}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs"
-                        onClick={() => handleRestore(item)}
-                      >
-                        <RotateCcwIcon className="size-3.5" />
-                        Geri Yükle
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => setPermanentDeleteTarget(item)}
-                      >
-                        <Trash2Icon className="size-3.5" />
-                        Kalıcı Sil
-                      </Button>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs"
+                      onClick={() => handleRestore(item)}
+                    >
+                      <RotateCcwIcon className="size-3.5" />
+                      Geri Yükle
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => setPermanentDeleteTarget(item)}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                      Kalıcı Sil
+                    </Button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
         )}
       </div>
 
@@ -240,7 +190,7 @@ export function TrashView() {
       <AlertDialog open={emptyConfirmOpen} onOpenChange={setEmptyConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Çöp kutusu boşaltılsın mı?</AlertDialogTitle>
+            <AlertDialogTitle>Çöp kutusu kalıcı olarak boşaltılsın mı?</AlertDialogTitle>
             <AlertDialogDescription>
               {items.length} öğe kalıcı olarak silinecek. Bu işlem geri alınamaz.
             </AlertDialogDescription>

@@ -30,7 +30,7 @@ interface SearchResultsViewProps {
   onOpen: (item: SearchResult) => void
   onDownload: (item: SearchResult) => void
   onRename: (item: SearchResult) => void
-  onDelete: (path: string) => void
+  onDelete: (id: string) => void
   onMoveTo: (paths: string[]) => void
 }
 
@@ -176,7 +176,7 @@ export function SearchResultsView({
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   className="gap-2 text-destructive focus:text-destructive"
-                  onClick={() => onDelete(item.path)}
+                  onClick={() => onDelete(item.id)}
                 >
                   <Trash2Icon className="size-4" /> Çöp Kutusuna Taşı
                 </ContextMenuItem>

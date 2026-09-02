@@ -76,9 +76,10 @@ export function fileRecordToItem(record: FileRecord): FileItem {
 
 export function fileRecordToTrashItem(record: FileRecord): TrashItem {
   const item = fileRecordToItem(record)
-  // Expiry: 30 days after deletion
-  let expiresAt: string | undefined
-  if (record.deleted_at) {
+  // Prefer backend-authoritative expires_at; fall back to client calculation
+  // during rolling deploys where the API may not yet send the field.
+  let expiresAt: string | undefined = record.expires_at
+  if (!expiresAt && record.deleted_at) {
     const d = new Date(record.deleted_at)
     d.setDate(d.getDate() + 30)
     expiresAt = d.toISOString()

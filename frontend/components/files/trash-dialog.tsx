@@ -2,9 +2,15 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Trash2Icon, RotateCcwIcon, Trash, XIcon, FolderIcon, FileIcon } from "lucide-react"
-import { formatDistanceToNow, differenceInDays } from "date-fns"
-import { tr } from "date-fns/locale"
+import {
+  Trash2Icon,
+  RotateCcwIcon,
+  Trash,
+  FolderIcon,
+  FileIcon,
+  AlertCircleIcon,
+} from "lucide-react"
+import { differenceInDays } from "date-fns"
 import {
   Dialog,
   DialogContent,
@@ -22,17 +28,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { formatSize } from "./file-utils"
 import type { TrashItem } from "@/components/files/file-utils"
-import {
-  listFiles,
-  restoreFile,
-  deleteFilePermanent,
-  emptyTrash,
-} from "@/lib/actions/files"
-import { fileRecordToTrashItem } from "./file-utils"
+import { useTrash } from "@/hooks/use-trash"
 
 interface TrashDialogProps {
   open: boolean
@@ -50,59 +49,29 @@ function expiryLabel(expiresAt?: string): { text: string; urgent: boolean } {
 
 export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
   const router = useRouter()
-  const [items, setItems] = React.useState<TrashItem[]>([])
-  const [loading, setLoading] = React.useState(false)
+  const { items, isLoading, error, refresh, restore, permanentDelete, emptyTrash } = useTrash()
   const [emptyConfirmOpen, setEmptyConfirmOpen] = React.useState(false)
   const [permanentDeleteTarget, setPermanentDeleteTarget] = React.useState<TrashItem | null>(null)
 
-  const load = React.useCallback(async () => {
-    setLoading(true)
-    try {
-      const records = await listFiles("", true /* showTrash */)
-      setItems(records.map(fileRecordToTrashItem))
-    } catch {
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
+  // Refresh when dialog opens
   React.useEffect(() => {
-    if (open) load()
-  }, [open, load])
+    if (open) refresh()
+  }, [open, refresh])
 
   const handleRestore = async (item: TrashItem) => {
-    try {
-      await restoreFile(item.id)
-      toast.success(`"${item.originalName}" geri yüklendi`)
-      router.refresh()
-      load()
-    } catch (err: unknown) {
-      toast.error((err as Error).message ?? "Geri yükleme başarısız")
-    }
+    await restore(item.id)
+    router.refresh()
   }
 
   const handlePermanentDelete = async (item: TrashItem) => {
     setPermanentDeleteTarget(null)
-    try {
-      await deleteFilePermanent(item.id)
-      toast.success(`"${item.originalName}" kalıcı olarak silindi`)
-      load()
-    } catch (err: unknown) {
-      toast.error((err as Error).message ?? "Silme başarısız")
-    }
+    await permanentDelete(item.id)
   }
 
   const handleEmptyTrash = async () => {
     setEmptyConfirmOpen(false)
-    try {
-      await emptyTrash()
-      toast.success("Çöp kutusu boşaltıldı")
-      setItems([])
-      router.refresh()
-    } catch (err: unknown) {
-      toast.error((err as Error).message ?? "Boşaltma başarısız")
-    }
+    await emptyTrash()
+    router.refresh()
   }
 
   return (
@@ -121,7 +90,23 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
             </DialogTitle>
           </DialogHeader>
 
-          {loading ? (
+          {/* Error banner */}
+          {error && (
+            <div className="flex items-center gap-2 px-1 py-2 rounded-md bg-destructive/10 text-destructive text-sm">
+              <AlertCircleIcon className="size-4 shrink-0" />
+              <span className="flex-1">{error}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-destructive hover:bg-destructive/10"
+                onClick={refresh}
+              >
+                Tekrar dene
+              </Button>
+            </div>
+          )}
+
+          {isLoading ? (
             <div className="flex h-40 items-center justify-center">
               <div className="size-6 animate-spin rounded-full border-2 border-muted border-t-primary" />
             </div>
@@ -131,92 +116,77 @@ export function TrashDialog({ open, onOpenChange }: TrashDialogProps) {
               <p className="text-sm">Çöp kutusu boş</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Öğeler 30 gün sonra otomatik olarak kalıcı şekilde silinir.
-              </p>
-              <div className="max-h-80 overflow-y-auto rounded-lg border border-border">
+            <>
+              <ul className="max-h-72 divide-y divide-border/50 overflow-y-auto rounded-md border border-border/50">
                 {items.map((item) => {
                   const expiry = expiryLabel(item.expiresAt)
                   return (
-                    <div
-                      key={item.id}
-                      className="group flex items-center gap-3 border-b border-border/50 px-4 py-2.5 last:border-0 hover:bg-muted/30"
-                    >
+                    <li key={item.id} className="flex items-center gap-3 px-3 py-2 group hover:bg-muted/40">
                       {item.type === "folder" ? (
-                        <FolderIcon className="size-4 shrink-0 fill-blue-500/20 text-blue-500" />
+                        <FolderIcon className="size-4 shrink-0 text-amber-500" />
                       ) : (
                         <FileIcon className="size-4 shrink-0 text-muted-foreground" />
                       )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-mono text-sm">{item.originalName}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {item.deletedAt
-                            ? formatDistanceToNow(new Date(item.deletedAt), { addSuffix: true, locale: tr }) + " silindi"
-                            : "silindi"}
-                          {item.type !== "folder" && item.size ? ` · ${formatSize(item.size)}` : ""}
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate text-sm font-medium">{item.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {item.size != null && <span>{formatSize(item.size)}</span>}
                           {expiry.text && (
-                            <>
-                              {" · "}
-                              <span className={cn(expiry.urgent ? "text-amber-500" : "text-muted-foreground")}>
-                                {expiry.text}
-                              </span>
-                            </>
+                            <span className={cn("font-medium", expiry.urgent && "text-destructive")}>
+                              {expiry.text}
+                            </span>
                           )}
-                        </p>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
-                          size="sm"
                           variant="ghost"
-                          className="h-7 gap-1.5 text-xs"
+                          size="icon"
+                          className="size-7 text-muted-foreground hover:text-foreground"
+                          title="Geri Yükle"
                           onClick={() => handleRestore(item)}
-                          title="Geri yükle"
                         >
-                          <RotateCcwIcon className="size-3" />
-                          Geri Yükle
+                          <RotateCcwIcon className="size-3.5" />
                         </Button>
                         <Button
-                          size="sm"
                           variant="ghost"
-                          className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          size="icon"
+                          className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          title="Kalıcı Sil"
                           onClick={() => setPermanentDeleteTarget(item)}
-                          title="Kalıcı olarak sil"
                         >
-                          <XIcon className="size-3.5" />
+                          <Trash2Icon className="size-3.5" />
                         </Button>
                       </div>
-                    </div>
+                    </li>
                   )
                 })}
-              </div>
+              </ul>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-1">
                 <Button
-                  variant="destructive"
+                  variant="ghost"
                   size="sm"
-                  className="gap-2"
+                  className="h-7 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={() => setEmptyConfirmOpen(true)}
                 >
                   <Trash2Icon className="size-3.5" />
-                  Çöp Kutusunu Boşalt
+                  Tümünü Kalıcı Sil ({items.length})
                 </Button>
               </div>
-            </div>
+            </>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Permanent delete confirm */}
+      {/* Permanent delete single item */}
       <AlertDialog
-        open={permanentDeleteTarget !== null}
-        onOpenChange={(o) => { if (!o) setPermanentDeleteTarget(null) }}
+        open={!!permanentDeleteTarget}
+        onOpenChange={(v) => { if (!v) setPermanentDeleteTarget(null) }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              "{permanentDeleteTarget?.originalName}" kalıcı olarak silinsin mi?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Kalıcı olarak silinsin mi?</AlertDialogTitle>
             <AlertDialogDescription>Bu işlem geri alınamaz.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

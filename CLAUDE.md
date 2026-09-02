@@ -21,6 +21,8 @@ Frontend commands run from `frontend/`. Backend commands run from `backend/`.
 pnpm build          # Production build
 pnpm lint           # ESLint
 pnpm format         # Prettier (writes in place)
+pnpm test           # Run tests (vitest, single pass)
+pnpm test:watch     # Run tests in watch mode
 ```
 
 **Backend** — run from `backend/` with venv active (`source .venv/bin/activate`):
@@ -53,8 +55,24 @@ docker-compose up --build   # Build and start all services (frontend :3051, back
 
 **Frontend** (`frontend/.env.local`):
 ```bash
-NEXT_PUBLIC_MOCK_AUTH=true       # Bypass real API auth, use localStorage mock user
-NEXT_PUBLIC_API_URL=             # Backend base URL (defaults to http://localhost:3052)
+NEXT_PUBLIC_MOCK_AUTH=true                # Bypass real API auth, use localStorage mock user
+NEXT_PUBLIC_API_URL=                      # Backend base URL (defaults to http://localhost:3052)
+NEXT_PUBLIC_FIREBASE_API_KEY=             # Firebase client config (required for real auth)
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=             # Google OAuth
+NEXT_PUBLIC_GOOGLE_PICKER_API_KEY=        # Google Drive Picker
+GOOGLE_CLIENT_SECRET=                     # Server-side Google OAuth secret
+FIREBASE_SERVICE_ACCOUNT_JSON=           # Firebase Admin SDK (Next.js server-side) — path or raw JSON
+CLOUDFLARE_ACCOUNT_ID=                   # R2 storage (Next.js can also use R2 directly)
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=
+APP_ENV=                                  # e.g. production
+HMAC_SECRET=                              # Webhook/signing secret
+ADMIN_EMAIL=                              # First-run admin seeding (remove after use)
+ADMIN_PASSWORD=
 ```
 
 **Backend** (`backend/.env`):
@@ -68,6 +86,7 @@ R2_SECRET_ACCESS_KEY=
 R2_BUCKET_NAME=
 R2_PUBLIC_URL=
 FILE_STORAGE_PATH=               # Override local file storage path (default: frontend/data/)
+GOOGLE_REDIRECT_URI=             # Google OAuth callback URL
 ```
 
 ---
@@ -123,6 +142,7 @@ Every app page (not landing/auth) wraps content in:
 - When `NEXT_PUBLIC_MOCK_AUTH=true`, bypasses the API and stores a mock user in `localStorage` (`wms:mock_user`).
 - In real mode, `frontend/lib/auth.ts` stores JWT tokens in `localStorage` (`wos_access_token`, `wos_refresh_token`) and syncs a `has_session` cookie.
 - `frontend/proxy.ts` is the Next.js middleware (named `proxy.ts`, not `middleware.ts`): reads `has_session`, `is_admin`, and `user_role` cookies to gate protected routes, redirect from auth pages when logged in, and block non-admin from `/admin`.
+- The frontend also uses the Firebase JS SDK (`firebase` package) directly — not only via the backend. Firebase client config is read from `NEXT_PUBLIC_FIREBASE_*` env vars.
 - `frontend/lib/api.ts` is the typed API client (base URL from `NEXT_PUBLIC_API_URL`, defaults to `http://localhost:3052`) with automatic token refresh on 401.
 
 ### Global contexts (in nesting order in `frontend/app/layout.tsx`)
@@ -187,6 +207,8 @@ Dark/light via `next-themes` (`frontend/components/layout/theme-provider.tsx`). 
 ---
 
 ## Backend Architecture
+
+> **Note:** The backend uses Firestore as its sole database. There is no PostgreSQL or SQL database. Any README instructions about `DATABASE_URL` are outdated.
 
 FastAPI + Firebase application in `backend/app/`. Firestore is the primary database; Firebase Authentication handles user auth. Activate the venv at `backend/.venv` before running any Python commands.
 

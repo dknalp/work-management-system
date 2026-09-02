@@ -149,7 +149,7 @@ export function FileExplorer({
   const [renameValue, setRenameValue] = React.useState("")
 
   const [deleteOpen, setDeleteOpen] = React.useState(false)
-  const [deletePaths, setDeletePaths] = React.useState<string[]>([])
+  const [deleteIds, setDeleteIds] = React.useState<string[]>([])
   const [deleteHasFolders, setDeleteHasFolders] = React.useState(false)
 
   const [moveToOpen, setMoveToOpen] = React.useState(false)
@@ -324,9 +324,9 @@ export function FileExplorer({
     }
   }
 
-  const handleDeleteConfirm = (paths: string | string[]) => {
-    const ids = typeof paths === "string" ? [paths] : paths
-    setDeletePaths(ids)
+  const handleDeleteConfirm = (input: string | string[]) => {
+    const ids = typeof input === "string" ? [input] : input
+    setDeleteIds(ids)
     // Check if any of the selected items is a folder (type=folder in items list)
     const hasFolders = ids.some((id) => items.find((item) => item.id === id)?.type === "folder")
     setDeleteHasFolders(hasFolders)
@@ -335,8 +335,7 @@ export function FileExplorer({
 
   const doDelete = async () => {
     setDeleteOpen(false)
-    // deletePaths holds file IDs in the new system
-    const results = await Promise.allSettled(deletePaths.map((id) => trashFile(id)))
+    const results = await Promise.allSettled(deleteIds.map((id) => trashFile(id)))
     const succeeded = results.filter((r) => r.status === "fulfilled")
     const failCount = results.length - succeeded.length
 
@@ -506,10 +505,12 @@ export function FileExplorer({
       if (renameOpen || deleteOpen) return
 
       if (e.key === "Delete" && selectedPaths.size > 0 && canDelete) {
-        const diskPaths = Array.from(selectedPaths).filter(
-          (p) => !items.find((i) => i.path === p)?.isDriveFile
-        )
-        if (diskPaths.length > 0) handleDeleteConfirm(diskPaths)
+        const diskIds = Array.from(selectedPaths)
+          .map(p => items.find(i => i.path === p))
+          .filter((i): i is typeof items[number] => !!i && !i.isDriveFile)
+          .map(i => i.id)
+          .filter(Boolean) as string[]
+        if (diskIds.length > 0) handleDeleteConfirm(diskIds)
       }
       if (e.key === "F2" && selectedPaths.size === 1 && activeItem && activeItem.name !== ".." && canRename && !activeItem.isDriveFile) {
         handleRename(activeItem)
@@ -780,7 +781,7 @@ export function FileExplorer({
               onOpen={handleItemDoubleClick}
               onDownload={(item) => downloadFile(item)}
               onRename={handleRename}
-              onDelete={(path) => handleDeleteConfirm(path)}
+              onDelete={(id) => handleDeleteConfirm(id)}
               onMoveTo={(paths) => handleMoveToOpen(paths)}
             />
           ) : viewMode === "list" ? (
@@ -1169,7 +1170,7 @@ export function FileExplorer({
               }}
               currentPath={currentPath}
               onRename={handleRename}
-              onDelete={(path) => handleDeleteConfirm(path)}
+              onDelete={(id) => handleDeleteConfirm(id)}
               onMoveTo={(paths) => handleMoveToOpen(paths)}
               onDownload={handleSingleItemDownload}
               clipboard={clipboard}
@@ -1302,7 +1303,7 @@ export function FileExplorer({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {deletePaths.length === 1 ? "Bu öğe çöp kutusuna taşınsın mı?" : `${deletePaths.length} öğe çöp kutusuna taşınsın mı?`}
+              {deleteIds.length === 1 ? "Bu öğe çöp kutusuna taşınsın mı?" : `${deleteIds.length} öğe çöp kutusuna taşınsın mı?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteHasFolders

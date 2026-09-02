@@ -20,6 +20,7 @@ export interface FileRecord {
   mime_type?: string
   is_deleted: boolean
   deleted_at?: string
+  expires_at?: string
   created_at: string
   updated_at: string
   color?: string | null
@@ -147,6 +148,10 @@ export async function copyFile(id: string, destParent: string): Promise<FileReco
 // ---------------------------------------------------------------------------
 // Trash / Restore / Delete
 // ---------------------------------------------------------------------------
+
+export async function listTrash(): Promise<FileRecord[]> {
+  return apiClient<FileRecord[]>("/api/v1/files/trash")
+}
 
 export async function trashFile(id: string): Promise<FileRecord> {
   return apiClient<FileRecord>(`/api/v1/files/trash/${id}`, { method: "DELETE" })
