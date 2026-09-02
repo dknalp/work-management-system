@@ -236,8 +236,8 @@ app.include_router(files_upload.router, prefix=_V1)
 # files_trash must be before files_core — its /empty-trash and /trash/{id} routes
 # would otherwise be swallowed by files_core's catch-all DELETE /{file_id}.
 app.include_router(files_trash.router, prefix=_V1)
-app.include_router(files_core.router, prefix=_V1)
 app.include_router(files_bulk.router, prefix=_V1)
+app.include_router(files_core.router, prefix=_V1)
 app.include_router(files_share.router, prefix=_V1)
 app.include_router(files_drive.router, prefix=_V1)
 app.include_router(files_misc.router, prefix=_V1)

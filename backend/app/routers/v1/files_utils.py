@@ -117,6 +117,7 @@ class QuotaResponse(BaseModel):
 
 
 class ShareCreateBody(BaseModel):
+    file_id: str
     shared_with_user_id: Optional[str] = None
     permission_level: Literal["view", "edit", "owner"] = "view"
     expires_at: Optional[datetime] = None

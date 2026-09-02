@@ -123,10 +123,6 @@ def access_by_token(
     if expires_at and isinstance(expires_at, datetime) and expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=410, detail="Share link has expired.")
 
-    # Reject access to files that have been moved to trash.
-    if file_data.get("is_deleted"):
-        raise HTTPException(status_code=410, detail="This file has been deleted.")
-
     file_id = share_data.get("file_id", "")
     file_doc = db.collection("file_records").document(file_id).get()
     if not file_doc.exists or (file_doc.to_dict() or {}).get("is_deleted", False):

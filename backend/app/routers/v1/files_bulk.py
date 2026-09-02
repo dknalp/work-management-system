@@ -15,6 +15,8 @@ from app.routers.v1.files_utils import (
     BulkResult,
     BulkTrashBody,
     _build_path,
+    _cascade_flag,
+    _cascade_rename,
     _get_record_or_404,
     _local_path,
     _now,
@@ -39,12 +41,16 @@ def bulk_move(
             if not current_user.is_admin and data.get("owner_id") != current_user.id:
                 failed.append(fid)
                 continue
+            old_path = data["path"]
             new_path = _build_path(body.dest_parent, data["name"])
             db.collection("file_records").document(fid).update({
                 "path": new_path,
                 "parent_path": body.dest_parent,
                 "updated_at": now,
             })
+            # Cascade path update to all descendants when moving a folder
+            if data.get("type") == "folder":
+                _cascade_rename(db, old_path, new_path)
             succeeded.append(fid)
         except Exception:
             failed.append(fid)
@@ -104,7 +110,7 @@ def bulk_trash(
     current_user: User = Depends(get_current_user),
     db: firestore.Client = Depends(get_db),
 ) -> BulkResult:
-    """Soft-delete (trash) a set of files/folders."""
+    """Soft-delete (trash) a set of files/folders, cascading to children."""
     succeeded, failed = [], []
     now = _now()
     for fid in body.ids:
@@ -118,6 +124,13 @@ def bulk_trash(
                 "deleted_at": now,
                 "updated_at": now,
             })
+            # Cascade trash to all descendants when trashing a folder
+            if data.get("type") == "folder":
+                _cascade_flag(
+                    db,
+                    data["path"],
+                    {"is_deleted": True, "deleted_at": now, "updated_at": now},
+                )
             succeeded.append(fid)
         except Exception:
             failed.append(fid)
