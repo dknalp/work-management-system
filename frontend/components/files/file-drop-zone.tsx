@@ -12,7 +12,13 @@ interface FileDropZoneProps {
 }
 
 /** Recursively read a FileSystemDirectoryEntry and collect all File objects
- *  with their paths relative to the dropped item's parent. */
+ *  with their paths relative to the dropped item's parent.
+ *
+ *  On Windows, Chromium's FileSystem API can fail silently for directories
+ *  with non-ASCII names or deep paths — readEntries() returns an empty batch
+ *  even when the directory has children. We detect this and skip gracefully
+ *  rather than losing the whole subtree silently.
+ */
 function readEntryRecursive(
   entry: FileSystemEntry,
   pathPrefix: string,
@@ -20,30 +26,64 @@ function readEntryRecursive(
 ): Promise<void> {
   return new Promise((resolve) => {
     if (entry.isFile) {
-      ;(entry as FileSystemFileEntry).file((file) => {
-        results.push({ file, path: pathPrefix })
-        resolve()
-      })
+      ;(entry as FileSystemFileEntry).file(
+        (file) => {
+          results.push({ file, path: pathPrefix })
+          resolve()
+        },
+        () => resolve(), // file() can fail on Windows for locked/system files
+      )
     } else if (entry.isDirectory) {
+      const subdir = pathPrefix ? `${pathPrefix}/${entry.name}` : entry.name
       const reader = (entry as FileSystemDirectoryEntry).createReader()
       const readAll = (accumulated: FileSystemEntry[]) => {
-        reader.readEntries((batch) => {
-          if (batch.length === 0) {
-            // all entries read — recurse into each
-            const subdir = pathPrefix ? `${pathPrefix}/${entry.name}` : entry.name
-            Promise.all(
-              accumulated.map((child) => readEntryRecursive(child, subdir, results)),
-            ).then(() => resolve())
-          } else {
-            readAll([...accumulated, ...batch])
-          }
-        })
+        reader.readEntries(
+          (batch) => {
+            if (batch.length === 0) {
+              Promise.all(
+                accumulated.map((child) => readEntryRecursive(child, subdir, results)),
+              ).then(() => resolve())
+            } else {
+              readAll([...accumulated, ...batch])
+            }
+          },
+          () => resolve(), // readEntries() error callback — skip this dir on Windows failures
+        )
       }
       readAll([])
     } else {
       resolve()
     }
   })
+}
+
+/**
+ * Windows fallback: build file+path list from e.dataTransfer.files using
+ * webkitRelativePath. Used when the FileSystemEntry API fails to read any
+ * files from a dropped folder (Chromium/Windows bug with non-ASCII paths).
+ */
+function collectFromDataTransferFiles(
+  fileList: FileList,
+  currentPath: string,
+): { file: File; path: string }[] {
+  const results: { file: File; path: string }[] = []
+  for (let i = 0; i < fileList.length; i++) {
+    const file = fileList[i]
+    if (file.size === 0 && !file.type) continue // skip directory entries on Windows
+    const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath
+    if (rel) {
+      // webkitRelativePath = "FolderName/sub/file.txt" — parent is everything except last segment
+      const parts = rel.split("/")
+      const parentParts = parts.slice(0, -1)
+      const parent = currentPath
+        ? [currentPath, ...parentParts].join("/")
+        : parentParts.join("/")
+      results.push({ file, path: parent })
+    } else {
+      results.push({ file, path: currentPath })
+    }
+  }
+  return results
 }
 
 export function FileDropZone({ children, currentPath, disabled = false }: FileDropZoneProps) {
@@ -162,9 +202,16 @@ export function FileDropZone({ children, currentPath, disabled = false }: FileDr
           )
         }
 
+        // Windows fallback: if FileSystemEntry API returned nothing (Chromium bug
+        // with non-ASCII folder names), use webkitRelativePath from dataTransfer.files
+        let finalEntries = collected
+        if (finalEntries.length === 0 && e.dataTransfer.files.length > 0) {
+          finalEntries = collectFromDataTransferFiles(e.dataTransfer.files, currentPath)
+        }
+
         // Group files by target path and upload
         const byPath = new Map<string, File[]>()
-        for (const { file, path } of collected) {
+        for (const { file, path } of finalEntries) {
           const arr = byPath.get(path) ?? []
           arr.push(file)
           byPath.set(path, arr)
