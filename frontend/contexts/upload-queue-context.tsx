@@ -1,13 +1,19 @@
 "use client"
 
 /**
- * Upload queue context — handles single-file XHR and chunked uploads.
+ * Upload queue context — direct browser-to-R2 upload via presigned URLs.
+ *
+ * Flow:
+ *   1. addFilesWithPaths() splits files into batches of 20
+ *   2. presignBatch() calls POST /api/v1/files/presign/batch → gets signed R2 URLs
+ *   3. uploadWithPresign() XHR PUTs file directly to R2 (progress events work)
+ *   4. confirmUpload() calls POST /api/v1/files/confirm/{file_id}
  *
  * Performance design for 1500+ files:
- * - Items stored in a Map ref (O(1) updates) plus a React state array for rendering
- * - Progress updates batched via requestAnimationFrame (no React re-render per progress tick)
- * - SessionStorage writes only on status changes (not on every progress update)
- * - drainQueue runs from a ref so it never depends on items React state
+ *   - Items stored in a Map ref (O(1) updates) + React state only for rendering
+ *   - Progress updates batched via requestAnimationFrame (no render per tick)
+ *   - SessionStorage writes only on status changes, never on progress
+ *   - drainQueue reads from ref — never depends on React items state
  */
 
 import * as React from "react"
@@ -17,17 +23,16 @@ import { tokenStorage } from "@/lib/auth"
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_CONCURRENT = 2
+const MAX_CONCURRENT = 2                     // concurrent R2 uploads
 const MAX_AUTO_RETRIES = 3
-const CHUNK_SIZE = 5 * 1024 * 1024           // 5 MiB per chunk
-const CHUNKED_THRESHOLD = 100 * 1024 * 1024  // files > 100 MiB use chunked upload
-const XHR_TIMEOUT_MS = 10 * 60 * 1000        // 10 minutes per chunk/request
-const REFRESH_DEBOUNCE_MS = 500              // fire wms:files:changed once after last completion
+const CHUNKED_THRESHOLD = 100 * 1024 * 1024  // files > 100 MiB use multipart
+const PART_SIZE = 5 * 1024 * 1024            // 5 MiB per multipart part
+const XHR_TIMEOUT_MS = 10 * 60 * 1000        // 10 min per upload/part
+const REFRESH_DEBOUNCE_MS = 500
 const SESSION_STORAGE_KEY = "wms:upload-queue"
-// Always use relative URLs so uploads go through the Next.js reverse proxy.
-// Direct backend URLs (localhost:3052) break in production where the backend
-// is not reachable from the user's browser.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
+const PRESIGN_BATCH_SIZE = 20
+const PRESIGN_EXPIRY_MS = 55 * 60 * 1000     // re-presign if older than 55 min
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,19 +54,23 @@ export interface FileRecord {
 }
 
 export interface UploadItem {
-  id: string
+  id: string               // queue item id (not file_id)
   file: File | null
-  path: string          // parent directory path
+  path: string             // parent directory path
   filename: string
-  status: "queued" | "uploading" | "done" | "error" | "paused"
-  progress: number      // 0-100
+  status: "presigning" | "queued" | "uploading" | "done" | "error" | "conflict"
+  progress: number
   errorMessage?: string
   retryCount: number
-  // chunked-only
-  isChunked?: boolean
-  uploadSessionId?: string
-  chunksTotal?: number
-  chunksUploaded?: number
+  // set after presign
+  file_id?: string
+  upload_url?: string
+  presignedAt?: number     // Date.now() when presigned — for expiry check
+  // multipart
+  isMultipart?: boolean
+  upload_id?: string
+  part_urls?: string[]
+  // progress detail
   bytesPerSec?: number
   etaSeconds?: number
   result?: FileRecord
@@ -96,180 +105,154 @@ export const UploadQueueContext = React.createContext<UploadQueueContextType>({
 export const useUploadQueue = () => React.useContext(UploadQueueContext)
 
 // ---------------------------------------------------------------------------
-// Simple (single-request) upload via XHR
+// Auth helper
 // ---------------------------------------------------------------------------
 
-function uploadWithXHR(
-  item: UploadItem,
-  onProgress: (p: number) => void,
-  onDone: (result: FileRecord) => void,
-  onError: (msg: string, retryable: boolean) => void,
-): XMLHttpRequest {
-  const xhr = new XMLHttpRequest()
-  const form = new FormData()
-  form.append("file", item.file as File)
-  form.append("path", item.path)
-  form.append("overwrite", "false")
-
-  xhr.timeout = XHR_TIMEOUT_MS
-  xhr.open("POST", `${API_BASE_URL}/api/v1/files/upload`)
+function authHeaders(): Record<string, string> {
   const token = tokenStorage.getAccess()
-  if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`)
-
-  xhr.upload.onprogress = (e) => {
-    if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
-  }
-  xhr.ontimeout = () => onError("Request timed out", true)
-  xhr.onerror = () => onError("Network error — check your connection", true)
-  xhr.onload = () => {
-    if (xhr.status === 201 || xhr.status === 200) {
-      try { onDone(JSON.parse(xhr.responseText) as FileRecord) }
-      catch { onDone({ id: "", name: item.filename } as FileRecord) }
-    } else if (xhr.status === 409) {
-      onError(`File already exists`, false)
-    } else if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504) {
-      onError(`Gateway error (${xhr.status}) — retrying`, true)
-    } else if (xhr.status >= 400 && xhr.status < 500) {
-      onError(`Upload rejected (${xhr.status})`, false)
-    } else {
-      onError(`Server error (${xhr.status})`, true)
-    }
-  }
-  xhr.send(form)
-  return xhr
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 // ---------------------------------------------------------------------------
-// Chunked upload
+// Presign API calls
 // ---------------------------------------------------------------------------
 
-async function apiJson<T>(path: string, opts: RequestInit): Promise<T> {
-  const token = tokenStorage.getAccess()
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(opts.headers ?? {}),
-    },
+interface PresignResult {
+  file_id: string
+  upload_url: string
+  r2_key: string
+  expires_at: string
+  conflict: boolean
+}
+
+async function presignBatch(
+  entries: { file: File; path: string; itemId: string }[],
+): Promise<Map<string, PresignResult>> {
+  const body = entries.map(({ file, path }) => ({
+    filename: file.name,
+    path,
+    size: file.size,
+    mime_type: file.type || "application/octet-stream",
+    overwrite: false,
+  }))
+
+  const res = await fetch(`${API_BASE}/api/v1/files/presign/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
   })
-  if (!res.ok) {
-    const body = await res.text().catch(() => "")
-    throw Object.assign(new Error(`HTTP ${res.status}: ${body}`), {
-      status: res.status,
-      retryable: res.status >= 500,
-    })
-  }
-  return res.json() as Promise<T>
+
+  if (!res.ok) throw new Error(`Presign failed: HTTP ${res.status}`)
+  const results: PresignResult[] = await res.json()
+
+  const map = new Map<string, PresignResult>()
+  entries.forEach(({ itemId }, i) => map.set(itemId, results[i]))
+  return map
 }
 
-function uploadChunkXHR(
-  uploadSessionId: string,
-  chunkIndex: number,
-  blob: Blob,
-  onProgress: (loaded: number) => void,
-): Promise<{ etag: string }> {
+async function presignMultipartInit(
+  file: File,
+  path: string,
+  totalParts: number,
+): Promise<{ file_id: string; upload_id: string; part_urls: string[] }> {
+  const res = await fetch(`${API_BASE}/api/v1/files/presign/multipart/init`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      filename: file.name,
+      path,
+      size: file.size,
+      mime_type: file.type || "application/octet-stream",
+      total_parts: totalParts,
+    }),
+  })
+  if (!res.ok) throw new Error(`Multipart init failed: HTTP ${res.status}`)
+  return res.json()
+}
+
+async function presignMultipartComplete(
+  file_id: string,
+  upload_id: string,
+  parts: { part_number: number; etag: string }[],
+): Promise<FileRecord> {
+  const res = await fetch(`${API_BASE}/api/v1/files/presign/multipart/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ file_id, upload_id, parts }),
+  })
+  if (!res.ok) throw new Error(`Multipart complete failed: HTTP ${res.status}`)
+  return res.json()
+}
+
+async function confirmUpload(file_id: string, size: number): Promise<FileRecord> {
+  const res = await fetch(`${API_BASE}/api/v1/files/confirm/${file_id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ size }),
+  })
+  if (!res.ok) throw new Error(`Confirm failed: HTTP ${res.status}`)
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// XHR PUT to R2 (single file)
+// ---------------------------------------------------------------------------
+
+function xhrPutR2(
+  url: string,
+  file: File,
+  onProgress: (p: number) => void,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.timeout = XHR_TIMEOUT_MS
-    xhr.open("PUT", `${API_BASE_URL}/api/v1/files/upload/chunk/${uploadSessionId}`)
-    const token = tokenStorage.getAccess()
-    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`)
-    xhr.setRequestHeader("X-Chunk-Index", String(chunkIndex))
+    xhr.open("PUT", url)
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream")
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.ontimeout = () => reject(Object.assign(new Error("Upload timed out"), { retryable: true }))
+    xhr.onerror = () => reject(Object.assign(new Error("Network error — check your connection"), { retryable: true }))
+    xhr.onload = () => {
+      if (xhr.status === 200) resolve()
+      else if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504)
+        reject(Object.assign(new Error(`Gateway error (${xhr.status})`), { retryable: true }))
+      else
+        reject(Object.assign(new Error(`R2 error (${xhr.status})`), { retryable: xhr.status >= 500 }))
+    }
+    xhr.send(file)
+  })
+}
+
+// ---------------------------------------------------------------------------
+// XHR PUT one multipart part to R2
+// ---------------------------------------------------------------------------
+
+function xhrPutPart(
+  url: string,
+  blob: Blob,
+  onProgress: (loaded: number) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.timeout = XHR_TIMEOUT_MS
+    xhr.open("PUT", url)
+    xhr.setRequestHeader("Content-Type", "application/octet-stream")
 
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded) }
-    xhr.ontimeout = () => reject(Object.assign(new Error("Chunk timed out"), { retryable: true }))
+    xhr.ontimeout = () => reject(Object.assign(new Error("Part timed out"), { retryable: true }))
     xhr.onerror = () => reject(Object.assign(new Error("Network error"), { retryable: true }))
     xhr.onload = () => {
       if (xhr.status === 200) {
-        try { resolve(JSON.parse(xhr.responseText)) }
-        catch { resolve({ etag: "" }) }
-      } else if (xhr.status >= 500) {
-        reject(Object.assign(new Error(`Server error ${xhr.status}`), { retryable: true }))
+        const etag = xhr.getResponseHeader("ETag") ?? ""
+        resolve(etag)
       } else {
-        reject(Object.assign(new Error(`Chunk rejected ${xhr.status}`), { retryable: false }))
+        reject(Object.assign(new Error(`Part error (${xhr.status})`), { retryable: xhr.status >= 500 }))
       }
     }
     xhr.send(blob)
   })
-}
-
-async function runChunkedUpload(
-  item: UploadItem,
-  onProgress: (progress: number, chunksUploaded: number, chunksTotal: number, bytesPerSec: number | undefined) => void,
-  onDone: (result: FileRecord) => void,
-  onError: (msg: string, retryable: boolean) => void,
-) {
-  const file = item.file as File
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
-
-  let sessionId: string
-  try {
-    const init = await apiJson<{ upload_id: string; chunk_size: number }>(
-      "/api/v1/files/upload/init",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          filename: item.filename,
-          path: item.path,
-          total_size: file.size,
-          total_chunks: totalChunks,
-          mime_type: file.type || "application/octet-stream",
-        }),
-      },
-    )
-    sessionId = init.upload_id
-  } catch (e: unknown) {
-    const err = e as { message?: string; retryable?: boolean }
-    onError(err.message ?? "Init failed", err.retryable ?? true)
-    return
-  }
-
-  let uploadedBytes = 0
-  const startTime = Date.now()
-  for (let i = 0; i < totalChunks; i++) {
-    const blob = file.slice(i * CHUNK_SIZE, Math.min((i + 1) * CHUNK_SIZE, file.size))
-    let attempts = 0
-    while (attempts < MAX_AUTO_RETRIES) {
-      try {
-        await uploadChunkXHR(sessionId, i, blob, (loaded) => {
-          const chunkBase = i * CHUNK_SIZE
-          const totalLoaded = chunkBase + loaded
-          const elapsed = (Date.now() - startTime) / 1000
-          const bytesPerSec = elapsed > 0 ? Math.round(totalLoaded / elapsed) : undefined
-          onProgress(
-            Math.round((totalLoaded / file.size) * 100),
-            i,
-            totalChunks,
-            bytesPerSec,
-          )
-        })
-        uploadedBytes += blob.size
-        break
-      } catch (e: unknown) {
-        const err = e as { retryable?: boolean; message?: string }
-        attempts++
-        if (!err.retryable || attempts >= MAX_AUTO_RETRIES) {
-          // abort session
-          apiJson(`/api/v1/files/upload/abort/${sessionId}`, { method: "DELETE" }).catch(() => {})
-          onError(err.message ?? "Chunk upload failed", err.retryable ?? false)
-          return
-        }
-        await new Promise((r) => setTimeout(r, 1000 * attempts))
-      }
-    }
-  }
-
-  try {
-    const result = await apiJson<FileRecord>(
-      `/api/v1/files/upload/complete/${sessionId}`,
-      { method: "POST", body: JSON.stringify({}) },
-    )
-    onDone(result)
-  } catch (e: unknown) {
-    const err = e as { message?: string; retryable?: boolean }
-    onError(err.message ?? "Complete failed", err.retryable ?? true)
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -277,28 +260,22 @@ async function runChunkedUpload(
 // ---------------------------------------------------------------------------
 
 export function UploadQueueProvider({ children }: { children: React.ReactNode }) {
-  // React state — used only for rendering. Updated selectively.
   const [items, setItems] = React.useState<UploadItem[]>([])
   const [isPaused, setIsPaused] = React.useState(false)
 
-  // Internal Map ref — O(1) updates, no React re-render for progress ticks
   const itemsMap = React.useRef<Map<string, UploadItem>>(new Map())
   const activeCount = React.useRef(0)
-  const rafPending = React.useRef(false)
   const isPausedRef = React.useRef(false)
+  const rafPending = React.useRef(false)
   const refreshTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const drainScheduled = React.useRef(false)
 
-  // ---------------------------------------------------------------------------
-  // Sync helpers
-  // ---------------------------------------------------------------------------
+  // ── sync helpers ──────────────────────────────────────────────────────────
 
-  // Immediately flush the Map to React state (for status changes)
   const flushItems = React.useCallback(() => {
     setItems([...itemsMap.current.values()])
   }, [])
 
-  // Flush via rAF for progress updates (batches multiple progress ticks into one render)
   const flushProgress = React.useCallback(() => {
     if (rafPending.current) return
     rafPending.current = true
@@ -308,17 +285,14 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
     })
   }, [])
 
-  // Write only status/structural changes to sessionStorage (not progress)
   const persistQueue = React.useCallback(() => {
     try {
-      const serializable = [...itemsMap.current.values()].map(({ file: _f, ...rest }) => rest)
+      const serializable = [...itemsMap.current.values()].map(
+        ({ file: _f, ...rest }) => rest,
+      )
       sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(serializable))
     } catch { /* storage full */ }
   }, [])
-
-  // ---------------------------------------------------------------------------
-  // Refresh debounce
-  // ---------------------------------------------------------------------------
 
   const scheduleRefresh = React.useCallback(() => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current)
@@ -328,9 +302,7 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
     }, REFRESH_DEBOUNCE_MS)
   }, [])
 
-  // ---------------------------------------------------------------------------
-  // SessionStorage restore on mount
-  // ---------------------------------------------------------------------------
+  // ── SessionStorage restore ─────────────────────────────────────────────────
 
   React.useEffect(() => {
     try {
@@ -340,9 +312,12 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
       const restored: UploadItem[] = saved.map((it) => ({
         ...it,
         file: null,
-        status: it.status === "uploading" || it.status === "queued" ? "error" : it.status,
+        status:
+          it.status === "uploading" || it.status === "queued" || it.status === "presigning"
+            ? "error"
+            : it.status,
         errorMessage:
-          it.status === "uploading" || it.status === "queued"
+          it.status === "uploading" || it.status === "queued" || it.status === "presigning"
             ? "Upload interrupted — re-add the file to retry"
             : it.errorMessage,
       }))
@@ -354,18 +329,15 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ---------------------------------------------------------------------------
-  // Drain queue — runs from a ref, never depends on React state
-  // ---------------------------------------------------------------------------
+  // ── drain queue ───────────────────────────────────────────────────────────
 
   const drainQueueRef = React.useRef<() => void>(() => {})
-
   drainQueueRef.current = () => {
     if (isPausedRef.current) return
     const slots = MAX_CONCURRENT - activeCount.current
     if (slots <= 0) return
     const queued = [...itemsMap.current.values()].filter(
-      (i) => i.status === "queued" && i.file != null
+      (i) => i.status === "queued" && i.file != null && i.upload_url,
     )
     queued.slice(0, slots).forEach((item) => startUploadRef.current(item))
   }
@@ -373,37 +345,56 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
   const scheduleDrain = React.useCallback(() => {
     if (drainScheduled.current) return
     drainScheduled.current = true
-    // Use setTimeout(0) so it runs after the current callstack settles
     setTimeout(() => {
       drainScheduled.current = false
       drainQueueRef.current()
     }, 0)
   }, [])
 
-  // ---------------------------------------------------------------------------
-  // Start upload
-  // ---------------------------------------------------------------------------
+  // ── upload execution ──────────────────────────────────────────────────────
 
   const startUploadRef = React.useRef<(item: UploadItem) => void>(() => {})
-
   startUploadRef.current = (item: UploadItem) => {
-    if (!item.file) {
-      const updated = { ...item, status: "error" as const, errorMessage: "File not available — re-add to retry" }
+    if (!item.file || !item.upload_url) return
+
+    // Re-presign if URL is about to expire
+    if (item.presignedAt && Date.now() - item.presignedAt > PRESIGN_EXPIRY_MS) {
+      const updated = { ...item, status: "presigning" as const }
       itemsMap.current.set(item.id, updated)
       flushItems()
+      presignBatch([{ file: item.file, path: item.path, itemId: item.id }])
+        .then((res) => {
+          const r = res.get(item.id)
+          if (!r) return
+          const refreshed = {
+            ...itemsMap.current.get(item.id)!,
+            file_id: r.file_id,
+            upload_url: r.upload_url,
+            presignedAt: Date.now(),
+            status: "queued" as const,
+          }
+          itemsMap.current.set(item.id, refreshed)
+          flushItems()
+          scheduleDrain()
+        })
+        .catch(() => {
+          const errored = { ...itemsMap.current.get(item.id)!, status: "error" as const, errorMessage: "Re-presign failed" }
+          itemsMap.current.set(item.id, errored)
+          flushItems()
+        })
       return
     }
 
     activeCount.current++
-    const uploading = { ...item, status: "uploading" as const, progress: 0 }
-    itemsMap.current.set(item.id, uploading)
+    itemsMap.current.set(item.id, { ...item, status: "uploading", progress: 0 })
     flushItems()
     persistQueue()
 
+    const file = item.file
+
     const onDone = (result: FileRecord) => {
       activeCount.current--
-      const done = { ...itemsMap.current.get(item.id)!, status: "done" as const, progress: 100, result }
-      itemsMap.current.set(item.id, done)
+      itemsMap.current.set(item.id, { ...itemsMap.current.get(item.id)!, status: "done", progress: 100, result })
       flushItems()
       persistQueue()
       if (activeCount.current === 0) scheduleRefresh()
@@ -412,112 +403,258 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
 
     const onError = (msg: string, retryable: boolean) => {
       activeCount.current--
-      const current = itemsMap.current.get(item.id)
-      const nextRetry = (current?.retryCount ?? 0) + 1
+      const current = itemsMap.current.get(item.id)!
+      const nextRetry = (current.retryCount ?? 0) + 1
       if (retryable && nextRetry <= MAX_AUTO_RETRIES) {
-        const retrying = {
-          ...current!,
-          status: "queued" as const,
+        itemsMap.current.set(item.id, {
+          ...current,
+          status: "queued",
           retryCount: nextRetry,
-          errorMessage: `Retrying (attempt ${nextRetry}/${MAX_AUTO_RETRIES})…`,
-        }
-        itemsMap.current.set(item.id, retrying)
+          errorMessage: `Retrying (${nextRetry}/${MAX_AUTO_RETRIES})…`,
+        })
         flushItems()
-        const delay = 1000 * nextRetry
-        setTimeout(() => scheduleDrain(), delay)
+        setTimeout(() => scheduleDrain(), 1000 * nextRetry)
       } else {
-        const errored = { ...current!, status: "error" as const, errorMessage: msg }
-        itemsMap.current.set(item.id, errored)
+        itemsMap.current.set(item.id, { ...current, status: "error", errorMessage: msg })
         flushItems()
         persistQueue()
         scheduleDrain()
       }
     }
 
-    if (item.isChunked) {
-      runChunkedUpload(
-        item,
-        (progress, chunksUploaded, chunksTotal, bytesPerSec) => {
-          const etaSeconds =
-            bytesPerSec && bytesPerSec > 0
-              ? Math.round(((chunksTotal - chunksUploaded) * CHUNK_SIZE) / bytesPerSec)
-              : undefined
-          const current = itemsMap.current.get(item.id)
-          if (!current) return
-          itemsMap.current.set(item.id, { ...current, progress, chunksUploaded, chunksTotal, bytesPerSec, etaSeconds })
-          flushProgress() // rAF-batched — no sessionStorage write
-        },
-        onDone,
-        onError,
-      )
+    if (item.isMultipart && item.upload_id && item.part_urls) {
+      // Multipart: PUT each part to its presigned URL
+      const partUrls = item.part_urls
+      const totalParts = partUrls.length
+      const startTime = Date.now()
+      let totalLoaded = 0
+      const parts: { part_number: number; etag: string }[] = []
+
+      ;(async () => {
+        for (let i = 0; i < totalParts; i++) {
+          const blob = file.slice(i * PART_SIZE, Math.min((i + 1) * PART_SIZE, file.size))
+          let attempts = 0
+          let etag = ""
+          while (attempts < MAX_AUTO_RETRIES) {
+            try {
+              etag = await xhrPutPart(partUrls[i], blob, (loaded) => {
+                const partBase = i * PART_SIZE
+                totalLoaded = partBase + loaded
+                const elapsed = (Date.now() - startTime) / 1000
+                const bytesPerSec = elapsed > 0 ? Math.round(totalLoaded / elapsed) : undefined
+                const etaSeconds = bytesPerSec && bytesPerSec > 0
+                  ? Math.round((file.size - totalLoaded) / bytesPerSec)
+                  : undefined
+                const current = itemsMap.current.get(item.id)
+                if (current) {
+                  itemsMap.current.set(item.id, {
+                    ...current,
+                    progress: Math.round((totalLoaded / file.size) * 100),
+                    bytesPerSec,
+                    etaSeconds,
+                  })
+                  flushProgress()
+                }
+              })
+              break
+            } catch (e: unknown) {
+              attempts++
+              const err = e as { retryable?: boolean; message?: string }
+              if (!err.retryable || attempts >= MAX_AUTO_RETRIES) {
+                onError(err.message ?? "Part upload failed", err.retryable ?? false)
+                return
+              }
+              await new Promise((r) => setTimeout(r, 1000 * attempts))
+            }
+          }
+          parts.push({ part_number: i + 1, etag })
+        }
+
+        try {
+          const result = await presignMultipartComplete(item.file_id!, item.upload_id!, parts)
+          onDone(result)
+        } catch (e: unknown) {
+          const err = e as { message?: string }
+          onError(err.message ?? "Complete failed", true)
+        }
+      })()
     } else {
-      uploadWithXHR(
-        item,
+      // Single file: PUT directly to R2
+      xhrPutR2(
+        item.upload_url!,
+        file,
         (progress) => {
           const current = itemsMap.current.get(item.id)
-          if (!current) return
-          itemsMap.current.set(item.id, { ...current, progress })
-          flushProgress() // rAF-batched — no sessionStorage write
+          if (current) {
+            itemsMap.current.set(item.id, { ...current, progress })
+            flushProgress()
+          }
         },
-        onDone,
-        onError,
       )
+        .then(() => confirmUpload(item.file_id!, file.size))
+        .then((result) => onDone(result))
+        .catch((e: unknown) => {
+          const err = e as { message?: string; retryable?: boolean }
+          onError(err.message ?? "Upload failed", err.retryable ?? true)
+        })
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Public API
-  // ---------------------------------------------------------------------------
+  // ── presign + enqueue ──────────────────────────────────────────────────────
 
   const addFilesWithPaths = React.useCallback(
     (entries: { file: File; path: string }[]) => {
+      // Create queue items immediately (status=presigning)
       const newItems: UploadItem[] = entries.map(({ file, path }) => ({
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         file,
         path,
         filename: file.name,
-        status: "queued" as const,
+        status: "presigning" as const,
         progress: 0,
         retryCount: 0,
-        isChunked: file.size > CHUNKED_THRESHOLD,
+        isMultipart: file.size > CHUNKED_THRESHOLD,
       }))
       for (const item of newItems) itemsMap.current.set(item.id, item)
       flushItems()
-      persistQueue()
-      scheduleDrain()
+
+      // Process in batches of PRESIGN_BATCH_SIZE
+      const batches: UploadItem[][] = []
+      for (let i = 0; i < newItems.length; i += PRESIGN_BATCH_SIZE) {
+        batches.push(newItems.slice(i, i + PRESIGN_BATCH_SIZE))
+      }
+
+      const processBatch = async (batch: UploadItem[]) => {
+        // Split small and large files
+        const small = batch.filter((it) => !it.isMultipart)
+        const large = batch.filter((it) => it.isMultipart)
+
+        // Presign small files in batch
+        if (small.length > 0) {
+          try {
+            const results = await presignBatch(
+              small.map((it) => ({ file: it.file!, path: it.path, itemId: it.id })),
+            )
+            for (const item of small) {
+              const r = results.get(item.id)
+              if (!r) continue
+              const current = itemsMap.current.get(item.id)
+              if (!current) continue
+              if (r.conflict) {
+                itemsMap.current.set(item.id, {
+                  ...current,
+                  status: "conflict",
+                  errorMessage: "File already exists — skip or replace",
+                })
+              } else {
+                itemsMap.current.set(item.id, {
+                  ...current,
+                  file_id: r.file_id,
+                  upload_url: r.upload_url,
+                  presignedAt: Date.now(),
+                  status: "queued",
+                })
+              }
+            }
+          } catch (e: unknown) {
+            const err = e as { message?: string }
+            for (const item of small) {
+              const current = itemsMap.current.get(item.id)
+              if (current) {
+                itemsMap.current.set(item.id, {
+                  ...current,
+                  status: "error",
+                  errorMessage: err.message ?? "Presign failed",
+                })
+              }
+            }
+          }
+        }
+
+        // Presign large files individually (multipart init)
+        for (const item of large) {
+          try {
+            const file = item.file!
+            const totalParts = Math.ceil(file.size / PART_SIZE)
+            const r = await presignMultipartInit(file, item.path, totalParts)
+            const current = itemsMap.current.get(item.id)
+            if (current) {
+              itemsMap.current.set(item.id, {
+                ...current,
+                file_id: r.file_id,
+                upload_id: r.upload_id,
+                part_urls: r.part_urls,
+                presignedAt: Date.now(),
+                status: "queued",
+              })
+            }
+          } catch (e: unknown) {
+            const err = e as { message?: string }
+            const current = itemsMap.current.get(item.id)
+            if (current) {
+              itemsMap.current.set(item.id, {
+                ...current,
+                status: "error",
+                errorMessage: err.message ?? "Multipart init failed",
+              })
+            }
+          }
+        }
+
+        flushItems()
+        persistQueue()
+        scheduleDrain()
+      }
+
+      // Process batches sequentially to avoid flooding backend
+      ;(async () => {
+        for (const batch of batches) {
+          await processBatch(batch)
+        }
+      })()
     },
     [flushItems, persistQueue, scheduleDrain],
   )
 
   const addFiles = React.useCallback(
-    (files: File[], path: string) => {
-      addFilesWithPaths(files.map((file) => ({ file, path })))
-    },
+    (files: File[], path: string) => addFilesWithPaths(files.map((file) => ({ file, path }))),
     [addFilesWithPaths],
   )
+
+  // ── public API ─────────────────────────────────────────────────────────────
 
   const retryItem = React.useCallback(
     (id: string) => {
       const item = itemsMap.current.get(id)
       if (!item || item.status !== "error" || !item.file) return
-      const retried = { ...item, status: "queued" as const, progress: 0, retryCount: 0, errorMessage: undefined }
-      itemsMap.current.set(id, retried)
-      flushItems()
-      scheduleDrain()
+      // If we still have a presigned URL, go straight to queued; otherwise re-presign
+      if (item.upload_url && item.presignedAt && Date.now() - item.presignedAt < PRESIGN_EXPIRY_MS) {
+        itemsMap.current.set(id, { ...item, status: "queued", progress: 0, retryCount: 0, errorMessage: undefined })
+        flushItems()
+        scheduleDrain()
+      } else {
+        // Re-presign
+        itemsMap.current.set(id, { ...item, status: "presigning", progress: 0, retryCount: 0, errorMessage: undefined })
+        flushItems()
+        addFilesWithPaths([{ file: item.file, path: item.path }])
+      }
     },
-    [flushItems, scheduleDrain],
+    [flushItems, scheduleDrain, addFilesWithPaths],
   )
 
   const retryAllFailed = React.useCallback(() => {
-    let changed = false
+    const toRetry: { file: File; path: string }[] = []
     for (const item of itemsMap.current.values()) {
       if (item.status === "error" && item.file) {
-        itemsMap.current.set(item.id, { ...item, status: "queued", progress: 0, retryCount: 0, errorMessage: undefined })
-        changed = true
+        toRetry.push({ file: item.file, path: item.path })
+        itemsMap.current.delete(item.id)
       }
     }
-    if (changed) { flushItems(); scheduleDrain() }
-  }, [flushItems, scheduleDrain])
+    if (toRetry.length > 0) {
+      flushItems()
+      addFilesWithPaths(toRetry)
+    }
+  }, [flushItems, addFilesWithPaths])
 
   const pauseAll = React.useCallback(() => {
     isPausedRef.current = true
@@ -532,7 +669,8 @@ export function UploadQueueProvider({ children }: { children: React.ReactNode })
 
   const clearCompleted = React.useCallback(() => {
     for (const [id, item] of itemsMap.current) {
-      if (item.status === "done" || item.status === "error") itemsMap.current.delete(id)
+      if (item.status === "done" || item.status === "error" || item.status === "conflict")
+        itemsMap.current.delete(id)
     }
     flushItems()
     persistQueue()

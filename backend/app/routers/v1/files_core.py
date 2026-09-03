@@ -76,7 +76,12 @@ def list_files(
     result = []
     for doc in docs:
         d = doc.to_dict() or {}
-        if d.get("parent_path") == path and not d.get("is_deleted", False):
+        # Exclude soft-deleted records and presign-pending records (upload not yet confirmed)
+        if (
+            d.get("parent_path") == path
+            and not d.get("is_deleted", False)
+            and d.get("status", "active") == "active"
+        ):
             result.append(_doc_to_response(doc.id, d))
     return result
 

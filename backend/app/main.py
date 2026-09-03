@@ -62,6 +62,8 @@ from .routers.v1 import (
     chat as v1_chat,
     files_bulk,
     files_core,
+    files_presign,
+    files_presign,
     files_drive,
     files_misc,
     files_share,
@@ -230,6 +232,9 @@ app.include_router(v1_tasks.router, prefix=_V1)
 app.include_router(v1_team.router, prefix=_V1)
 app.include_router(v1_activity.router, prefix=_V1)
 app.include_router(v1_analytics.router, prefix=_V1)
+# files_presign must be before files_core — /presign/batch, /confirm/{id} etc.
+# would otherwise be caught by files_core's /{file_id} catch-all.
+app.include_router(files_presign.router, prefix=_V1)
 # files_upload must be before files_core — its /upload/init, /upload/chunk, /upload/complete
 # routes would otherwise be caught by files_core's /{file_id} catch-all DELETE handler.
 app.include_router(files_upload.router, prefix=_V1)

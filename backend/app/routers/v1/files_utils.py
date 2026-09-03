@@ -406,3 +406,68 @@ def _delete_file_metadata(db: "firestore.Client", file_ids: list[str]) -> None:
                     "_delete_file_metadata: cleanup failed collection=%s file_id=%s: %s",
                     collection, file_id, exc,
                 )
+
+
+# ---------------------------------------------------------------------------
+# Deterministic file ID
+# ---------------------------------------------------------------------------
+
+import hashlib
+
+
+def make_file_id(owner_id: str, virtual_path: str) -> str:
+    """Return a stable 32-char hex ID for a given owner+path combination.
+
+    Using a deterministic ID means:
+    - Retrying a failed upload never creates a duplicate Firestore record.
+    - Cron workers re-uploading the same file silently upsert instead of 409.
+    - Two concurrent presign requests for the same path produce the same ID.
+    """
+    raw = f"{owner_id}:{virtual_path}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+
+# ---------------------------------------------------------------------------
+# Presign schemas
+# ---------------------------------------------------------------------------
+
+
+class PresignBatchItem(BaseModel):
+    filename: str
+    path: str          # parent directory path (e.g. "folder/subfolder")
+    size: int
+    mime_type: str
+    overwrite: bool = False
+
+
+class PresignBatchResult(BaseModel):
+    file_id: str
+    upload_url: str    # presigned PUT URL (valid 1 hour)
+    r2_key: str
+    expires_at: str    # ISO-8601 UTC
+    conflict: bool = False
+
+
+class ConfirmUploadRequest(BaseModel):
+    size: Optional[int] = None  # actual bytes written (for quota tracking)
+
+
+class MultipartInitRequest(BaseModel):
+    filename: str
+    path: str
+    size: int
+    mime_type: str
+    total_parts: int
+
+
+class MultipartInitResponse(BaseModel):
+    file_id: str
+    upload_id: str
+    r2_key: str
+    part_urls: list[str]   # one presigned PUT URL per part, 1-indexed order
+
+
+class MultipartCompleteRequest(BaseModel):
+    file_id: str
+    upload_id: str
+    parts: list[dict]  # [{ "part_number": 1, "etag": "..." }, ...]

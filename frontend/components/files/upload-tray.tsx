@@ -13,6 +13,8 @@ import {
   AlertCircleIcon,
   PauseIcon,
   PlayIcon,
+  Loader2Icon,
+  AlertTriangleIcon,
 } from "lucide-react"
 
 function formatEta(seconds: number): string {
@@ -30,22 +32,25 @@ function ItemRow({
   retryItem: (id: string) => void
   removeItem: (id: string) => void
 }) {
-  const fileName = item.file?.name ?? item.path.split("/").pop() ?? "dosya"
-
-  const progressLabel = item.isChunked && item.chunksTotal
-    ? `${item.progress}% (${item.chunksUploaded ?? 0}/${item.chunksTotal} parça)`
-    : `${item.progress}%`
+  const fileName = item.filename ?? item.path.split("/").pop() ?? "dosya"
 
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 min-w-0">
         <p className="text-xs truncate">{fileName}</p>
 
+        {item.status === "presigning" && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Loader2Icon className="h-3 w-3 animate-spin" />
+            Hazırlanıyor…
+          </p>
+        )}
+
         {item.status === "uploading" && (
           <>
             <Progress value={item.progress} className="h-1 mt-1" />
             <p className="text-xs text-muted-foreground mt-0.5">
-              {progressLabel}
+              {item.progress}%
               {item.etaSeconds ? ` · ${formatEta(item.etaSeconds)}` : ""}
             </p>
           </>
@@ -53,6 +58,12 @@ function ItemRow({
 
         {item.status === "queued" && (
           <p className="text-xs text-muted-foreground">Sırada bekliyor…</p>
+        )}
+
+        {item.status === "conflict" && (
+          <p className="text-xs text-amber-500 truncate">
+            Dosya zaten var — atlandı
+          </p>
         )}
 
         {item.status === "error" && item.errorMessage && (
@@ -64,6 +75,10 @@ function ItemRow({
 
       {item.status === "done" && (
         <CheckIcon className="h-4 w-4 text-green-500 shrink-0" />
+      )}
+
+      {item.status === "conflict" && (
+        <AlertTriangleIcon className="h-4 w-4 text-amber-500 shrink-0" />
       )}
 
       {item.status === "error" && item.file && (
@@ -78,7 +93,7 @@ function ItemRow({
         </Button>
       )}
 
-      {(item.status === "done" || item.status === "error") && (
+      {(item.status === "done" || item.status === "error" || item.status === "conflict") && (
         <Button
           variant="ghost"
           size="icon"
@@ -94,36 +109,44 @@ function ItemRow({
 }
 
 export function UploadTray() {
-  const { items, retryItem, retryAllFailed, pauseAll, resumeAll, isPaused, clearCompleted, removeItem } = useUploadQueue()
+  const { items, retryItem, retryAllFailed, pauseAll, resumeAll, isPaused, clearCompleted, removeItem } =
+    useUploadQueue()
   const [minimized, setMinimized] = React.useState(false)
 
   if (items.length === 0) return null
 
   const done = items.filter((i) => i.status === "done").length
   const uploading = items.filter((i) => i.status === "uploading").length
+  const presigning = items.filter((i) => i.status === "presigning").length
   const queued = items.filter((i) => i.status === "queued").length
   const failed = items.filter((i) => i.status === "error").length
   const total = items.length
-  const allTerminal = items.every((i) => i.status === "done" || i.status === "error")
+  const active = uploading + presigning + queued
+  const allTerminal = items.every(
+    (i) => i.status === "done" || i.status === "error" || i.status === "conflict",
+  )
 
-  let headerLabel: string
-  if (allTerminal) {
-    headerLabel = `Tamamlandı (${done}/${total})`
-  } else if (uploading > 0 && queued > 0) {
-    headerLabel = `${uploading} yükleniyor, ${queued} bekliyor`
-  } else if (uploading > 0) {
-    headerLabel = `Yükleniyor (${done}/${total})`
-  } else {
-    headerLabel = `Hazırlanıyor…`
+  let headerLabel = `Tamamlandı (${done}/${total})`
+  if (!allTerminal) {
+    if (uploading > 0 && queued + presigning > 0) {
+      headerLabel = `${uploading} yükleniyor, ${queued + presigning} bekliyor`
+    } else if (uploading > 0) {
+      headerLabel = `Yükleniyor (${done}/${total})`
+    } else if (presigning > 0) {
+      headerLabel = `Hazırlanıyor…`
+    } else {
+      headerLabel = `Bekliyor (${done}/${total})`
+    }
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border bg-background shadow-lg">
+    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl border bg-background shadow-lg overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b">
         <span className="text-sm font-medium">{headerLabel}</span>
-        <div className="flex gap-1">
-          {!allTerminal && (
+        <div className="flex items-center gap-1">
+          {/* Pause/resume — only when active uploads exist */}
+          {active > 0 && (
             <Button
               variant="ghost"
               size="icon"
@@ -131,31 +154,23 @@ export function UploadTray() {
               title={isPaused ? "Devam ettir" : "Tümünü duraklat"}
               onClick={isPaused ? resumeAll : pauseAll}
             >
-              {isPaused ? (
-                <PlayIcon className="h-3 w-3" />
-              ) : (
-                <PauseIcon className="h-3 w-3" />
-              )}
+              {isPaused ? <PlayIcon className="h-3 w-3" /> : <PauseIcon className="h-3 w-3" />}
             </Button>
           )}
           <Button
             variant="ghost"
             size="icon"
             className="h-6 w-6"
-            onClick={() => setMinimized((m) => !m)}
+            onClick={() => setMinimized((v) => !v)}
           >
-            {minimized ? (
-              <ChevronUpIcon className="h-3 w-3" />
-            ) : (
-              <ChevronDownIcon className="h-3 w-3" />
-            )}
+            {minimized ? <ChevronUpIcon className="h-3 w-3" /> : <ChevronDownIcon className="h-3 w-3" />}
           </Button>
         </div>
       </div>
 
-      {/* Error summary banner */}
-      {!minimized && failed > 0 && (
-        <div className="flex items-center justify-between gap-2 px-4 py-1.5 bg-destructive/10 border-b">
+      {/* Error banner */}
+      {failed > 0 && (
+        <div className="flex items-center justify-between px-4 py-1.5 bg-destructive/10 border-b">
           <span className="flex items-center gap-1 text-xs text-destructive">
             <AlertCircleIcon className="h-3 w-3" />
             {failed} dosya başarısız

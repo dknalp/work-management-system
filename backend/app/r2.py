@@ -249,3 +249,47 @@ async def r2_abort_multipart_upload(key: str, upload_id: str) -> None:
             UploadId=upload_id,
         ),
     )
+
+
+def r2_presign_put(key: str, content_type: str, expires: int = 3600) -> str:
+    """Generate a presigned PUT URL for direct browser-to-R2 upload.
+
+    The browser PUTs the file bytes directly to this URL — the backend never
+    touches the file data. URL is valid for `expires` seconds (default 1 hour).
+    """
+    client = get_r2_client()
+    bucket = get_bucket()
+    return client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": bucket,
+            "Key": key,
+            "ContentType": content_type,
+        },
+        ExpiresIn=expires,
+    )
+
+
+def r2_presign_multipart_part(
+    key: str,
+    upload_id: str,
+    part_number: int,
+    expires: int = 3600,
+) -> str:
+    """Generate a presigned PUT URL for one part of a multipart upload.
+
+    Part numbers are 1-indexed (R2/S3 requirement).
+    URL is valid for `expires` seconds (default 1 hour).
+    """
+    client = get_r2_client()
+    bucket = get_bucket()
+    return client.generate_presigned_url(
+        "upload_part",
+        Params={
+            "Bucket": bucket,
+            "Key": key,
+            "UploadId": upload_id,
+            "PartNumber": part_number,
+        },
+        ExpiresIn=expires,
+    )
