@@ -11,6 +11,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from ..deps import get_current_user
 from ..firebase import get_db
@@ -41,7 +42,7 @@ def _unique_slug(base: str, existing_slugs: set) -> str:
 
 def _get_owner_slugs(owner_id: str, db: firestore.Client, exclude_id: str = "") -> set:
     """Return the set of all project slugs owned by the given user."""
-    docs = db.collection("projects").where("owner_id", "==", owner_id).stream()
+    docs = db.collection("projects").where(filter=FieldFilter("owner_id", "==", owner_id)).stream()
     return {
         (doc.to_dict() or {}).get("slug", "")
         for doc in docs
@@ -73,7 +74,7 @@ def list_projects(
     """Return all projects owned by the current user, ordered by creation date."""
     docs = (
         db.collection("projects")
-        .where("owner_id", "==", current_user.id)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
         .order_by("created_at")
         .limit(500)
         .stream()

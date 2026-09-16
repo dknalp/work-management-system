@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from ..deps import get_current_user
 from ..firebase import get_db
@@ -21,7 +22,7 @@ router = APIRouter(tags=["pipelines"])
 
 def _get_owner_project_ids(owner_id: str, db: firestore.Client) -> set:
     """Return the set of project IDs owned by the given user."""
-    docs = db.collection("projects").where("owner_id", "==", owner_id).stream()
+    docs = db.collection("projects").where(filter=FieldFilter("owner_id", "==", owner_id)).stream()
     return {doc.id for doc in docs}
 
 
@@ -51,7 +52,7 @@ def list_pipelines(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
         docs = (
             db.collection("pipelines")
-            .where("project_id", "==", project_id)
+            .where(filter=FieldFilter("project_id", "==", project_id))
             .order_by("created_at")
             .stream()
         )
@@ -61,7 +62,7 @@ def list_pipelines(
             return []
         docs = (
             db.collection("pipelines")
-            .where("project_id", "in", list(owned_ids))
+            .where(filter=FieldFilter("project_id", "in", list(owned_ids)))
             .order_by("created_at")
             .stream()
         )

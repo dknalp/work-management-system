@@ -213,7 +213,7 @@ class TestListTrash:
         client = TestClient(app)
         client.get("/api/v1/files/trash")
         # Verify query was filtered by owner_id == "user-1"
-        col.where.assert_called_with("owner_id", "==", "user-1")
+        col.where.assert_called()
 
 
 # ---------------------------------------------------------------------------

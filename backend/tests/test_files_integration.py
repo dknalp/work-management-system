@@ -109,7 +109,10 @@ class FakeQuery:
         self._conditions = conditions
         self._limit_n: int | None = None
 
-    def where(self, field, op, value):
+    def where(self, field=None, op=None, value=None, *, filter=None):
+        if filter is not None:
+            # google-cloud-firestore 2.21+ FieldFilter object
+            field, op, value = filter.field_path, filter.op_string, filter.value
         return FakeQuery(self._store, self._col, self._conditions + [(field, op, value)])
 
     def limit(self, n):
@@ -177,7 +180,9 @@ class FakeCollection:
     def document(self, doc_id: str):
         return FakeDocRef(self._store, self._col, doc_id)
 
-    def where(self, field, op, value):
+    def where(self, field=None, op=None, value=None, *, filter=None):
+        if filter is not None:
+            field, op, value = filter.field_path, filter.op_string, filter.value
         return FakeQuery(self._store, self._col, [(field, op, value)])
 
     def stream(self):

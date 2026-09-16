@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.deps import get_current_user
 from app.firebase import get_db
@@ -49,8 +50,8 @@ async def empty_trash(
     """
     docs = (
         db.collection("file_records")
-        .where("owner_id", "==", current_user.id)
-        .where("is_deleted", "==", True)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
+        .where(filter=FieldFilter("is_deleted", "==", True))
         .stream()
     )
 
@@ -194,7 +195,7 @@ def list_trash(
     # while the (owner_id, is_deleted) composite index is being built.
     docs = (
         db.collection("file_records")
-        .where("owner_id", "==", current_user.id)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
         .stream()
     )
     all_trashed: dict[str, dict] = {}
@@ -325,9 +326,9 @@ async def delete_permanently(
         prefix_end = folder_path + "/"
         child_docs = (
             db.collection("file_records")
-            .where("owner_id", "==", current_user.id)
-            .where("path", ">=", folder_path + "/")
-            .where("path", "<=", prefix_end)
+            .where(filter=FieldFilter("owner_id", "==", current_user.id))
+            .where(filter=FieldFilter("path", ">=", folder_path + "/"))
+            .where(filter=FieldFilter("path", "<=", prefix_end))
             .stream()
         )
         for child in child_docs:

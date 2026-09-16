@@ -17,6 +17,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from ..deps import _permission_cache, get_current_user
 from ..firebase import get_db
@@ -125,7 +126,7 @@ def get_my_permissions(
     db: firestore.Client = Depends(get_db),
 ):
     """Return the list of permissions granted to the current user's role."""
-    docs = db.collection("role_permissions").where("role", "==", current_user.role).stream()
+    docs = db.collection("role_permissions").where(filter=FieldFilter("role", "==", current_user.role)).stream()
     perms = [doc.to_dict().get("permission", "") for doc in docs if doc.to_dict().get("permission")]
     return PermissionsResponse(permissions=perms)
 
@@ -184,7 +185,7 @@ def create_role(
 
     # Optionally copy permissions from another role
     if body.copy_from:
-        source_docs = db.collection("role_permissions").where("role", "==", body.copy_from).stream()
+        source_docs = db.collection("role_permissions").where(filter=FieldFilter("role", "==", body.copy_from)).stream()
         for source_doc in source_docs:
             perm = source_doc.to_dict().get("permission", "")
             if perm:
@@ -213,12 +214,12 @@ def delete_role(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
 
     # Reassign users that had this role to 'member'
-    user_docs = db.collection("users").where("role", "==", role_name).stream()
+    user_docs = db.collection("users").where(filter=FieldFilter("role", "==", role_name)).stream()
     for user_doc in user_docs:
         user_doc.reference.update({"role": "member", "is_admin": False, "updated_at": datetime.now(timezone.utc)})
 
     # Delete all permission grants for this role
-    perm_docs = db.collection("role_permissions").where("role", "==", role_name).stream()
+    perm_docs = db.collection("role_permissions").where(filter=FieldFilter("role", "==", role_name)).stream()
     for perm_doc in perm_docs:
         perm_doc.reference.delete()
 
@@ -263,7 +264,7 @@ def update_permissions(
 
     # Delete existing grants for the roles being updated
     for role in roles_to_update:
-        existing = db.collection("role_permissions").where("role", "==", role).stream()
+        existing = db.collection("role_permissions").where(filter=FieldFilter("role", "==", role)).stream()
         for doc in existing:
             doc.reference.delete()
 

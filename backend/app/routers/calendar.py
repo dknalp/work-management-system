@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from ..deps import get_current_user
 from ..firebase import get_db
@@ -45,12 +46,12 @@ def list_events(
     """Return calendar events for the current user, optionally filtered by date."""
     query = (
         db.collection("calendar_events")
-        .where("owner_id", "==", current_user.id)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
         .order_by("date")
         .limit(500)
     )
     if date:
-        query = query.where("date", "==", date)
+        query = query.where(filter=FieldFilter("date", "==", date))
 
     return [_doc_to_response(doc.id, doc.to_dict() or {}) for doc in query.stream()]
 

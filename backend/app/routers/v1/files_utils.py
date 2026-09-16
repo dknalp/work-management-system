@@ -21,6 +21,7 @@ UPLOAD_SEMAPHORE = asyncio.Semaphore(3)
 
 from fastapi import HTTPException
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -279,8 +280,8 @@ def _cascade_rename(
 
     docs = (
         db.collection("file_records")
-        .where("path", ">=", lower)
-        .where("path", "<", upper)
+        .where(filter=FieldFilter("path", ">=", lower))
+        .where(filter=FieldFilter("path", "<", upper))
         .stream()
     )
 
@@ -365,8 +366,8 @@ def _cascade_flag(
     suffix = folder_path + "0"  # '0' > '/' in ASCII — safe upper bound
     docs = (
         db.collection("file_records")
-        .where("path", ">=", prefix)
-        .where("path", "<", suffix)
+        .where(filter=FieldFilter("path", ">=", prefix))
+        .where(filter=FieldFilter("path", "<", suffix))
         .stream()
     )
     batch = db.batch()
@@ -399,7 +400,7 @@ def _delete_file_metadata(db: "firestore.Client", file_ids: list[str]) -> None:
     for collection in ("file_access_logs", "file_shares"):
         for file_id in file_ids:
             try:
-                for mdoc in db.collection(collection).where("file_id", "==", file_id).stream():
+                for mdoc in db.collection(collection).where(filter=FieldFilter("file_id", "==", file_id)).stream():
                     mdoc.reference.delete()
             except Exception as exc:
                 logger.warning(

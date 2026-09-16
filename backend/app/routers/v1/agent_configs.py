@@ -1,3 +1,4 @@
+from google.cloud.firestore_v1.base_query import FieldFilter
 """Agent configuration CRUD router — ``/api/v1/agents``.
 
 Owns the ``agent_configs`` Firestore collection.  Each document stores the
@@ -108,7 +109,7 @@ async def list_agent_configs(
     """Return all agent configurations owned by the current user."""
     docs = (
         db.collection(_COLLECTION)
-        .where("owner_id", "==", current_user.id)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
         .stream()
     )
     results = [_doc_to_response(doc.id, doc.to_dict()) for doc in docs]

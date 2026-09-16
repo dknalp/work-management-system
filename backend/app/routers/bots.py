@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from ..deps import get_current_user
 from ..firebase import get_db
@@ -177,7 +178,7 @@ def delete_bot(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bot not found.")
 
     # Delete associated webhooks
-    wh_docs = db.collection("webhooks").where("bot_id", "==", bot_id).stream()
+    wh_docs = db.collection("webhooks").where(filter=FieldFilter("bot_id", "==", bot_id)).stream()
     for wh_doc in wh_docs:
         wh_doc.reference.delete()
 

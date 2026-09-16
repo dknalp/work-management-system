@@ -90,15 +90,18 @@ async def _cleanup_stale_upload_sessions(db: firestore.Client) -> None:
     """
     cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
     try:
+        # Single-field query only (no composite index needed).
+        # Filter status in Python to avoid requiring a composite Firestore index.
         stale = (
             db.collection("upload_sessions")
-            .where("created_at", "<", cutoff)
-            .where("status", "==", "in_progress")
+            .where(filter=FieldFilter("created_at", "<", cutoff.isoformat()))
             .stream()
         )
         count = 0
         for doc in stale:
             data = doc.to_dict() or {}
+            if data.get("status") != "in_progress":
+                continue
             r2_key = data.get("r2_key")
             r2_upload_id = data.get("r2_upload_id")
             if r2_key and r2_upload_id:
@@ -412,7 +415,7 @@ def _seed_admin_user(db: firestore.Client) -> None:
 
     # Check if any admin already exists to keep this truly idempotent
     existing_admins = list(
-        db.collection("users").where("is_admin", "==", True).limit(1).stream()
+        db.collection("users").where(filter=FieldFilter("is_admin", "==", True)).limit(1).stream()
     )
     if existing_admins:
         return

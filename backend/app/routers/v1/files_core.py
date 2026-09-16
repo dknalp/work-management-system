@@ -16,6 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.deps import Actor, get_current_actor, get_current_user
 from app.firebase import get_db
@@ -70,7 +71,7 @@ def list_files(
     """List non-deleted files/folders at the given directory path."""
     docs = (
         db.collection("file_records")
-        .where("owner_id", "==", current_user.id)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
         .stream()
     )
     result = []
@@ -133,8 +134,8 @@ async def upload_file(
     try:
         _all_owner_docs = (
             db.collection("file_records")
-            .where("owner_id", "==", current_user.id)
-            .where("path", "==", virtual_path)
+            .where(filter=FieldFilter("owner_id", "==", current_user.id))
+            .where(filter=FieldFilter("path", "==", virtual_path))
             .stream()
         )
         existing_docs = [
@@ -500,7 +501,7 @@ def list_starred(
     """Return all non-deleted starred files for the current user."""
     docs = (
         db.collection("file_records")
-        .where("owner_id", "==", current_user.id)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
         .stream()
     )
     result = []
@@ -520,7 +521,7 @@ def list_recent(
     """Return recently accessed files for the current user."""
     logs = sorted(
         db.collection("file_access_logs")
-        .where("user_id", "==", current_user.id)
+        .where(filter=FieldFilter("user_id", "==", current_user.id))
         .limit(limit * 10)
         .stream(),
         key=lambda d: (d.to_dict() or {}).get("accessed_at") or "",
@@ -552,7 +553,7 @@ def get_quota(
     """Return the total used bytes and file count for the current user."""
     docs = (
         db.collection("file_records")
-        .where("owner_id", "==", current_user.id)
+        .where(filter=FieldFilter("owner_id", "==", current_user.id))
         .stream()
     )
     used_bytes = 0
