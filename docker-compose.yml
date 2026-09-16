@@ -1,8 +1,14 @@
+networks:
+  dokploy-network:
+    external: true
+
 services:
   backend:
     build: ./backend
     stop_signal: SIGINT
     stop_grace_period: 10s
+    networks:
+      - dokploy-network
     environment:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3051}
       APP_ENV: ${APP_ENV:-production}
@@ -46,6 +52,8 @@ services:
         NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-}
     depends_on:
       - backend
+    networks:
+      - dokploy-network
     environment:
       NEXT_PUBLIC_MOCK_AUTH: "false"
       # Internal URL used by Next.js rewrites to reach the backend container
