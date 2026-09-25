@@ -11,7 +11,7 @@ RUN groupadd --system --gid 999 appgroup && \
 # Install dependencies as root into system site-packages, then lock down
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 COPY . .
 
