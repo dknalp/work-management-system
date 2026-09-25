@@ -7,14 +7,9 @@ services:
     build: ./backend
     stop_signal: SIGINT
     stop_grace_period: 10s
+    restart: unless-stopped
     networks:
       - dokploy-network
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3052/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
     environment:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3051}
       APP_ENV: ${APP_ENV:-production}
@@ -42,28 +37,18 @@ services:
     build:
       context: ./frontend
       args:
-        # NEXT_PUBLIC_* vars are baked into the JS bundle at build time.
-        # The browser never talks to the backend directly — all API calls go
-        # through Next.js rewrites (/api/* and legacy prefixes → backend:3052).
-        # So NEXT_PUBLIC_API_URL is intentionally left empty here; the
-        # api client defaults to "" which means relative URLs that Next.js proxies.
         NEXT_PUBLIC_API_URL: ""
-        # Uploads use relative URLs (/api/v1/files/upload) which Next.js
-        # proxies to backend:3052. No direct backend URL is ever baked into
-        # the JS bundle — this ensures uploads work from any network/domain.
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
         NEXT_PUBLIC_GOOGLE_PICKER_API_KEY: ${NEXT_PUBLIC_GOOGLE_PICKER_API_KEY:-}
         NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
         NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
         NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-}
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - dokploy-network
     environment:
       NEXT_PUBLIC_MOCK_AUTH: "false"
-      # Internal URL used by Next.js rewrites to reach the backend container
       BACKEND_INTERNAL_URL: http://backend:3052
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
