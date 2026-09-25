@@ -30,14 +30,12 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
+# node:22-alpine ships with a 'node' user (uid 1000) — use it directly
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+RUN chown -R node:node /app
 EXPOSE 3051
 ENV PORT=3051
-# Run as non-root
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 --ingroup nodejs nextjs
-USER nextjs
-
+USER node
 CMD ["node", "server.js"]
