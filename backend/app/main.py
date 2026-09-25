@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from .deps import prewarm_permission_cache
 from .firebase import get_db, initialize_firebase
