@@ -17,10 +17,14 @@ FRONTEND_URL
 """
 
 import logging
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+from .logging_config import configure_logging
+configure_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +79,7 @@ from .routers.v1 import (
     tasks as v1_tasks,
     team as v1_team,
     webhooks as v1_webhooks,
+    logs as v1_logs,
 )
 
 import os
@@ -172,6 +177,30 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def _request_logger(request, call_next):
+    """Log every request with method, path, status, and duration."""
+    start = time.monotonic()
+    response = await call_next(request)
+    duration_ms = round((time.monotonic() - start) * 1000)
+    level = logging.WARNING if response.status_code >= 400 else logging.DEBUG
+    logger.log(
+        level,
+        "%s %s → %d (%dms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status": response.status_code,
+            "duration_ms": duration_ms,
+        },
+    )
+    return response
+
+
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request, exc: Exception):
     """Ensure CORS headers are present on unhandled 500 responses.
@@ -254,6 +283,7 @@ app.include_router(v1_webhooks.router, prefix=_V1)
 app.include_router(v1_chat.router, prefix=_V1)
 app.include_router(v1_presence_mod.router, prefix=_V1)
 app.include_router(v1_presence_mod.ws_router, prefix=_V1)
+app.include_router(v1_logs.router, prefix=_V1)
 
 
 # ── Health check ───────────────────────────────────────────────────────────────

@@ -28,8 +28,10 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       # Local file storage inside the container, backed by a named volume
       FILE_STORAGE_PATH: /data/files
+      LOG_DIR: /data/logs
     volumes:
       - file_storage:/data/files
+      - log_storage:/data/logs
     ports:
       - "3052:3052"
 
@@ -58,3 +60,4 @@ services:
 
 volumes:
   file_storage:
+  log_storage:

@@ -12,6 +12,7 @@ import {
   CheckSquareIcon,
   KeyRoundIcon,
   PlugIcon,
+  ScrollTextIcon,
   SlidersHorizontalIcon,
   UsersIcon,
 } from "lucide-react"
@@ -101,6 +102,23 @@ export default function AdminPage() {
                 <div className="px-5 py-8 text-center text-sm text-muted-foreground">
                   Aktivite geçmişi için{" "}
                   <Link href="/admin/activity" className="text-primary hover:underline">Admin Aktivite</Link>
+                  {" "}sayfasına gidin.
+                </div>
+              </div>
+
+              {/* System Logs card */}
+              <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+                  <h2 className="text-sm font-semibold">Sistem Logları</h2>
+                  <Link href="/admin/logs" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Logları Gör <ArrowRightIcon className="size-3.5" />
+                  </Link>
+                </div>
+                <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+                  Hata ve uyarı logları için{" "}
+                  <Link href="/admin/logs" className="text-primary hover:underline flex-inline items-center gap-1">
+                    <ScrollTextIcon className="size-3.5 inline" /> Sistem Logları
+                  </Link>
                   {" "}sayfasına gidin.
                 </div>
               </div>

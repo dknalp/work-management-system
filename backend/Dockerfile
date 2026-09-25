@@ -5,7 +5,7 @@ WORKDIR /app
 # Create non-root user first (debian slim uses adduser differently from alpine)
 RUN groupadd --system --gid 999 appgroup && \
     useradd --system --uid 999 --gid appgroup --no-create-home appuser && \
-    mkdir -p /data/files && \
+    mkdir -p /data/files /data/logs && \
     chown -R appuser:appgroup /data /app
 
 # Install dependencies as root into system site-packages, then lock down
